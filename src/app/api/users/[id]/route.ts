@@ -9,7 +9,7 @@ import { UserRole } from '@/types';
 // GET /api/users/[id]
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
   await connectDB();
-  const { id } = ctx.params;
+  const { id } = await ctx.params;
 
   const user = await UserModel.findById(id).select('-__v').lean();
   if (!user) {
@@ -23,7 +23,7 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
 export const PATCH = withAuth(
   async (req: NextRequest, ctx, { user: currentUser }) => {
     await connectDB();
-    const { id } = ctx.params;
+    const { id } = await ctx.params;
 
     // Only super_admin can edit others; admins can edit themselves
     if (
@@ -70,7 +70,7 @@ export const PATCH = withAuth(
 export const DELETE = withAuth(
   async (_req: NextRequest, ctx, { user: currentUser }) => {
     await connectDB();
-    const { id } = ctx.params;
+    const { id } = await ctx.params;
 
     if (currentUser._id.toString() === id) {
       return NextResponse.json(

@@ -101,6 +101,7 @@ export async function POST(req: Request) {
         console.warn(`[Webhook] User ${id} not found for deactivation.`);
       }
     } catch (dbError) {
+      console.error('[Webhook DB Error]', dbError);
       return new Response('Database Error', { status: 500 });
     }
   }

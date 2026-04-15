@@ -81,7 +81,7 @@ export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
         {/* User */}
         <div className="p-4 border-t border-gray-200">
           <div className="flex items-center gap-3">
-            <UserButton afterSignOutUrl="/sign-in" />
+            <UserButton />
             <div className="min-w-0">
               <p className="text-xs font-medium text-gray-900 truncate">Account</p>
               <p className="text-[10px] text-gray-500 font-mono truncate">Settings</p>

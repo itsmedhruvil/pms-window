@@ -18,7 +18,7 @@ export default async function ProjectsPage() {
     getAlerts({ isAdmin, department: user.department, limit: 100 }),
   ]);
 
-  const projects = serialize(rawProjects) as IProject[];
+  const projects = serialize(rawProjects) as unknown as IProject[];
   const activeAlertCount = rawAlerts.filter(
     (a: { status: string }) => a.status === AlertStatus.ACTIVE
   ).length;

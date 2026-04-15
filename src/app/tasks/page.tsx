@@ -24,7 +24,7 @@ export default async function TasksPage() {
     getAlerts({ isAdmin, department: user.department, limit: 100 }),
   ]);
 
-  const tasks = serialize(rawTasks) as ITask[];
+  const tasks = serialize(rawTasks) as unknown as ITask[];
   const activeAlertCount = rawAlerts.filter(
     (a: { status: string }) => a.status === AlertStatus.ACTIVE
   ).length;

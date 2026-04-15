@@ -20,7 +20,7 @@ export default async function UsersPage() {
     getAlerts({ isAdmin, limit: 100 }),
   ]);
 
-  const users = serialize(rawUsers) as IUser[];
+  const users = serialize(rawUsers) as unknown as IUser[];
   const activeAlertCount = rawAlerts.filter(
     (a: { status: string }) => a.status === AlertStatus.ACTIVE
   ).length;

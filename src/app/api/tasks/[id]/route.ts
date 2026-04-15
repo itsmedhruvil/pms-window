@@ -15,7 +15,8 @@ import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 // GET /api/tasks/[id]
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
   await connectDB();
-  const task = await TaskModel.findById(ctx.params.id)
+  const params = await ctx.params;
+  const task = await TaskModel.findById(params.id)
     .populate('assignedUser', 'name email department avatar')
     .populate('dependencyTaskId', 'title status department sequence')
     .lean();
@@ -31,7 +32,7 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
 export const PATCH = withAuth(async (req: NextRequest, ctx, { user }) => {
   await connectDB();
 
-  const { id } = ctx.params;
+  const { id } = await ctx.params;
   const task = await TaskModel.findById(id);
 
   if (!task) {
