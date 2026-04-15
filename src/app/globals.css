@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    font-size: 16px;
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --font-mono: 'Inter', system-ui, sans-serif;
+  }
+
+  * {
+    @apply box-border;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    @apply text-gray-900 bg-white;
+  }
+
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+@layer components {
+  /* ERP dense card style */
+  .erp-card {
+    @apply border border-gray-200 bg-white;
+  }
+
+  /* Status pulse for alerts */
+  .alert-pulse {
+    @apply animate-pulse;
+  }
+
+  /* Locked task overlay */
+  .task-locked {
+    @apply opacity-50 pointer-events-none;
+  }
+
+  /* Dense table */
+  .erp-table {
+    @apply w-full text-xs font-mono border-collapse;
+  }
+
+  .erp-table th {
+    @apply px-3 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-gray-500 border-b border-gray-200 bg-gray-50;
+  }
+
+  .erp-table td {
+    @apply px-3 py-2.5 border-b border-gray-100;
+  }
+
+  .erp-table tr:hover td {
+    @apply bg-gray-50;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-200 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+}
+
+/* Alert border pulse for blocked/on-hold items */
+@keyframes alert-border {
+  0%, 100% { border-color: rgb(252, 165, 165); }
+  50% { border-color: rgb(239, 68, 68); }
+}
+
+.alert-border-pulse {
+  animation: alert-border 2s ease-in-out infinite;
+}

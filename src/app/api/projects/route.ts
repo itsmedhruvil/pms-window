@@ -1,0 +1,147 @@
+import { NextRequest, NextResponse } from 'next/server';
+import connectDB from '@/lib/db';
+import ProjectModel from '@/models/Project';
+import { withAuth } from '@/lib/auth';
+import { CreateProjectSchema, ProjectFiltersSchema } from '@/lib/validations';
+import { generateProjectTasks } from '@/lib/workflow';
+import { ProjectStatus, UserRole } from '@/types';
+import mongoose from 'mongoose';
+import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
+import { createSystemLog } from '@/lib/workflow';
+
+// GET /api/projects - List projects with filters
+export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
+  await connectDB();
+
+  const searchParams = Object.fromEntries(req.nextUrl.searchParams);
+  const filters = ProjectFiltersSchema.safeParse(searchParams);
+
+  if (!filters.success) {
+    return NextResponse.json(
+      { success: false, error: filters.error.flatten() },
+      { status: 400 }
+    );
+  }
+
+  const { status, priority, search, page, limit } = filters.data;
+  const skip = (page - 1) * limit;
+
+  // Build query
+  const query: Record<string, unknown> = {};
+
+  if (status) query.status = status;
+  if (priority) query.priority = priority;
+  if (search) {
+    query.$or = [
+      { clientName: { $regex: search, $options: 'i' } },
+      { projectTitle: { $regex: search, $options: 'i' } },
+    ];
+  }
+
+  // Department users only see assigned projects
+  if (user.role === UserRole.DEPARTMENT_USER) {
+    query.assignedUsers = user._id;
+  }
+
+  const [items, total] = await Promise.all([
+    ProjectModel.find(query)
+      .sort({ priority: -1, deadline: 1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('createdBy', 'name email department')
+      .lean(),
+    ProjectModel.countDocuments(query),
+  ]);
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  });
+});
+
+// POST /api/projects - Create project
+export const POST = withAuth(
+  async (req: NextRequest, _ctx, { user }) => {
+    await connectDB();
+
+    const body = await req.json();
+    const parsed = CreateProjectSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const projectData = parsed.data;
+
+    // Validate total windows matches specs
+    const specTotal = projectData.windowSpecifications.reduce(
+      (sum, spec) => sum + spec.quantity,
+      0
+    );
+    if (specTotal !== projectData.totalWindows) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Total windows (${projectData.totalWindows}) must match sum of specifications (${specTotal})`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const [project] = await ProjectModel.create(
+        [
+          {
+            ...projectData,
+            createdBy: user._id,
+            status: ProjectStatus.NEW,
+            completionPercentage: 0,
+          },
+        ],
+        { session }
+      );
+
+      // Auto-generate workflow tasks
+      await generateProjectTasks(project._id, user._id);
+
+      // Create system log
+      await createSystemLog({
+        content: `Project "${project.projectTitle}" created for ${project.clientName}. Workflow tasks auto-generated.`,
+        authorId: user._id.toString(),
+      });
+
+      await session.commitTransaction();
+
+      // Notify all
+      await triggerEvent(CHANNELS.global, EVENTS.PROJECT_STATUS_CHANGED, {
+        projectId: project._id,
+        status: project.status,
+        action: 'created',
+      });
+
+      const populated = await ProjectModel.findById(project._id)
+        .populate('createdBy', 'name email department')
+        .lean();
+
+      return NextResponse.json({ success: true, data: populated }, { status: 201 });
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  },
+  [UserRole.SUPER_ADMIN, UserRole.ADMIN]
+);

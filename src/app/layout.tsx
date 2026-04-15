@@ -1,0 +1,18 @@
+import type { Metadata } from 'next';
+import ClerkAppProvider from '@/components/ClerkAppProvider';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'Window ERP — Manufacturing Operations',
+  description: 'Production-grade ERP system for window manufacturing operations',
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body className="antialiased">
+        <ClerkAppProvider>{children}</ClerkAppProvider>
+      </body>
+    </html>
+  );
+}

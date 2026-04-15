@@ -1,0 +1,255 @@
+import mongoose from 'mongoose';
+import TaskModel from '@/models/Task';
+import ProjectModel from '@/models/Project';
+import AlertModel from '@/models/Alert';
+import CommentModel from '@/models/Comment';
+import {
+  Department,
+  TaskStatus,
+  ProjectStatus,
+  AlertStatus,
+  DEPARTMENT_SEQUENCE,
+  DEFAULT_TASKS_PER_DEPARTMENT,
+} from '@/types';
+import { triggerEvent, CHANNELS, EVENTS } from './pusher';
+
+/**
+ * Generate all workflow tasks for a new project
+ * Respects department sequence and creates dependency chain
+ */
+export async function generateProjectTasks(
+  projectId: mongoose.Types.ObjectId,
+  createdByUserId: mongoose.Types.ObjectId
+): Promise<void> {
+  const tasks = [];
+  let globalSequence = 0;
+  let previousDeptLastTaskId: mongoose.Types.ObjectId | null = null;
+
+  for (const dept of DEPARTMENT_SEQUENCE) {
+    const deptTasks = DEFAULT_TASKS_PER_DEPARTMENT[dept];
+    let previousTaskIdInDept: mongoose.Types.ObjectId | null = null;
+
+    for (let i = 0; i < deptTasks.length; i++) {
+      const taskData = deptTasks[i];
+      const taskId = new mongoose.Types.ObjectId();
+
+      // Determine dependency:
+      // First task of a department depends on last task of previous department
+      // Subsequent tasks in same dept depend on previous task in same dept
+      let dependencyTaskId: mongoose.Types.ObjectId | null = null;
+      if (i === 0 && previousDeptLastTaskId) {
+        dependencyTaskId = previousDeptLastTaskId;
+      } else if (i > 0 && previousTaskIdInDept) {
+        dependencyTaskId = previousTaskIdInDept;
+      }
+
+      const isLocked = dependencyTaskId !== null;
+
+      tasks.push({
+        _id: taskId,
+        projectId,
+        department: dept,
+        title: taskData.title,
+        description: taskData.description,
+        status: isLocked ? TaskStatus.TODO : TaskStatus.TODO,
+        dependencyTaskId,
+        isLocked,
+        sequence: globalSequence++,
+      });
+
+      previousTaskIdInDept = taskId;
+    }
+
+    previousDeptLastTaskId = previousTaskIdInDept;
+  }
+
+  await TaskModel.insertMany(tasks);
+
+  // Log system comment
+  await CommentModel.create({
+    taskId: tasks[0]._id,
+    content: `Project workflow initialized. ${tasks.length} tasks created across ${DEPARTMENT_SEQUENCE.length} departments.`,
+    author: createdByUserId,
+    isSystemLog: true,
+  });
+}
+
+/**
+ * Check and unlock tasks whose dependencies are now met
+ */
+export async function unlockDependentTasks(completedTaskId: string): Promise<void> {
+  const dependentTasks = await TaskModel.find({
+    dependencyTaskId: completedTaskId,
+    isLocked: true,
+  });
+
+  for (const task of dependentTasks) {
+    task.isLocked = false;
+    if (task.status === TaskStatus.BLOCKED) {
+      task.status = TaskStatus.TODO;
+    }
+    await task.save();
+
+    await triggerEvent(CHANNELS.project(task.projectId.toString()), EVENTS.TASK_UPDATED, {
+      taskId: task._id,
+      status: task.status,
+      isLocked: false,
+    });
+  }
+}
+
+/**
+ * Update project completion percentage based on task status
+ */
+export async function updateProjectCompletion(projectId: string): Promise<void> {
+  const tasks = await TaskModel.find({ projectId });
+  if (tasks.length === 0) return;
+
+  const doneTasks = tasks.filter((t) => t.status === TaskStatus.DONE).length;
+  const completionPercentage = Math.round((doneTasks / tasks.length) * 100);
+
+  const project = await ProjectModel.findById(projectId);
+  if (!project) return;
+
+  project.completionPercentage = completionPercentage;
+
+  // Auto-complete project if all tasks done
+  if (completionPercentage === 100 && project.status === ProjectStatus.IN_PRODUCTION) {
+    project.status = ProjectStatus.COMPLETED;
+  }
+
+  await project.save();
+
+  await triggerEvent(CHANNELS.project(projectId), EVENTS.PROJECT_STATUS_CHANGED, {
+    projectId,
+    status: project.status,
+    completionPercentage,
+  });
+}
+
+/**
+ * Apply alert effects: put project on hold, block affected tasks
+ */
+export async function applyAlertEffects(alertId: string): Promise<void> {
+  const alert = await AlertModel.findById(alertId).populate('projectId');
+  if (!alert) return;
+
+  // Put project on hold
+  await ProjectModel.findByIdAndUpdate(alert.projectId, {
+    status: ProjectStatus.ON_HOLD,
+    $addToSet: { activeAlertIds: alert._id },
+  });
+
+  // Block tasks in affected departments
+  await TaskModel.updateMany(
+    {
+      projectId: alert.projectId,
+      department: { $in: alert.affectedDepartments },
+      status: { $in: [TaskStatus.TODO, TaskStatus.IN_PROGRESS] },
+    },
+    { $set: { status: TaskStatus.BLOCKED } }
+  );
+
+  // Global notification
+  await triggerEvent(CHANNELS.global, EVENTS.ALERT_CREATED, {
+    alertId: alert._id,
+    projectId: alert.projectId,
+    severity: alert.severity,
+    type: alert.type,
+  });
+}
+
+/**
+ * Resolve alert effects: restore project, unblock tasks
+ */
+export async function resolveAlertEffects(alertId: string): Promise<void> {
+  const alert = await AlertModel.findById(alertId);
+  if (!alert) return;
+
+  // Remove from project's active alerts
+  await ProjectModel.findByIdAndUpdate(alert.projectId, {
+    $pull: { activeAlertIds: alert._id },
+  });
+
+  // Check if any other active alerts exist
+  const remainingAlerts = await AlertModel.countDocuments({
+    projectId: alert.projectId,
+    status: AlertStatus.ACTIVE,
+  });
+
+  if (remainingAlerts === 0) {
+    // Restore project status
+    await ProjectModel.findByIdAndUpdate(alert.projectId, {
+      status: ProjectStatus.IN_PRODUCTION,
+    });
+
+    // Unblock tasks (restore them to TODO or their previous status)
+    await TaskModel.updateMany(
+      {
+        projectId: alert.projectId,
+        status: TaskStatus.BLOCKED,
+        isLocked: false, // Only unblock tasks that aren't dependency-locked
+      },
+      { $set: { status: TaskStatus.TODO } }
+    );
+  }
+
+  await triggerEvent(CHANNELS.project(alert.projectId.toString()), EVENTS.ALERT_UPDATED, {
+    alertId: alert._id,
+    status: AlertStatus.RESOLVED,
+  });
+}
+
+/**
+ * Validate task status transition
+ */
+export function validateTaskTransition(
+  currentStatus: TaskStatus,
+  newStatus: TaskStatus,
+  isLocked: boolean
+): { valid: boolean; reason?: string } {
+  if (isLocked) {
+    return { valid: false, reason: 'Task is locked. Complete dependent tasks first.' };
+  }
+
+  if (currentStatus === TaskStatus.BLOCKED) {
+    return { valid: false, reason: 'Task is blocked by an active alert.' };
+  }
+
+  const allowedTransitions: Record<TaskStatus, TaskStatus[]> = {
+    [TaskStatus.TODO]: [TaskStatus.IN_PROGRESS],
+    [TaskStatus.IN_PROGRESS]: [TaskStatus.DONE, TaskStatus.TODO],
+    [TaskStatus.BLOCKED]: [], // Cannot transition from blocked
+    [TaskStatus.DONE]: [], // Cannot un-complete
+  };
+
+  if (!allowedTransitions[currentStatus].includes(newStatus)) {
+    return {
+      valid: false,
+      reason: `Cannot transition from ${currentStatus} to ${newStatus}`,
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Create system log comment
+ */
+export async function createSystemLog(
+  options: {
+    taskId?: string;
+    alertId?: string;
+    content: string;
+    authorId: string;
+  }
+): Promise<void> {
+  await CommentModel.create({
+    taskId: options.taskId,
+    alertId: options.alertId,
+    content: options.content,
+    author: options.authorId,
+    isSystemLog: true,
+    mentions: [],
+  });
+}
