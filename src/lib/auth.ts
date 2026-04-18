@@ -1,4 +1,3 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import UserModel from "@/models/User";
@@ -25,25 +24,26 @@ export function withAuth(handler: ApiHandler, requiredRoles?: UserRole[]) {
     context: { params: Promise<Record<string, string>> },
   ) => {
     try {
-      const { userId } = await auth();
-      if (!userId) {
+      const user = await getCurrentUser();
+      if (!user) {
         return NextResponse.json(
           { success: false, error: "Unauthorized" },
           { status: 401 },
         );
       }
+      const userId = user.clerkId;
 
       await connectDB();
-      const user = await UserModel.findOne({ clerkId: userId });
+      const dbUser = await UserModel.findOne({ clerkId: userId });
 
-      if (!user) {
+      if (!dbUser) {
         return NextResponse.json(
           { success: false, error: "User not found in system" },
           { status: 403 },
         );
       }
 
-      if (!user.isActive) {
+      if (!dbUser.isActive) {
         return NextResponse.json(
           { success: false, error: "Account is deactivated" },
           { status: 403 },
@@ -96,11 +96,14 @@ export const MAIN_ADMIN_EMAIL = 'corp.weexalate@gmail.com';
 
 export async function getCurrentUser(): Promise<IUserDocument | null> {
   try {
-    const clerkUser = await currentUser();
+    const { clerkClient, auth } = await import("@clerk/nextjs/server");
+    const clerkUser = await auth();
     if (!clerkUser) return null;
 
     await connectDB();
-    let user = await UserModel.findOne({ clerkId: clerkUser.id });
+    const client = await clerkClient();
+    const clerkUserData = await client.users.getUser(clerkUser.userId);
+    let user = await UserModel.findOne({ clerkId: clerkUserData.id });
     
     if (!user) {
       console.log(`[JIT Sync] User ${clerkUser.id} authenticated but not in DB. Creating record...`);

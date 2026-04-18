@@ -177,22 +177,23 @@ export async function resolveAlertEffects(alertId: string): Promise<void> {
     status: AlertStatus.ACTIVE,
   });
 
-  if (remainingAlerts === 0) {
-    // Restore project status
-    await ProjectModel.findByIdAndUpdate(alert.projectId, {
-      status: ProjectStatus.IN_PRODUCTION,
-    });
+    if (remainingAlerts === 0) {
+      // Restore project status
+      await ProjectModel.findByIdAndUpdate(alert.projectId, {
+        status: ProjectStatus.IN_PRODUCTION,
+      });
 
-    // Unblock tasks (restore them to TODO or their previous status)
-    await TaskModel.updateMany(
-      {
-        projectId: alert.projectId,
-        status: TaskStatus.BLOCKED,
-        isLocked: false, // Only unblock tasks that aren't dependency-locked
-      },
-      { $set: { status: TaskStatus.TODO } }
-    );
-  }
+      // Unblock ALL tasks that were blocked by alert
+      // - Unlocked tasks go back to TODO
+      // - Locked tasks stay locked but no longer blocked (go back to TODO)
+      await TaskModel.updateMany(
+        {
+          projectId: alert.projectId,
+          status: TaskStatus.BLOCKED,
+        },
+        { $set: { status: TaskStatus.TODO } }
+      );
+    }
 
   await triggerEvent(CHANNELS.project(alert.projectId.toString()), EVENTS.ALERT_UPDATED, {
     alertId: alert._id,

@@ -36,7 +36,7 @@ export function AlertSidebar({ alerts, onAlertAction, currentUserId, isAdmin }: 
   if (activeAlerts.length === 0) return null;
 
   return (
-    <div className="fixed right-0 top-16 h-[calc(100vh-4rem)] w-80 border-l border-gray-200 bg-white z-40 flex flex-col overflow-hidden">
+    <div className="fixed right-0 top-16 h-[calc(100vh-4rem)] w-80 border-l border-gray-200 bg-white z-50 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-red-100 bg-red-50">
         <div className="flex items-center gap-2">

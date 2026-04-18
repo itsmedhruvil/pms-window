@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import TaskModel from '@/models/Task';
+import CommentModel from '@/models/Comment';
 import { withAuth, canModifyTask } from '@/lib/auth';
 import { UpdateTaskSchema } from '@/lib/validations';
-import { TaskStatus } from '@/types';
+import { TaskStatus, UserRole } from '@/types';
 import {
   validateTaskTransition,
   unlockDependentTasks,
@@ -98,3 +99,43 @@ export const PATCH = withAuth(async (req: NextRequest, ctx, { user }) => {
 
   return NextResponse.json({ success: true, data: updated });
 });
+
+// DELETE /api/tasks/[id]
+export const DELETE = withAuth(
+  async (_req: NextRequest, ctx, { user }) => {
+    await connectDB();
+    const params = await ctx.params;
+    const { id } = params;
+
+    const task = await TaskModel.findById(id);
+    if (!task) {
+      return NextResponse.json({ success: false, error: 'Task not found' }, { status: 404 });
+    }
+
+    if (!canModifyTask(user, task.department)) {
+      return NextResponse.json(
+        { success: false, error: 'You cannot delete tasks outside your department' },
+        { status: 403 }
+      );
+    }
+
+    const projectId = task.projectId;
+
+    // Delete task and all related comments
+    await CommentModel.deleteMany({ taskId: id });
+    await TaskModel.findByIdAndDelete(id);
+
+    // Update project completion percentage
+    await updateProjectCompletion(projectId.toString());
+
+    // Trigger realtime event
+    await triggerEvent(
+      CHANNELS.project(projectId.toString()),
+      EVENTS.TASK_UPDATED,
+      { taskId: id, deleted: true }
+    );
+
+    return NextResponse.json({ success: true, message: 'Task deleted' });
+  },
+  [UserRole.SUPER_ADMIN, UserRole.ADMIN]
+);
