@@ -21,23 +21,32 @@ export function cn(...inputs: ClassValue[]) {
 // ============================================================
 
 export function formatDate(date: Date | string): string {
-  return format(new Date(date), 'MMM d, yyyy');
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return 'No date';
+  return format(parsed, 'MMM d, yyyy');
 }
 
 export function formatDateTime(date: Date | string): string {
-  return format(new Date(date), 'MMM d, yyyy · HH:mm');
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return 'No date';
+  return format(parsed, 'MMM d, yyyy · HH:mm');
 }
 
 export function timeAgo(date: Date | string): string {
-  return formatDistanceToNow(new Date(date), { addSuffix: true });
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return 'unknown time';
+  return formatDistanceToNow(parsed, { addSuffix: true });
 }
 
 export function isOverdue(deadline: Date | string): boolean {
-  return isBefore(new Date(deadline), new Date());
+  const parsed = new Date(deadline);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return isBefore(parsed, new Date());
 }
 
 export function isDueSoon(deadline: Date | string, daysThreshold = 3): boolean {
   const d = new Date(deadline);
+  if (Number.isNaN(d.getTime())) return false;
   return isAfter(d, new Date()) && isBefore(d, addDays(new Date(), daysThreshold));
 }
 

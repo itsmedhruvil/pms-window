@@ -1,23 +1,5 @@
-import Pusher from 'pusher';
-import PusherJS from 'pusher-js';
-
-// Server-side Pusher instance
-let pusherServer: Pusher | null = null;
-
-export function getPusherServer(): Pusher {
-  if (!pusherServer) {
-pusherServer = new Pusher({
-  appId: process.env.PUSHER_APP_ID || 'your_app_id',
-  key: process.env.NEXT_PUBLIC_PUSHER_KEY || 'your_pusher_key',
-  secret: process.env.PUSHER_SECRET || 'your_pusher_secret',
-  cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'ap2',
-  useTLS: true,
-});
-  }
-  return pusherServer;
-}
-
-// Channel naming conventions
+// Realtime is temporarily disabled. Keep these names exported so callers can
+// continue to describe events without depending on a provider.
 export const CHANNELS = {
   project: (projectId: string) => `project-${projectId}`,
   global: 'erp-global',
@@ -33,19 +15,10 @@ export const EVENTS = {
   COMMENT_ADDED: 'comment_added',
 };
 
-// Trigger helper
-export async function triggerEvent(channel: string, event: string, data: unknown): Promise<void> {
-  try {
-    const pusher = getPusherServer();
-    await pusher.trigger(channel, event, data);
-  } catch (error) {
-    console.error('[Pusher Error]', error);
-  }
-}
-
-// Client-side hook helper
-export function createPusherClient(): PusherJS {
-  return new PusherJS(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-    cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-  });
+export async function triggerEvent(
+  _channel: string,
+  _event: string,
+  _data: unknown,
+): Promise<void> {
+  return Promise.resolve();
 }

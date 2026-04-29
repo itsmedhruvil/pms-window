@@ -237,7 +237,6 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
           projectTitle={project.projectTitle}
           onSuccess={() => {
             setAlertModalOpen(false);
-            // Alerts will arrive via Pusher — no manual refetch needed
           }}
           onCancel={() => setAlertModalOpen(false)}
         />
