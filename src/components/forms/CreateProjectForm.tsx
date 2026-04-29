@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Trash2, AlertCircle, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 import { cn, apiFetch } from '@/lib/utils';
-import { ProjectPriority, Department } from '@/types';
+import { ProjectPriority } from '@/types';
 import type { WindowSpec } from '@/types';
 
 const PRIORITIES = [

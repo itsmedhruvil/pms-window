@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Play, CheckCircle2, Truck, AlertTriangle } from 'lucide-react';
-import { cn, PROJECT_STATUS_LABEL, apiFetch } from '@/lib/utils';
+import { cn, apiFetch } from '@/lib/utils';
 import { ProjectStatus } from '@/types';
 import type { IProject } from '@/types';
 

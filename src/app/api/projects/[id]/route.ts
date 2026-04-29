@@ -8,7 +8,7 @@ import { UpdateProjectSchema } from '@/lib/validations';
 import { UserRole, ProjectStatus } from '@/types';
 
 // GET /api/projects/[id]
-export const GET = withAuth(async (_req: NextRequest, ctx, { user }) => {
+export const GET = withAuth(async (_req: NextRequest, ctx) => {
   await connectDB();
 
   const params = await ctx.params;
@@ -43,7 +43,7 @@ export const GET = withAuth(async (_req: NextRequest, ctx, { user }) => {
 
 // PATCH /api/projects/[id]
 export const PATCH = withAuth(
-  async (req: NextRequest, ctx, { user }) => {
+  async (req: NextRequest, ctx) => {
     await connectDB();
     const params = await ctx.params;
     const { id } = params;
@@ -66,8 +66,6 @@ export const PATCH = withAuth(
     // Validate status transitions
     if (parsed.data.status) {
       const newStatus = parsed.data.status;
-      const currentStatus = project.status;
-
       // Cannot complete if tasks are pending
       if (newStatus === ProjectStatus.COMPLETED) {
         const incompleteTasks = await TaskModel.countDocuments({

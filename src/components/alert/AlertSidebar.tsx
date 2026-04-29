@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
-import { cn, ALERT_TYPE_LABEL, formatDateTime, timeAgo, apiFetch } from '@/lib/utils';
+import { cn, ALERT_TYPE_LABEL, timeAgo, apiFetch } from '@/lib/utils';
 import { AlertSeverityBadge, AlertStatusBadge } from '@/components/ui/badges';
 import type { IAlert } from '@/types';
 import { AlertStatus } from '@/types';

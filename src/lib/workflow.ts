@@ -4,7 +4,6 @@ import ProjectModel from '@/models/Project';
 import AlertModel from '@/models/Alert';
 import CommentModel from '@/models/Comment';
 import {
-  Department,
   TaskStatus,
   ProjectStatus,
   AlertStatus,
@@ -99,6 +98,56 @@ export async function unlockDependentTasks(completedTaskId: string): Promise<voi
 }
 
 /**
+ * Repair stale blocked tasks by comparing them with unresolved alerts.
+ * This keeps older data sane if an alert was resolved before unblock logic ran.
+ */
+export async function reconcileBlockedTasksWithAlerts(projectId?: string): Promise<void> {
+  const projectIds = projectId
+    ? [new mongoose.Types.ObjectId(projectId)]
+    : await TaskModel.distinct('projectId', { status: TaskStatus.BLOCKED });
+
+  await Promise.all(
+    projectIds.map(async (id) => {
+      const openAlerts = await AlertModel.find({
+        projectId: id,
+        status: { $ne: AlertStatus.RESOLVED },
+      })
+        .select('_id affectedDepartments')
+        .lean();
+
+      if (openAlerts.length === 0) {
+        await Promise.all([
+          TaskModel.updateMany(
+            { projectId: id, status: TaskStatus.BLOCKED },
+            { $set: { status: TaskStatus.TODO } }
+          ),
+          ProjectModel.findByIdAndUpdate(id, { $set: { activeAlertIds: [] } }),
+        ]);
+        return;
+      }
+
+      const blockedDepartments = [
+        ...new Set(openAlerts.flatMap((alert) => alert.affectedDepartments)),
+      ];
+
+      await Promise.all([
+        TaskModel.updateMany(
+          {
+            projectId: id,
+            status: TaskStatus.BLOCKED,
+            department: { $nin: blockedDepartments },
+          },
+          { $set: { status: TaskStatus.TODO } }
+        ),
+        ProjectModel.findByIdAndUpdate(id, {
+          $set: { activeAlertIds: openAlerts.map((alert) => alert._id) },
+        }),
+      ]);
+    })
+  );
+}
+
+/**
  * Update project completion percentage based on task status
  */
 export async function updateProjectCompletion(projectId: string): Promise<void> {
@@ -171,29 +220,20 @@ export async function resolveAlertEffects(alertId: string): Promise<void> {
     $pull: { activeAlertIds: alert._id },
   });
 
-  // Check if any other active alerts exist
+  // Check if any other unresolved alerts exist
   const remainingAlerts = await AlertModel.countDocuments({
     projectId: alert.projectId,
-    status: AlertStatus.ACTIVE,
+    status: { $ne: AlertStatus.RESOLVED },
   });
 
-    if (remainingAlerts === 0) {
-      // Restore project status
-      await ProjectModel.findByIdAndUpdate(alert.projectId, {
-        status: ProjectStatus.IN_PRODUCTION,
-      });
+  if (remainingAlerts === 0) {
+    // Restore project status
+    await ProjectModel.findByIdAndUpdate(alert.projectId, {
+      status: ProjectStatus.IN_PRODUCTION,
+    });
+  }
 
-      // Unblock ALL tasks that were blocked by alert
-      // - Unlocked tasks go back to TODO
-      // - Locked tasks stay locked but no longer blocked (go back to TODO)
-      await TaskModel.updateMany(
-        {
-          projectId: alert.projectId,
-          status: TaskStatus.BLOCKED,
-        },
-        { $set: { status: TaskStatus.TODO } }
-      );
-    }
+  await reconcileBlockedTasksWithAlerts(alert.projectId.toString());
 
   await triggerEvent(CHANNELS.project(alert.projectId.toString()), EVENTS.ALERT_UPDATED, {
     alertId: alert._id,

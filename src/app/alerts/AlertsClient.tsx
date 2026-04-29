@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/badges';
 import { CommentThread } from '@/components/comment/CommentThread';
 import { useGlobalAlerts } from '@/hooks/useRealtime';
-import type { IAlert, IUser } from '@/types';
+import type { IAlert } from '@/types';
 import { AlertStatus, AlertType, Department } from '@/types';
 
 interface AlertsClientProps {

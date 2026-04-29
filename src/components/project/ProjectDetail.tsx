@@ -2,8 +2,8 @@
 
 import { useState, useCallback } from 'react';
 import {
-  AlertTriangle, Calendar, User, Package, ChevronRight,
-  CheckCircle2, Circle
+  AlertTriangle, Calendar, Package, ChevronRight,
+  CheckCircle2
 } from 'lucide-react';
 import { cn, DEPARTMENT_LABELS, formatDate, timeAgo, ALERT_TYPE_LABEL } from '@/lib/utils';
 import {
@@ -47,7 +47,7 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
     onAlertUpdated: useCallback((updatedAlert: IAlert) => {
       setAlerts((prev) => prev.map((a) => a._id === updatedAlert._id ? updatedAlert : a));
     }, []),
-    onProjectStatusChanged: useCallback((data: { projectId: string; status: typeof project.status; completionPercentage?: number }) => {
+    onProjectStatusChanged: useCallback((data: { projectId: string; status: IProject['status']; completionPercentage?: number }) => {
       setProject((prev) => ({
         ...prev,
         status: data.status,
@@ -56,7 +56,7 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
     }, []),
   });
 
-  const activeAlerts = alerts.filter((a) => a.status === AlertStatus.ACTIVE);
+  const activeAlerts = alerts.filter((a) => a.status !== AlertStatus.RESOLVED);
   const completedTasks = tasks.filter((t) => t.status === TaskStatus.DONE).length;
   const hasActiveAlerts = activeAlerts.length > 0;
 
@@ -77,7 +77,7 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
         <div className="bg-red-600 text-white px-6 py-2 flex items-center gap-3">
           <AlertTriangle className="w-4 h-4 animate-pulse" />
           <span className="text-sm font-mono font-bold">
-            {activeAlerts.length} ACTIVE ALERT{activeAlerts.length > 1 ? 'S' : ''} — PROJECT ON HOLD
+            {activeAlerts.length} OPEN ALERT{activeAlerts.length > 1 ? 'S' : ''} - PROJECT ON HOLD
           </span>
         </div>
       )}
@@ -210,7 +210,7 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
           </div>
         )}
         {activeTab === 'alerts' && (
-          <AlertsTab alerts={alerts} projectId={project._id} isAdmin={isAdmin} />
+          <AlertsTab alerts={alerts} />
         )}
         {activeTab === 'timeline' && (
           <WorkflowTimeline tasks={tasks} />
@@ -320,7 +320,7 @@ function OverviewTab({ project, tasks, alerts }: { project: IProject; tasks: ITa
   );
 }
 
-function AlertsTab({ alerts, projectId, isAdmin }: { alerts: IAlert[]; projectId: string; isAdmin: boolean }) {
+function AlertsTab({ alerts }: { alerts: IAlert[] }) {
   return (
     <div className="space-y-4 max-w-3xl">
       {alerts.length === 0 && (
@@ -388,7 +388,7 @@ function WorkflowTimeline({ tasks }: { tasks: ITask[] }) {
               </span>
             </div>
             <div className="divide-y divide-gray-100">
-              {deptTasks.map((task, taskIdx) => (
+              {deptTasks.map((task) => (
                 <div key={task._id} className={cn(
                   'flex items-center gap-3 px-4 py-3',
                   task.isLocked && 'opacity-50'

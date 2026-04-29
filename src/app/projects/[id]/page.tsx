@@ -8,8 +8,8 @@ import type { IProject, ITask, IAlert } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ProjectDetailPage(props: { params: any }) {
-  const { params } = props;
+export default async function ProjectDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await getCurrentUser();
   if (!user) redirect('/sign-in');
 

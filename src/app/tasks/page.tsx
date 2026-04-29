@@ -4,7 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { TasksClient } from './TasksClient';
 import { getTasks, getAlerts, serialize } from '@/lib/server-data';
 import { UserRole, AlertStatus } from '@/types';
-import type { ITask, IAlert } from '@/types';
+import type { ITask } from '@/types';
 
 export const dynamic = 'force-dynamic';
 

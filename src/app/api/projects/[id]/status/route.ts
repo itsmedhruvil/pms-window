@@ -75,17 +75,17 @@ export const POST = withAuth(
       }
     }
 
-    // Guard: cannot start production if active alerts
+    // Guard: cannot start production if unresolved alerts
     if (newStatus === ProjectStatus.IN_PRODUCTION) {
-      const activeAlerts = await AlertModel.countDocuments({
+      const openAlerts = await AlertModel.countDocuments({
         projectId: id,
-        status: AlertStatus.ACTIVE,
+        status: { $ne: AlertStatus.RESOLVED },
       });
-      if (activeAlerts > 0) {
+      if (openAlerts > 0) {
         return NextResponse.json(
           {
             success: false,
-            error: `Cannot resume production: ${activeAlerts} active alert(s) must be resolved first`,
+            error: `Cannot resume production: ${openAlerts} unresolved alert(s) must be resolved first`,
           },
           { status: 400 }
         );

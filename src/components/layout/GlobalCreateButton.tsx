@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, FolderPlus, ClipboardList, AlertTriangle, X } from 'lucide-react';
 import { apiFetch, cn } from '@/lib/utils';
 import { CreateProjectForm } from '@/components/forms/CreateProjectForm';
@@ -57,11 +57,6 @@ export function GlobalCreateButton() {
       mounted = false;
     };
   }, [open, section, projects.length]);
-
-  const activeSection = useMemo(
-    () => SECTIONS.find((item) => item.id === section) ?? SECTIONS[0],
-    [section]
-  );
 
   const closeAll = () => {
     setOpen(false);

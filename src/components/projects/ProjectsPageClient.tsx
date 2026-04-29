@@ -8,7 +8,6 @@ import { CreateProjectForm } from '@/components/forms/CreateProjectForm';
 import { ProjectStatusBadge, PriorityBadge } from '@/components/ui/badges';
 import { formatDate, isOverdue, isDueSoon, cn } from '@/lib/utils';
 import { Modal } from '@/components/ui/Modal';
-import { UserRole, AlertStatus } from '@/types';
 import type { IProject } from '@/types';
 
 interface ProjectsPageClientProps {

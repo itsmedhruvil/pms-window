@@ -5,12 +5,13 @@ import { withAuth } from '@/lib/auth';
 import { AlertStatus, UserRole } from '@/types';
 import { resolveAlertEffects, createSystemLog } from '@/lib/workflow';
 import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
+import type { IUserDocument } from '@/models/User';
 
 // PATCH /api/alerts/[id] - acknowledge or resolve
 async function patchHandler(
   req: NextRequest,
   context: { params: Promise<Record<string, string>> },
-  { user }: { user: any }
+  { user }: { user: IUserDocument }
 ) {
   await connectDB();
 
@@ -114,7 +115,7 @@ async function patchHandler(
     updated
   );
 
-return NextResponse.json({ success: true, data: updated });
+  return NextResponse.json({ success: true, data: updated });
 }
 
 export const PATCH = withAuth(patchHandler);

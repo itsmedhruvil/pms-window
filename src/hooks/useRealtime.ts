@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import PusherJS from 'pusher-js';
 import { EVENTS } from '@/lib/pusher';
 import type { IAlert, ITask, ProjectStatus } from '@/types';
@@ -16,6 +16,7 @@ type EventHandlers = {
 export function useRealtime(channels: string[], handlers: EventHandlers) {
   const pusherRef = useRef<PusherJS | null>(null);
   const handlersRef = useRef(handlers);
+  const channelKey = channels.join('\u001f');
 
   // Keep handlers ref updated without re-subscribing
   useEffect(() => {
@@ -23,7 +24,8 @@ export function useRealtime(channels: string[], handlers: EventHandlers) {
   }, [handlers]);
 
   useEffect(() => {
-    if (!channels.length) return;
+    const channelNames = channelKey ? channelKey.split('\u001f') : [];
+    if (!channelNames.length) return;
 
     const pusher = new PusherJS(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
@@ -31,7 +33,7 @@ export function useRealtime(channels: string[], handlers: EventHandlers) {
 
     pusherRef.current = pusher;
 
-    const subscribedChannels = channels.map((channelName) => {
+    const subscribedChannels = channelNames.map((channelName) => {
       const channel = pusher.subscribe(channelName);
 
       channel.bind(EVENTS.ALERT_CREATED, (data: IAlert) => {
@@ -59,11 +61,11 @@ export function useRealtime(channels: string[], handlers: EventHandlers) {
 
     return () => {
       subscribedChannels.forEach((ch) => ch.unbind_all());
-      channels.forEach((name) => pusher.unsubscribe(name));
+      channelNames.forEach((name) => pusher.unsubscribe(name));
       pusher.disconnect();
       pusherRef.current = null;
     };
-  }, [channels.join(',')]);
+  }, [channelKey]);
 }
 
 export function useProjectRealtime(projectId: string, handlers: EventHandlers) {

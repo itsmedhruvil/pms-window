@@ -4,8 +4,8 @@ import ProjectModel from '@/models/Project';
 import TaskModel from '@/models/Task';
 import AlertModel from '@/models/Alert';
 import { withAuth } from '@/lib/auth';
-import { Department, ProjectStatus, TaskStatus, AlertType, AlertStatus, UserRole } from '@/types';
-import { subDays, startOfDay } from 'date-fns';
+import { Department, ProjectStatus, TaskStatus, AlertType, AlertStatus } from '@/types';
+import { subDays } from 'date-fns';
 
 export const GET = withAuth(async (_req: NextRequest) => {
   await connectDB();

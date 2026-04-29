@@ -14,19 +14,16 @@ import ProjectModel from '@/models/Project';
 import TaskModel from '@/models/Task';
 import AlertModel from '@/models/Alert';
 import UserModel from '@/models/User';
-import CommentModel from '@/models/Comment';
 import {
   Department,
   ProjectStatus,
   ProjectPriority,
   TaskStatus,
-  AlertType,
   AlertStatus,
   UserRole,
-  DEPARTMENT_SEQUENCE,
 } from '@/types';
 import { subDays } from 'date-fns';
-import type { IUserDocument } from '@/models/User';
+import { reconcileBlockedTasksWithAlerts } from '@/lib/workflow';
 
 // ─── Projects ────────────────────────────────────────────────────────────────
 
@@ -74,6 +71,7 @@ export async function getProjects(filters: ProjectListFilters = {}) {
 
 export async function getProjectDetail(id: string) {
   await connectDB();
+  await reconcileBlockedTasksWithAlerts(id);
 
   const [project, tasks, alerts] = await Promise.all([
     ProjectModel.findById(id)
@@ -111,6 +109,8 @@ export async function getTasks(filters: TaskListFilters = {}) {
   await connectDB();
 
   const { department, projectId, status, assignedUserId, isAdmin = true, limit = 100 } = filters;
+
+  await reconcileBlockedTasksWithAlerts(projectId);
 
   const query: Record<string, unknown> = {};
   if (projectId) query.projectId = projectId;

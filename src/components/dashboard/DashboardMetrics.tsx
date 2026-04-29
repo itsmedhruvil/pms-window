@@ -10,7 +10,6 @@ import {
   LineChart,
   Line,
   ResponsiveContainer,
-  Cell,
 } from 'recharts';
 import { AlertTriangle, TrendingUp, Clock, Layers, Zap } from 'lucide-react';
 import { cn, DEPARTMENT_LABELS, ALERT_TYPE_LABEL } from '@/lib/utils';

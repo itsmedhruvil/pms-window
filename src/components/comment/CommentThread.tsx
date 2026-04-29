@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Bot } from 'lucide-react';
-import { cn, timeAgo, apiFetch } from '@/lib/utils';
+import { timeAgo, apiFetch } from '@/lib/utils';
 import type { IComment, IUser } from '@/types';
 
 interface CommentThreadProps {
@@ -12,7 +12,7 @@ interface CommentThreadProps {
   availableUsers?: Partial<IUser>[];
 }
 
-export function CommentThread({ taskId, alertId, currentUser, availableUsers: propUsers = [] }: CommentThreadProps) {
+export function CommentThread({ taskId, alertId, availableUsers: propUsers = [] }: CommentThreadProps) {
   const [comments, setComments] = useState<IComment[]>([]);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,28 +24,28 @@ export function CommentThread({ taskId, alertId, currentUser, availableUsers: pr
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     const params = taskId ? `taskId=${taskId}` : `alertId=${alertId}`;
     const result = await apiFetch<{ items: IComment[] }>(`/api/comments?${params}&limit=50`);
     if (result.success && result.data) {
       setComments(result.data.items);
     }
     setFetching(false);
-  };
+  }, [alertId, taskId]);
 
   // Load users for @mention if not provided as props
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     if (propUsers.length > 0) return;
     const result = await apiFetch<Partial<IUser>[]>('/api/users');
     if (result.success && result.data) {
       setAvailableUsers(result.data);
     }
-  };
+  }, [propUsers.length]);
 
   useEffect(() => {
     fetchComments();
     fetchUsers();
-  }, [taskId, alertId]);
+  }, [fetchComments, fetchUsers]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });

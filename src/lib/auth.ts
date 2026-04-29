@@ -9,19 +9,24 @@ export interface AuthContext {
   user: IUserDocument;
 }
 
-type ApiHandler = (
-  req: NextRequest,
-  context: { params: Promise<Record<string, string>> },
-  authCtx: AuthContext,
-) => Promise<NextResponse>;
+type RouteHandlerContext = {
+  params: Promise<Record<string, string>>;
+};
 
 /**
  * Wraps an API route with auth + DB user resolution
  */
-export function withAuth(handler: ApiHandler, requiredRoles?: UserRole[]) {
+export function withAuth<TContext = RouteHandlerContext>(
+  handler: (
+    req: NextRequest,
+    context: TContext,
+    authCtx: AuthContext,
+  ) => Promise<NextResponse>,
+  requiredRoles?: UserRole[],
+) {
   return async (
     req: NextRequest,
-    context: { params: Promise<Record<string, string>> },
+    context: TContext,
   ) => {
     try {
       const user = await getCurrentUser();
@@ -102,27 +107,31 @@ export async function getCurrentUser(): Promise<IUserDocument | null> {
 
     await connectDB();
     const client = await clerkClient();
-    const clerkUserData = await client.users.getUser(clerkUser.userId);
+    const clerkUserId = clerkUser.userId;
+    if (!clerkUserId) {
+      return null;
+    }
+
+    const clerkUserData = await client.users.getUser(clerkUserId);
     let user = await UserModel.findOne({ clerkId: clerkUserData.id });
     
     if (!user) {
-      console.log(`[JIT Sync] User ${clerkUser.id} authenticated but not in DB. Creating record...`);
+      console.log(`[JIT Sync] User ${clerkUserData.id} authenticated but not in DB. Creating record...`);
       
       // Fallback: Create the user immediately if the webhook hasn't fired yet
       const primaryEmail =
-        clerkUser.primaryEmailAddress?.emailAddress ||
-        clerkUser.emailAddresses?.[0]?.emailAddress ||
-        clerkUser.externalAccounts?.[0]?.emailAddress ||
-        `${clerkUser.id}@clerk.local`;
-      const fullName = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim();
+        clerkUserData.emailAddresses?.[0]?.emailAddress ||
+        clerkUserData.externalAccounts?.[0]?.emailAddress ||
+        `${clerkUserData.id}@clerk.local`;
+      const fullName = `${clerkUserData.firstName || ""} ${clerkUserData.lastName || ""}`.trim();
       const isMainAdmin = primaryEmail.toLowerCase() === MAIN_ADMIN_EMAIL;
 
       try {
         user = await UserModel.create({
-          clerkId: clerkUser.id,
+          clerkId: clerkUserData.id,
           email: primaryEmail,
           name: fullName || "New User",
-          avatar: clerkUser.imageUrl,
+          avatar: clerkUserData.imageUrl,
           role: isMainAdmin ? UserRole.SUPER_ADMIN : UserRole.DEPARTMENT_USER,
           department: Department.OFFICE_ADMIN,
           isActive: true,
