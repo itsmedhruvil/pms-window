@@ -113,23 +113,28 @@ export async function getCurrentUser(): Promise<IUserDocument | null> {
     }
 
     const clerkUserData = await client.users.getUser(clerkUserId);
-    let user = await UserModel.findOne({ clerkId: clerkUserData.id });
-    
+    const primaryEmail =
+      clerkUserData.emailAddresses.find(
+        (email) => email.id === clerkUserData.primaryEmailAddressId,
+      )?.emailAddress ||
+      clerkUserData.emailAddresses[0]?.emailAddress ||
+      clerkUserData.externalAccounts[0]?.emailAddress ||
+      `${clerkUserData.id}@clerk.local`;
+    const normalizedEmail = primaryEmail.toLowerCase();
+    const fullName = `${clerkUserData.firstName || ""} ${clerkUserData.lastName || ""}`.trim();
+    const isMainAdmin = normalizedEmail === MAIN_ADMIN_EMAIL;
+
+    let user = await UserModel.findOne({
+      $or: [{ clerkId: clerkUserData.id }, { email: normalizedEmail }],
+    });
+
     if (!user) {
       console.log(`[JIT Sync] User ${clerkUserData.id} authenticated but not in DB. Creating record...`);
-      
-      // Fallback: Create the user immediately if the webhook hasn't fired yet
-      const primaryEmail =
-        clerkUserData.emailAddresses?.[0]?.emailAddress ||
-        clerkUserData.externalAccounts?.[0]?.emailAddress ||
-        `${clerkUserData.id}@clerk.local`;
-      const fullName = `${clerkUserData.firstName || ""} ${clerkUserData.lastName || ""}`.trim();
-      const isMainAdmin = primaryEmail.toLowerCase() === MAIN_ADMIN_EMAIL;
 
       try {
         user = await UserModel.create({
           clerkId: clerkUserData.id,
-          email: primaryEmail,
+          email: normalizedEmail,
           name: fullName || "New User",
           avatar: clerkUserData.imageUrl,
           role: isMainAdmin ? UserRole.SUPER_ADMIN : UserRole.DEPARTMENT_USER,
@@ -139,15 +144,28 @@ export async function getCurrentUser(): Promise<IUserDocument | null> {
         console.log(`[JIT Sync] Successfully created user ${user._id}`);
       } catch (createError) {
         console.error("[JIT Sync Error] Failed to create user:", createError);
-        return null;
+        user = await UserModel.findOne({ email: normalizedEmail });
+        if (!user) return null;
       }
+    }
+
+    let shouldSave = false;
+    if (user.clerkId !== clerkUserData.id) {
+      user.clerkId = clerkUserData.id;
+      shouldSave = true;
+    }
+    if (clerkUserData.imageUrl && user.avatar !== clerkUserData.imageUrl) {
+      user.avatar = clerkUserData.imageUrl;
+      shouldSave = true;
     }
 
     if (user.email.toLowerCase() === MAIN_ADMIN_EMAIL && user.role !== UserRole.SUPER_ADMIN) {
       user.role = UserRole.SUPER_ADMIN;
       user.department = Department.OFFICE_ADMIN;
-      await user.save();
+      shouldSave = true;
     }
+
+    if (shouldSave) await user.save();
 
     return user;
   } catch (error) {
