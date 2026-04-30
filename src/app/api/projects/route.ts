@@ -6,7 +6,6 @@ import { CreateProjectSchema, ProjectFiltersSchema } from '@/lib/validations';
 import { generateProjectTasks } from '@/lib/workflow';
 import { ProjectStatus, UserRole } from '@/types';
 import mongoose from 'mongoose';
-import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 import { createSystemLog } from '@/lib/workflow';
 
 // GET /api/projects - List projects with filters
@@ -123,13 +122,6 @@ export const POST = withAuth(
       });
 
       await session.commitTransaction();
-
-      // Notify all
-      await triggerEvent(CHANNELS.global, EVENTS.PROJECT_STATUS_CHANGED, {
-        projectId: project._id,
-        status: project.status,
-        action: 'created',
-      });
 
       const populated = await ProjectModel.findById(project._id)
         .populate('createdBy', 'name email department')

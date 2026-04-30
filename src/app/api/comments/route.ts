@@ -4,7 +4,6 @@ import CommentModel from '@/models/Comment';
 import UserModel from '@/models/User';
 import { withAuth } from '@/lib/auth';
 import { CreateCommentSchema, PaginationSchema } from '@/lib/validations';
-import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 
 // GET /api/comments?taskId=xxx OR ?alertId=xxx
 export const GET = withAuth(async (req: NextRequest) => {
@@ -86,31 +85,6 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
     .populate('author', 'name email department avatar role')
     .populate('mentions', 'name email department')
     .lean();
-
-  // Realtime: push to project channel if we can determine it
-  if (parsed.data.taskId) {
-    const TaskModel = (await import('@/models/Task')).default;
-    const task = await TaskModel.findById(parsed.data.taskId).select('projectId');
-    if (task) {
-      await triggerEvent(
-        CHANNELS.project(task.projectId.toString()),
-        EVENTS.COMMENT_ADDED,
-        { comment: populated, taskId: parsed.data.taskId }
-      );
-    }
-  }
-
-  if (parsed.data.alertId) {
-    const AlertModel = (await import('@/models/Alert')).default;
-    const alert = await AlertModel.findById(parsed.data.alertId).select('projectId');
-    if (alert) {
-      await triggerEvent(
-        CHANNELS.project(alert.projectId.toString()),
-        EVENTS.COMMENT_ADDED,
-        { comment: populated, alertId: parsed.data.alertId }
-      );
-    }
-  }
 
   return NextResponse.json({ success: true, data: populated }, { status: 201 });
 });

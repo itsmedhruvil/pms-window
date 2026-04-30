@@ -7,7 +7,6 @@ import AlertModel from '@/models/Alert';
 import { withAuth } from '@/lib/auth';
 import { ProjectStatus, AlertStatus, TaskStatus, UserRole } from '@/types';
 import { createSystemLog } from '@/lib/workflow';
-import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 
 const StatusSchema = z.object({
   status: z.nativeEnum(ProjectStatus),
@@ -102,12 +101,6 @@ export const POST = withAuth(
     await createSystemLog({
       content: logMsg,
       authorId: user._id.toString(),
-    });
-
-    await triggerEvent(CHANNELS.project(id), EVENTS.PROJECT_STATUS_CHANGED, {
-      projectId: id,
-      status: newStatus,
-      changedBy: user.name,
     });
 
     const updated = await ProjectModel.findById(id)

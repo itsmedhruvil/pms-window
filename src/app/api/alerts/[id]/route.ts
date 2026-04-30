@@ -1,10 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import AlertModel from '@/models/Alert';
 import { withAuth } from '@/lib/auth';
 import { AlertStatus, UserRole } from '@/types';
 import { resolveAlertEffects, createSystemLog } from '@/lib/workflow';
-import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 import type { IUserDocument } from '@/models/User';
 
 // PATCH /api/alerts/[id] - acknowledge or resolve
@@ -108,12 +107,6 @@ async function patchHandler(
     .populate('raisedBy', 'name email')
     .populate('acknowledgedBy', 'name department')
     .lean();
-
-  await triggerEvent(
-    CHANNELS.project(alert.projectId.toString()),
-    EVENTS.ALERT_UPDATED,
-    updated
-  );
 
   return NextResponse.json({ success: true, data: updated });
 }

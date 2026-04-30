@@ -11,7 +11,6 @@ import {
   updateProjectCompletion,
   createSystemLog,
 } from '@/lib/workflow';
-import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 
 // GET /api/tasks/[id]
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
@@ -91,12 +90,6 @@ export const PATCH = withAuth(async (req: NextRequest, ctx, { user }) => {
     await updateProjectCompletion(updated.projectId.toString());
   }
 
-  await triggerEvent(
-    CHANNELS.project(updated.projectId.toString()),
-    EVENTS.TASK_UPDATED,
-    updated.toObject()
-  );
-
   return NextResponse.json({ success: true, data: updated });
 });
 
@@ -127,13 +120,6 @@ export const DELETE = withAuth(
 
     // Update project completion percentage
     await updateProjectCompletion(projectId.toString());
-
-    // Trigger realtime event
-    await triggerEvent(
-      CHANNELS.project(projectId.toString()),
-      EVENTS.TASK_UPDATED,
-      { taskId: id, deleted: true }
-    );
 
     return NextResponse.json({ success: true, message: 'Task deleted' });
   },
