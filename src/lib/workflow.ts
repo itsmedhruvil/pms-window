@@ -10,7 +10,6 @@ import {
   DEPARTMENT_SEQUENCE,
   DEFAULT_TASKS_PER_DEPARTMENT,
 } from '@/types';
-import { triggerEvent, CHANNELS, EVENTS } from './pusher';
 
 /**
  * Generate all workflow tasks for a new project
