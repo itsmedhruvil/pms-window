@@ -1,6 +1,6 @@
-# Window Manufacturing ERP
+# Window Manufacturing PMS
 
-Production-grade ERP system for window manufacturing operations. Built with Next.js 14 App Router, MongoDB, Clerk auth, and Pusher realtime.
+Production-grade PMS system for window manufacturing operations. Built with Next.js 14 App Router, MongoDB, Clerk auth, and Pusher realtime.
 
 ---
 
