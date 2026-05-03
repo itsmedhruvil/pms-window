@@ -94,7 +94,7 @@ export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
       <main className="flex-1 overflow-auto">
         {children}
       </main>
-      {pathname.startsWith('/dashboard') && <GlobalCreateButton />}
+      {(pathname.startsWith('/dashboard') || pathname.startsWith('/tasks')) && <GlobalCreateButton />}
     </div>
   );
 }
