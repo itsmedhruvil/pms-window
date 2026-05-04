@@ -230,6 +230,7 @@ export async function getDashboardData() {
     ]),
 
     AlertModel.aggregate([
+      { $match: { status: { $ne: AlertStatus.RESOLVED } } },
       { $group: { _id: '$type', count: { $sum: 1 } } },
     ]),
 
@@ -344,7 +345,14 @@ export async function getDashboardData() {
 // Mongoose lean() returns BSON ObjectIds and Dates. Next.js requires plain
 // JSON-serializable objects when passing from Server → Client components.
 // This helper converts ObjectId → string and Date → ISO string recursively.
+// It also properly handles objects with custom toJSON methods.
 
 export function serialize<T>(obj: T): T {
+  // First, call toJSON on the object if it exists
+  if (obj && typeof obj === 'object' && 'toJSON' in obj && typeof obj.toJSON === 'function') {
+    obj = obj.toJSON() as T;
+  }
+  
+  // Then use JSON.parse(JSON.stringify()) for the rest of the serialization
   return JSON.parse(JSON.stringify(obj));
 }

@@ -57,6 +57,10 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
     projectTitle: '',
     priority: ProjectPriority.MEDIUM,
     deadline: '',
+    // new fields
+    address: '',
+    contactPhone: '',
+    budget: 0,
     windowSpecifications: [{ ...EMPTY_SPEC }],
   });
 
@@ -86,7 +90,10 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
   const step1Valid =
     form.clientName.trim().length >= 2 &&
     form.projectTitle.trim().length >= 3 &&
-    form.deadline !== '';
+    form.deadline !== '' &&
+    form.address.trim().length >= 5 &&
+    /^\+?[0-9]{7,15}$/.test(form.contactPhone) &&
+    form.budget > 0;
 
   const step2Valid = form.windowSpecifications.every(
     (s) => s.width > 0 && s.height > 0 && s.design && s.glassType && s.quantity >= 1
@@ -262,6 +269,35 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             </span>
           </div>
 
+          {/* New Project Detail Fields */}
+          <Field label="Address" required>
+            <input
+              type="text"
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              placeholder="e.g. 123 Main St, City"
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Contact Phone" required>
+            <input
+              type="tel"
+              value={form.contactPhone}
+              onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
+              placeholder="e.g. +919876543210"
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Budget (₹)" required>
+            <input
+              type="number"
+              value={form.budget}
+              min={0}
+              onChange={(e) => setForm({ ...form, budget: Number(e.target.value) })}
+              placeholder="e.g. 500000"
+              className={inputClass}
+            />
+          </Field>
           {/* Template Group selector (applied to all specs) */}
           <div className="border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-2">

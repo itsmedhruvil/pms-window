@@ -18,6 +18,55 @@ import { Modal } from '@/components/ui/Modal';
 import type { IProject, ITask, IAlert, IUser } from '@/types';
 import { TaskStatus, AlertStatus, DEPARTMENT_SEQUENCE } from '@/types';
 
+// Component to display windows in a table
+function ProjectWindowsTab({ windows, progress }: { windows: any[]; progress?: number }) {
+  if (!windows || windows.length === 0) {
+    return (
+      <div className="border border-dashed border-gray-200 p-12 text-center">
+        <p className="text-sm text-gray-400 font-mono">No windows defined for this project</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border border-gray-200 overflow-hidden max-w-5xl">
+      <table className="erp-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Size (W×H mm)</th>
+            <th>Design</th>
+            <th>Glass Type</th>
+            <th>Quantity</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {windows.map((w, i) => (
+            <tr key={i}>
+              <td className="font-mono">#{i + 1}</td>
+              <td className="font-mono">{w.width}×{w.height}</td>
+              <td className="font-mono">{w.design}</td>
+              <td className="font-mono">{w.glassType}</td>
+              <td className="font-mono">{w.quantity}</td>
+              <td className="font-mono">{w.notes}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {/* Progress bar for windows */}
+      {typeof progress === 'number' && (
+        <div className="mt-4 h-1.5 bg-gray-100">
+          <div
+            className="h-full bg-black transition-all duration-700"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface ProjectDetailProps {
   project: IProject;
   tasks: ITask[];
@@ -25,7 +74,7 @@ interface ProjectDetailProps {
   isAdmin: boolean;
 }
 
-type TabId = 'overview' | 'tasks' | 'alerts' | 'timeline';
+type TabId = 'overview' | 'windows' | 'alerts' | 'timeline';
 
 export function ProjectDetail({ project: initialProject, tasks: initialTasks, alerts: initialAlerts, isAdmin }: ProjectDetailProps) {
   const [project, setProject] = useState(initialProject);
@@ -75,7 +124,8 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'overview', label: 'Overview' },
-    { id: 'tasks', label: 'Tasks', count: tasks.length },
+    // Replace Tasks tab with Windows tab
+    { id: 'windows', label: 'Windows', count: project.totalWindows },
     { id: 'alerts', label: 'Alerts', count: alerts.length },
     { id: 'timeline', label: 'Workflow' },
   ];
@@ -213,8 +263,8 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
         {activeTab === 'overview' && (
           <OverviewTab project={project} tasks={tasks} alerts={alerts} />
         )}
-        {activeTab === 'tasks' && (
-          <ProjectTasksTab tasks={tasks} />
+        {activeTab === 'windows' && (
+          <ProjectWindowsTab windows={project.windowSpecifications} progress={project.completionPercentage} />
         )}
         {activeTab === 'alerts' && (
           <AlertsTab alerts={alerts} />
@@ -334,83 +384,7 @@ function AlertsTab({ alerts }: { alerts: IAlert[] }) {
   );
 }
 
-function ProjectTasksTab({ tasks }: { tasks: ITask[] }) {
-  if (tasks.length === 0) {
-    return (
-      <div className="border border-dashed border-gray-200 p-12 text-center">
-        <p className="text-sm text-gray-400 font-mono">No tasks for this project</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="border border-gray-200 overflow-hidden max-w-5xl">
-      <table className="erp-table">
-        <thead>
-          <tr>
-            <th>Task</th>
-            <th>Department</th>
-            <th>Status</th>
-            <th>Assigned</th>
-            <th>Due Date</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {tasks.map((task) => {
-            const assignedUser =
-              typeof task.assignedUser === 'object' && task.assignedUser !== null
-                ? task.assignedUser as Partial<IUser>
-                : null;
-
-            return (
-              <tr key={task._id} className={cn(task.status === TaskStatus.BLOCKED && 'bg-red-50/30')}>
-                <td>
-                  <Link href={`/tasks/${task._id}`} className="font-medium text-gray-900 hover:underline">
-                    {task.title}
-                  </Link>
-                  {task.isLocked && (
-                    <p className="text-[10px] font-mono text-gray-400 mt-1">Waiting for dependency</p>
-                  )}
-                </td>
-                <td>
-                  <span className="font-mono text-gray-500 uppercase text-[10px] tracking-wide">
-                    {DEPARTMENT_LABELS[task.department]}
-                  </span>
-                </td>
-                <td>
-                  <TaskStatusBadge status={task.status} size="sm" />
-                </td>
-                <td>
-                  <span className="text-[11px] text-gray-500">
-                    {assignedUser?.name ?? 'Unassigned'}
-                  </span>
-                </td>
-                <td>
-                  {task.dueDate ? (
-                    <span className="font-mono text-[11px] text-gray-600">
-                      {formatDate(task.dueDate)}
-                    </span>
-                  ) : (
-                    <span className="text-gray-300">-</span>
-                  )}
-                </td>
-                <td>
-                  <Link
-                    href={`/tasks/${task._id}`}
-                    className="text-[10px] font-mono text-gray-400 hover:text-black uppercase"
-                  >
-                    Open
-                  </Link>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+// Duplicate ProjectWindowsTab removed – the component is defined earlier in the file.
 
 function AlertRow({ alert }: { alert: IAlert }) {
   const [showComments, setShowComments] = useState(false);

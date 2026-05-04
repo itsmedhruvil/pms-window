@@ -16,6 +16,10 @@ const WindowSpecSchema = new Schema(
 export interface IProjectDocument extends Document {
   clientName: string;
   projectTitle: string;
+  // New fields for additional project details
+  address?: string;
+  contactPhone?: string;
+  budget?: number;
   totalWindows: number;
   windowSpecifications: typeof WindowSpecSchema[];
   priority: ProjectPriority;

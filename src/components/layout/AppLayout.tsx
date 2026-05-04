@@ -18,13 +18,13 @@ import { DEPARTMENT_LABELS, DEPARTMENT_SEQUENCE } from '@/types';
 const BASE_NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
+  { href: '/templates', label: 'Templates', icon: ClipboardList },
   { href: '/alerts', label: 'Alerts', icon: AlertTriangle },
   { href: '/users', label: 'Users', icon: Users },
 ];
 
 const ADMIN_NAV_ITEMS = [
   { href: '/tasks', label: 'Task Templates', icon: ClipboardList },
-  { href: '/template-groups', label: 'Template Groups', icon: ClipboardList },
 ];
 
 interface AppLayoutProps {
@@ -39,7 +39,7 @@ export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
   const isAdmin = user?.publicMetadata?.role === 'ADMIN' || user?.publicMetadata?.role === 'SUPER_ADMIN';
   const NAV_ITEMS = isAdmin ? [...BASE_NAV_ITEMS, ...ADMIN_NAV_ITEMS] : BASE_NAV_ITEMS;
   const isNavActive = (href: string) =>
-    href === '/tasks' ? pathname === '/tasks' : href === '/template-groups' ? pathname === '/template-groups' : pathname.startsWith(href);
+    href === '/tasks' ? pathname === '/tasks' : href === '/templates' ? pathname === '/templates' : href === '/template-groups' ? pathname === '/template-groups' : pathname.startsWith(href);
 
   return (
     <div className="flex h-screen bg-white overflow-hidden">

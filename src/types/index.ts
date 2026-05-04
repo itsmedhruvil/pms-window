@@ -67,6 +67,7 @@ export interface WindowSpec {
   design: string;
   glassType: string;
   quantity: number;
+  // Optional template group to generate tasks for this window type
   notes?: string;
   templateGroupId?: string;
 }
