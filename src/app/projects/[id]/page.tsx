@@ -32,12 +32,6 @@ export default async function ProjectDetailPage(props: { params: Promise<{ id: s
         project={data.project as IProject}
         tasks={data.tasks as ITask[]}
         alerts={data.alerts as IAlert[]}
-        currentUser={{
-          _id: user._id.toString(),
-          name: user.name,
-          department: user.department,
-          role: user.role,
-        }}
         isAdmin={isAdmin}
       />
     </AppLayout>

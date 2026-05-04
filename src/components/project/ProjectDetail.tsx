@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import Link from 'next/link';
 import {
   AlertTriangle, Calendar, Package, ChevronRight,
   CheckCircle2, Copy
@@ -9,7 +10,6 @@ import { cn, DEPARTMENT_LABELS, formatDate, timeAgo, ALERT_TYPE_LABEL } from '@/
 import {
   ProjectStatusBadge, PriorityBadge, TaskStatusBadge, AlertSeverityBadge, AlertStatusBadge
 } from '@/components/ui/badges';
-import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { CommentThread } from '@/components/comment/CommentThread';
 import { useProjectRealtime } from '@/hooks/useRealtime';
 import { ProjectStatusControl } from '@/components/project/ProjectStatusControl';
@@ -22,18 +22,16 @@ interface ProjectDetailProps {
   project: IProject;
   tasks: ITask[];
   alerts: IAlert[];
-  currentUser: Partial<IUser>;
   isAdmin: boolean;
 }
 
-type TabId = 'overview' | 'kanban' | 'alerts' | 'timeline';
+type TabId = 'overview' | 'tasks' | 'alerts' | 'timeline';
 
-export function ProjectDetail({ project: initialProject, tasks: initialTasks, alerts: initialAlerts, currentUser, isAdmin }: ProjectDetailProps) {
+export function ProjectDetail({ project: initialProject, tasks: initialTasks, alerts: initialAlerts, isAdmin }: ProjectDetailProps) {
   const [project, setProject] = useState(initialProject);
   const [tasks, setTasks] = useState(initialTasks);
   const [alerts, setAlerts] = useState(initialAlerts);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
-  const [selectedTask, setSelectedTask] = useState<ITask | null>(null);
   const [alertModalOpen, setAlertModalOpen] = useState(false);
 
   // Realtime updates
@@ -77,7 +75,7 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'overview', label: 'Overview' },
-    { id: 'kanban', label: 'Task Board', count: tasks.length },
+    { id: 'tasks', label: 'Tasks', count: tasks.length },
     { id: 'alerts', label: 'Alerts', count: alerts.length },
     { id: 'timeline', label: 'Workflow' },
   ];
@@ -142,7 +140,7 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
                   className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold uppercase border border-red-400 text-red-600 hover:bg-red-50 transition-colors"
                 >
                   <AlertTriangle className="w-3 h-3" />
-                  Raise Alert
+                  Raise Global Alert
                 </button>
                 <button
                   onClick={handleDuplicateProject}
@@ -215,21 +213,8 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
         {activeTab === 'overview' && (
           <OverviewTab project={project} tasks={tasks} alerts={alerts} />
         )}
-        {activeTab === 'kanban' && (
-          <div className="h-[calc(100vh-300px)]">
-            <KanbanBoard
-              tasks={tasks}
-              canAssign={isAdmin}
-              onTaskUpdate={(updated) => {
-                setTasks((prev) => prev.map((t) => t._id === updated._id ? updated : t));
-                if (updated.status === TaskStatus.DONE) setSelectedTask(null);
-              }}
-              canDrag={(task) => {
-                if (!currentUser.department) return false;
-                return task.department === currentUser.department || isAdmin;
-              }}
-            />
-          </div>
+        {activeTab === 'tasks' && (
+          <ProjectTasksTab tasks={tasks} />
         )}
         {activeTab === 'alerts' && (
           <AlertsTab alerts={alerts} />
@@ -238,15 +223,6 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
           <WorkflowTimeline tasks={tasks} />
         )}
       </div>
-
-      {/* Task slide-over */}
-      {selectedTask && (
-        <TaskSlideOver
-          task={selectedTask}
-          currentUser={currentUser}
-          onClose={() => setSelectedTask(null)}
-        />
-      )}
 
       {/* Raise Alert modal */}
       <Modal
@@ -257,6 +233,7 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
         <CreateAlertForm
           projectId={project._id}
           projectTitle={project.projectTitle}
+          title="Raise Global Alert"
           onSuccess={() => {
             setAlertModalOpen(false);
           }}
@@ -357,6 +334,84 @@ function AlertsTab({ alerts }: { alerts: IAlert[] }) {
   );
 }
 
+function ProjectTasksTab({ tasks }: { tasks: ITask[] }) {
+  if (tasks.length === 0) {
+    return (
+      <div className="border border-dashed border-gray-200 p-12 text-center">
+        <p className="text-sm text-gray-400 font-mono">No tasks for this project</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border border-gray-200 overflow-hidden max-w-5xl">
+      <table className="erp-table">
+        <thead>
+          <tr>
+            <th>Task</th>
+            <th>Department</th>
+            <th>Status</th>
+            <th>Assigned</th>
+            <th>Due Date</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map((task) => {
+            const assignedUser =
+              typeof task.assignedUser === 'object' && task.assignedUser !== null
+                ? task.assignedUser as Partial<IUser>
+                : null;
+
+            return (
+              <tr key={task._id} className={cn(task.status === TaskStatus.BLOCKED && 'bg-red-50/30')}>
+                <td>
+                  <Link href={`/tasks/${task._id}`} className="font-medium text-gray-900 hover:underline">
+                    {task.title}
+                  </Link>
+                  {task.isLocked && (
+                    <p className="text-[10px] font-mono text-gray-400 mt-1">Waiting for dependency</p>
+                  )}
+                </td>
+                <td>
+                  <span className="font-mono text-gray-500 uppercase text-[10px] tracking-wide">
+                    {DEPARTMENT_LABELS[task.department]}
+                  </span>
+                </td>
+                <td>
+                  <TaskStatusBadge status={task.status} size="sm" />
+                </td>
+                <td>
+                  <span className="text-[11px] text-gray-500">
+                    {assignedUser?.name ?? 'Unassigned'}
+                  </span>
+                </td>
+                <td>
+                  {task.dueDate ? (
+                    <span className="font-mono text-[11px] text-gray-600">
+                      {formatDate(task.dueDate)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-300">-</span>
+                  )}
+                </td>
+                <td>
+                  <Link
+                    href={`/tasks/${task._id}`}
+                    className="text-[10px] font-mono text-gray-400 hover:text-black uppercase"
+                  >
+                    Open
+                  </Link>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function AlertRow({ alert }: { alert: IAlert }) {
   const [showComments, setShowComments] = useState(false);
   const raisedBy = typeof alert.raisedBy === 'object' ? alert.raisedBy as { name: string } : null;
@@ -429,13 +484,15 @@ function WorkflowTimeline({ tasks }: { tasks: ITask[] }) {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={cn(
+                    <Link
+                      href={`/tasks/${task._id}`}
+                      className={cn(
                       'text-xs font-medium',
                       task.status === TaskStatus.DONE ? 'text-gray-500 line-through' :
                       task.status === TaskStatus.BLOCKED ? 'text-red-600' : 'text-gray-900'
                     )}>
                       {task.title}
-                    </p>
+                    </Link>
                   </div>
                   <TaskStatusBadge status={task.status} size="sm" />
                 </div>
@@ -444,24 +501,6 @@ function WorkflowTimeline({ tasks }: { tasks: ITask[] }) {
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function TaskSlideOver({ task, currentUser, onClose }: { task: ITask; currentUser: Partial<IUser>; onClose: () => void }) {
-  return (
-    <div className="fixed inset-y-0 right-0 w-96 bg-white border-l border-gray-200 shadow-2xl z-50 flex flex-col">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-        <h3 className="text-sm font-bold text-gray-900">{task.title}</h3>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-900 text-lg font-bold">×</button>
-      </div>
-      <div className="p-4 border-b border-gray-100">
-        <TaskStatusBadge status={task.status} />
-        <p className="text-xs text-gray-600 mt-2">{task.description}</p>
-      </div>
-      <div className="flex-1 overflow-hidden">
-        <CommentThread taskId={task._id} currentUser={currentUser} />
-      </div>
     </div>
   );
 }

@@ -1,8 +1,17 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 import { Department, TaskStatus } from '@/types';
 
+interface TaskImageAttachment {
+  id: string;
+  name: string;
+  url: string;
+  size: number;
+  uploadedAt: Date;
+}
+
 export interface ITaskDocument extends Document {
   projectId: mongoose.Types.ObjectId;
+  templateTaskId?: mongoose.Types.ObjectId;
   department: Department;
   title: string;
   description: string;
@@ -12,6 +21,7 @@ export interface ITaskDocument extends Document {
   startDate?: Date;
   dueDate?: Date;
   completedAt?: Date;
+  imageAttachments?: TaskImageAttachment[];
   isLocked: boolean;
   sequence: number;
   createdAt: Date;
@@ -24,6 +34,12 @@ const TaskSchema = new Schema<ITaskDocument>(
       type: Schema.Types.ObjectId,
       ref: 'Project',
       required: true,
+      index: true,
+    },
+    templateTaskId: {
+      type: Schema.Types.ObjectId,
+      ref: 'TaskTemplate',
+      default: null,
       index: true,
     },
     department: {
@@ -69,6 +85,18 @@ const TaskSchema = new Schema<ITaskDocument>(
     completedAt: {
       type: Date,
       default: null,
+    },
+    imageAttachments: {
+      type: [
+        {
+          id: { type: String, required: true },
+          name: { type: String, required: true },
+          url: { type: String, required: true },
+          size: { type: Number, required: true },
+          uploadedAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
     },
     isLocked: {
       type: Boolean,

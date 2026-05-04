@@ -1,30 +1,26 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import Link from 'next/link';
-import { LayoutGrid, List, ExternalLink, Lock, AlertTriangle, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Lock, AlertTriangle, Plus } from 'lucide-react';
 import { cn, DEPARTMENT_LABELS, formatDate } from '@/lib/utils';
 import { TaskStatusBadge } from '@/components/ui/badges';
-import { KanbanBoard } from '@/components/kanban/KanbanBoard';
-import { CommentThread } from '@/components/comment/CommentThread';
 import { Modal } from '@/components/ui/Modal';
 import { CreateTaskForm } from '@/components/forms/CreateTaskForm';
-import type { ITask, IUser } from '@/types';
+import type { ITask } from '@/types';
 import { TaskStatus, Department } from '@/types';
 
 interface TasksClientProps {
   initialTasks: ITask[];
-  currentUser: Partial<IUser>;
   isAdmin: boolean;
+  selectedDepartment?: Department;
 }
 
-export function TasksClient({ initialTasks, currentUser, isAdmin }: TasksClientProps) {
+export function TasksClient({ initialTasks, isAdmin, selectedDepartment }: TasksClientProps) {
   const [tasks, setTasks] = useState<ITask[]>(initialTasks);
-  const [view, setView] = useState<'list' | 'kanban'>('list');
-  const [selectedTask, setSelectedTask] = useState<ITask | null>(null);
-  const [deptFilter, setDeptFilter] = useState<Department | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
   const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const router = useRouter();
 
   const handleTaskCreated = useCallback((task: ITask) => {
     setTasks((prev) => [task, ...prev]);
@@ -32,15 +28,9 @@ export function TasksClient({ initialTasks, currentUser, isAdmin }: TasksClientP
   }, []);
 
   const filtered = tasks.filter((t) => {
-    if (deptFilter !== 'all' && t.department !== deptFilter) return false;
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
     return true;
   });
-
-  const handleTaskUpdate = useCallback((updated: ITask) => {
-    setTasks((prev) => prev.map((t) => (t._id === updated._id ? updated : t)));
-    if (selectedTask?._id === updated._id) setSelectedTask(updated);
-  }, [selectedTask]);
 
   const counts = {
     todo: tasks.filter((t) => t.status === TaskStatus.TODO).length,
@@ -52,16 +42,15 @@ export function TasksClient({ initialTasks, currentUser, isAdmin }: TasksClientP
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Main panel */}
-      <div className={cn('flex-1 flex flex-col overflow-hidden', selectedTask && 'lg:mr-96')}>
-        {/* Header */}
+      <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-3 gap-3">
             <div>
               <h1 className="text-xl font-black text-gray-900">
-                {isAdmin ? 'All Tasks' : 'My Tasks'}
+                {selectedDepartment ? DEPARTMENT_LABELS[selectedDepartment] : 'Department Tasks'}
               </h1>
               <p className="text-xs text-gray-500 font-mono mt-0.5">
-                {currentUser.department && !isAdmin ? DEPARTMENT_LABELS[currentUser.department] : 'All Departments'}
+                {filtered.length} task{filtered.length === 1 ? '' : 's'} in list view
               </p>
             </div>
 
@@ -76,27 +65,6 @@ export function TasksClient({ initialTasks, currentUser, isAdmin }: TasksClientP
                   New Task
                 </button>
               )}
-
-              <div className="flex border border-gray-200">
-                <button
-                  onClick={() => setView('list')}
-                  className={cn(
-                    'p-2 transition-colors',
-                    view === 'list' ? 'bg-black text-white' : 'text-gray-500 hover:text-black'
-                  )}
-                >
-                  <List className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setView('kanban')}
-                  className={cn(
-                    'p-2 transition-colors',
-                    view === 'kanban' ? 'bg-black text-white' : 'text-gray-500 hover:text-black'
-                  )}
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
-              </div>
             </div>
           </div>
 
@@ -115,129 +83,46 @@ export function TasksClient({ initialTasks, currentUser, isAdmin }: TasksClientP
           </div>
         </div>
 
-        {/* Filters */}
-        {isAdmin && (
-          <div className="flex-shrink-0 px-6 py-2.5 border-b border-gray-100 flex items-center gap-3 bg-gray-50">
-            <select
-              value={deptFilter}
-              onChange={(e) => setDeptFilter(e.target.value as Department | 'all')}
-              className="text-[10px] font-mono border border-gray-200 px-2 py-1 bg-white focus:outline-none focus:border-black"
-            >
-              <option value="all">All Departments</option>
-              {Object.values(Department).map((d) => (
-                <option key={d} value={d}>{DEPARTMENT_LABELS[d]}</option>
-              ))}
-            </select>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as TaskStatus | 'all')}
-              className="text-[10px] font-mono border border-gray-200 px-2 py-1 bg-white focus:outline-none focus:border-black"
-            >
-              <option value="all">All Statuses</option>
-              {Object.values(TaskStatus).map((s) => (
-                <option key={s} value={s}>{s.replace('_', ' ')}</option>
-              ))}
-            </select>
-            <span className="text-[10px] text-gray-500 font-mono ml-auto">
-              {filtered.length} tasks
-            </span>
-          </div>
-        )}
-
-        {/* Content */}
+        <div className="flex-shrink-0 px-6 py-2.5 border-b border-gray-100 flex items-center gap-3 bg-gray-50">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as TaskStatus | 'all')}
+            className="text-[10px] font-mono border border-gray-200 px-2 py-1 bg-white focus:outline-none focus:border-black"
+          >
+            <option value="all">All Statuses</option>
+            {Object.values(TaskStatus).map((s) => (
+              <option key={s} value={s}>{s.replace('_', ' ')}</option>
+            ))}
+          </select>
+          <span className="text-[10px] text-gray-500 font-mono ml-auto">
+            {filtered.length} tasks
+          </span>
+        </div>
         <div className="flex-1 overflow-auto p-6">
-          {view === 'kanban' ? (
-            <KanbanBoard
-              tasks={filtered}
-              canAssign={isAdmin}
-              onTaskUpdate={handleTaskUpdate}
-              canDrag={(task) => task.department === currentUser.department || isAdmin}
-            />
-          ) : (
-            <TaskListView
-              tasks={filtered}
-              selectedTaskId={selectedTask?._id}
-              onSelectTask={setSelectedTask}
-            />
-          )}
+          <TaskListView
+            tasks={filtered}
+            onOpenTask={(task) => router.push(`/tasks/${task._id}`)}
+          />
         </div>
       </div>
 
       <Modal open={taskModalOpen} onClose={() => setTaskModalOpen(false)} size="lg">
-        <CreateTaskForm onSuccess={handleTaskCreated} onCancel={() => setTaskModalOpen(false)} />
+        <CreateTaskForm
+          department={selectedDepartment}
+          onSuccess={handleTaskCreated}
+          onCancel={() => setTaskModalOpen(false)}
+        />
       </Modal>
-
-      {/* Task detail slide-over */}
-      {selectedTask && (
-        <div className="fixed right-0 top-0 bottom-0 w-96 bg-white border-l border-gray-200 shadow-2xl z-50 flex flex-col animate-slide-in-right">
-          {/* Slide-over header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <TaskStatusBadge status={selectedTask.status} size="sm" />
-              <span className="text-xs font-bold text-gray-900 truncate">{selectedTask.title}</span>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {selectedTask.projectId && (
-                <Link
-                  href={`/projects/${typeof selectedTask.projectId === 'object'
-                    ? (selectedTask.projectId as { _id: string })._id
-                    : selectedTask.projectId}`}
-                  className="text-gray-400 hover:text-black transition-colors"
-                  title="Open project"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </Link>
-              )}
-              <button
-                onClick={() => setSelectedTask(null)}
-                className="text-gray-400 hover:text-black text-xl font-bold leading-none"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-
-          {/* Task meta */}
-          <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0 space-y-2">
-            <p className="text-xs text-gray-600 leading-relaxed">{selectedTask.description}</p>
-            <div className="flex items-center gap-3 text-[10px] font-mono text-gray-500">
-              <span className="uppercase">{DEPARTMENT_LABELS[selectedTask.department]}</span>
-              {selectedTask.dueDate && (
-                <span>Due {formatDate(selectedTask.dueDate)}</span>
-              )}
-            </div>
-            {selectedTask.isLocked && (
-              <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-mono">
-                <Lock className="w-3 h-3" />
-                Waiting for dependency to complete
-              </div>
-            )}
-            {selectedTask.status === TaskStatus.BLOCKED && (
-              <div className="flex items-center gap-1.5 text-[11px] text-red-600 font-mono">
-                <AlertTriangle className="w-3 h-3" />
-                Blocked by active alert
-              </div>
-            )}
-          </div>
-
-          {/* Comment thread */}
-          <div className="flex-1 overflow-hidden">
-            <CommentThread taskId={selectedTask._id} currentUser={currentUser} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 function TaskListView({
   tasks,
-  selectedTaskId,
-  onSelectTask,
+  onOpenTask,
 }: {
   tasks: ITask[];
-  selectedTaskId?: string;
-  onSelectTask: (task: ITask) => void;
+  onOpenTask: (task: ITask) => void;
 }) {
   if (tasks.length === 0) {
     return (
@@ -271,11 +156,10 @@ function TaskListView({
                 key={task._id}
                 className={cn(
                   'cursor-pointer transition-colors',
-                  selectedTaskId === task._id ? 'bg-gray-50' : '',
                   task.status === TaskStatus.BLOCKED ? 'bg-red-50/30' : '',
                   task.isLocked ? 'opacity-60' : ''
                 )}
-                onClick={() => onSelectTask(task)}
+                onClick={() => onOpenTask(task)}
               >
                 <td>
                   <div className="flex items-center gap-2">

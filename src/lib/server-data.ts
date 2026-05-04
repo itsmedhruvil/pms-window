@@ -12,6 +12,7 @@
 import connectDB from '@/lib/db';
 import ProjectModel from '@/models/Project';
 import TaskModel from '@/models/Task';
+import TaskTemplateModel from '@/models/TaskTemplate';
 import AlertModel from '@/models/Alert';
 import UserModel from '@/models/User';
 import {
@@ -23,7 +24,7 @@ import {
   UserRole,
 } from '@/types';
 import { subDays } from 'date-fns';
-import { reconcileBlockedTasksWithAlerts } from '@/lib/workflow';
+import { ensureDefaultTaskTemplates, reconcileBlockedTasksWithAlerts } from '@/lib/workflow';
 
 // ─── Projects ────────────────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ export async function getProjectDetail(id: string) {
       .populate('assignedUsers', 'name email department')
       .lean(),
     TaskModel.find({ projectId: id })
+      .populate('templateTaskId', 'title department sequence')
       .populate('assignedUser', 'name email department avatar')
       .populate('dependencyTaskId', 'title status department')
       .sort({ sequence: 1 })
@@ -126,10 +128,35 @@ export async function getTasks(filters: TaskListFilters = {}) {
   }
 
   return TaskModel.find(query)
+    .populate('projectId', 'projectTitle clientName')
+    .populate('templateTaskId', 'title department sequence')
     .populate('assignedUser', 'name email department avatar')
     .populate('dependencyTaskId', 'title status department')
     .sort({ sequence: 1 })
     .limit(limit)
+    .lean();
+}
+
+export async function getTaskDetail(id: string) {
+  await connectDB();
+
+  return TaskModel.findById(id)
+    .populate('projectId', 'projectTitle clientName status deadline')
+    .populate('templateTaskId', 'title department sequence')
+    .populate('assignedUser', 'name email department avatar')
+    .populate('dependencyTaskId', 'title status department sequence')
+    .lean();
+}
+
+export async function getTaskTemplates(filters: { department?: Department } = {}) {
+  await connectDB();
+  await ensureDefaultTaskTemplates();
+
+  const query: Record<string, unknown> = {};
+  if (filters.department) query.department = filters.department;
+
+  return TaskTemplateModel.find(query)
+    .sort({ department: 1, sequence: 1, createdAt: 1 })
     .lean();
 }
 

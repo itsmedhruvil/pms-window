@@ -103,6 +103,7 @@ export interface IProject {
 export interface ITask {
   _id: string;
   projectId: string | IProject;
+  templateTaskId?: string | ITaskTemplate;
   department: Department;
   title: string;
   description: string;
@@ -112,10 +113,30 @@ export interface ITask {
   startDate?: Date;
   dueDate?: Date;
   completedAt?: Date;
+  imageAttachments?: TaskImageAttachment[];
   isLocked: boolean;
   sequence: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface ITaskTemplate {
+  _id: string;
+  department: Department;
+  title: string;
+  description: string;
+  sequence: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface TaskImageAttachment {
+  id: string;
+  name: string;
+  url: string;
+  size: number;
+  uploadedAt: Date;
 }
 
 export interface IAlert {

@@ -6,25 +6,24 @@ import { UserButton, useUser } from '@clerk/nextjs';
 import {
   LayoutDashboard,
   FolderKanban,
-  ListTodo,
+  ClipboardList,
   AlertTriangle,
   Users,
   Factory,
-  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GlobalCreateButton } from '@/components/layout/GlobalCreateButton';
+import { DEPARTMENT_LABELS, DEPARTMENT_SEQUENCE } from '@/types';
 
 const BASE_NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
-  { href: '/tasks', label: 'My Tasks', icon: ListTodo },
   { href: '/alerts', label: 'Alerts', icon: AlertTriangle },
   { href: '/users', label: 'Users', icon: Users },
 ];
 
 const ADMIN_NAV_ITEMS = [
-  { href: '/tasks/manage', label: 'Task Management', icon: Settings },
+  { href: '/tasks', label: 'Task Templates', icon: ClipboardList },
 ];
 
 interface AppLayoutProps {
@@ -38,6 +37,8 @@ export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
 
   const isAdmin = user?.publicMetadata?.role === 'ADMIN' || user?.publicMetadata?.role === 'SUPER_ADMIN';
   const NAV_ITEMS = isAdmin ? [...BASE_NAV_ITEMS, ...ADMIN_NAV_ITEMS] : BASE_NAV_ITEMS;
+  const isNavActive = (href: string) =>
+    href === '/tasks' ? pathname === '/tasks' : pathname.startsWith(href);
 
   return (
     <div className="flex h-screen bg-white overflow-hidden">
@@ -57,7 +58,7 @@ export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
         {/* Nav */}
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
-            const isActive = pathname.startsWith(item.href);
+            const isActive = isNavActive(item.href);
             const Icon = item.icon;
             const isAlert = item.href === '/alerts';
 
@@ -85,6 +86,34 @@ export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
               </Link>
             );
           })}
+
+          <div className="pt-3 mt-3 border-t border-gray-100">
+            <p className="px-3 pb-2 text-[9px] font-mono font-bold uppercase tracking-widest text-gray-400">
+              Department Tasks
+            </p>
+            <div className="space-y-0.5">
+              {DEPARTMENT_SEQUENCE.map((department) => {
+                const href = `/tasks/departments/${department}`;
+                const isActive = pathname === href;
+
+                return (
+                  <Link
+                    key={department}
+                    href={href}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2 text-xs font-mono font-medium transition-colors',
+                      isActive
+                        ? 'bg-black text-white'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    )}
+                  >
+                    <ClipboardList className="w-4 h-4 flex-shrink-0" />
+                    <span>{DEPARTMENT_LABELS[department]}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
         </nav>
 
         {/* User */}
@@ -103,7 +132,7 @@ export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
       <main className="flex-1 overflow-auto">
         {children}
       </main>
-      {(pathname.startsWith('/dashboard') || pathname.startsWith('/tasks')) && <GlobalCreateButton />}
+      {pathname.startsWith('/dashboard') && <GlobalCreateButton />}
     </div>
   );
 }

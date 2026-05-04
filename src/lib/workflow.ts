@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 import TaskModel from '@/models/Task';
+import TaskTemplateModel from '@/models/TaskTemplate';
 import ProjectModel from '@/models/Project';
 import AlertModel from '@/models/Alert';
 import CommentModel from '@/models/Comment';
@@ -12,6 +13,23 @@ import {
   DEFAULT_TASKS_PER_DEPARTMENT,
 } from '@/types';
 
+export async function ensureDefaultTaskTemplates() {
+  const existingCount = await TaskTemplateModel.estimatedDocumentCount();
+  if (existingCount > 0) return;
+
+  const templates = DEPARTMENT_SEQUENCE.flatMap((department) =>
+    DEFAULT_TASKS_PER_DEPARTMENT[department].map((task, index) => ({
+      department,
+      title: task.title,
+      description: task.description,
+      sequence: index,
+      isActive: true,
+    }))
+  );
+
+  await TaskTemplateModel.insertMany(templates);
+}
+
 /**
  * Generate all workflow tasks for a new project
  * Respects department sequence and creates dependency chain
@@ -20,12 +38,16 @@ export async function generateProjectTasks(
   projectId: Types.ObjectId,
   createdByUserId: Types.ObjectId
 ): Promise<void> {
+  await ensureDefaultTaskTemplates();
+
   const tasks = [];
   let globalSequence = 0;
   let previousDeptLastTaskId: Types.ObjectId | null = null;
 
   for (const dept of DEPARTMENT_SEQUENCE) {
-    const deptTasks = DEFAULT_TASKS_PER_DEPARTMENT[dept];
+    const deptTasks = await TaskTemplateModel.find({ department: dept, isActive: true })
+      .sort({ sequence: 1, createdAt: 1 })
+      .lean();
     let previousTaskIdInDept: Types.ObjectId | null = null;
 
     for (let i = 0; i < deptTasks.length; i++) {
@@ -47,6 +69,7 @@ export async function generateProjectTasks(
       tasks.push({
         _id: taskId,
         projectId,
+        templateTaskId: taskData._id,
         department: dept,
         title: taskData.title,
         description: taskData.description,
@@ -112,7 +135,7 @@ export async function reconcileBlockedTasksWithAlerts(projectId?: string): Promi
         projectId: id,
         status: { $ne: AlertStatus.RESOLVED },
       })
-        .select('_id affectedDepartments')
+        .select('_id taskId affectedDepartments')
         .lean();
 
       if (openAlerts.length === 0) {
@@ -126,8 +149,16 @@ export async function reconcileBlockedTasksWithAlerts(projectId?: string): Promi
         return;
       }
 
-      const blockedDepartments = [
-        ...new Set(openAlerts.flatMap((alert) => alert.affectedDepartments)),
+      const taskAlertTaskIds = openAlerts
+        .map((alert) => alert.taskId)
+        .filter((taskId): taskId is NonNullable<typeof taskId> => Boolean(taskId))
+        .map((id) => id.toString());
+      const globalAlertDepartments = [
+        ...new Set(
+          openAlerts
+            .filter((alert) => !alert.taskId)
+            .flatMap((alert) => alert.affectedDepartments)
+        ),
       ];
 
       await Promise.all([
@@ -135,7 +166,8 @@ export async function reconcileBlockedTasksWithAlerts(projectId?: string): Promi
           {
             projectId: id,
             status: TaskStatus.BLOCKED,
-            department: { $nin: blockedDepartments },
+            _id: { $nin: taskAlertTaskIds },
+            department: { $nin: globalAlertDepartments },
           },
           { $set: { status: TaskStatus.TODO } }
         ),
@@ -189,15 +221,21 @@ export async function applyAlertEffects(alertId: string): Promise<void> {
     $addToSet: { activeAlertIds: alert._id },
   });
 
-  // Block tasks in affected departments
-  await TaskModel.updateMany(
-    {
-      projectId: alert.projectId,
-      department: { $in: alert.affectedDepartments },
-      status: { $in: [TaskStatus.TODO, TaskStatus.IN_PROGRESS] },
-    },
-    { $set: { status: TaskStatus.BLOCKED } }
-  );
+  if (alert.taskId) {
+    await TaskModel.findByIdAndUpdate(alert.taskId, {
+      status: TaskStatus.BLOCKED,
+    });
+  } else {
+    // Global/project alert: block tasks in affected departments
+    await TaskModel.updateMany(
+      {
+        projectId: alert.projectId,
+        department: { $in: alert.affectedDepartments },
+        status: { $in: [TaskStatus.TODO, TaskStatus.IN_PROGRESS] },
+      },
+      { $set: { status: TaskStatus.BLOCKED } }
+    );
+  }
 
   // Global notification
   await triggerEvent(CHANNELS.global, EVENTS.ALERT_CREATED, {
@@ -258,10 +296,10 @@ export function validateTaskTransition(
   }
 
   const allowedTransitions: Record<TaskStatus, TaskStatus[]> = {
-    [TaskStatus.TODO]: [TaskStatus.IN_PROGRESS],
+    [TaskStatus.TODO]: [TaskStatus.IN_PROGRESS, TaskStatus.DONE],
     [TaskStatus.IN_PROGRESS]: [TaskStatus.DONE, TaskStatus.TODO],
     [TaskStatus.BLOCKED]: [], // Cannot transition from blocked
-    [TaskStatus.DONE]: [], // Cannot un-complete
+    [TaskStatus.DONE]: [TaskStatus.TODO, TaskStatus.IN_PROGRESS],
   };
 
   if (!allowedTransitions[currentStatus].includes(newStatus)) {

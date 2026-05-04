@@ -17,6 +17,8 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
   await connectDB();
   const params = await ctx.params;
   const task = await TaskModel.findById(params.id)
+    .populate('projectId', 'projectTitle clientName')
+    .populate('templateTaskId', 'title department sequence')
     .populate('assignedUser', 'name email department avatar')
     .populate('dependencyTaskId', 'title status department sequence')
     .lean();
@@ -57,6 +59,9 @@ export const PATCH = withAuth(async (req: NextRequest, ctx, { user }) => {
     if (body.status === TaskStatus.DONE && task.status !== TaskStatus.DONE) {
       body.completedAt = new Date();
     }
+    if (body.status !== TaskStatus.DONE && task.status === TaskStatus.DONE) {
+      body.completedAt = null;
+    }
     if (body.status === TaskStatus.IN_PROGRESS && !task.startDate) {
       body.startDate = new Date();
     }
@@ -69,6 +74,8 @@ export const PATCH = withAuth(async (req: NextRequest, ctx, { user }) => {
 
   const oldStatus = task.status;
   const updated = await TaskModel.findByIdAndUpdate(id, { $set: parsed.data }, { new: true })
+    .populate('projectId', 'projectTitle clientName')
+    .populate('templateTaskId', 'title department sequence')
     .populate('assignedUser', 'name email department')
     .populate('dependencyTaskId', 'title status');
 
@@ -87,7 +94,15 @@ export const PATCH = withAuth(async (req: NextRequest, ctx, { user }) => {
       await unlockDependentTasks(id);
     }
 
-    await updateProjectCompletion(updated.projectId.toString());
+    await updateProjectCompletion(task.projectId.toString());
+  }
+
+  if (parsed.data.imageAttachments) {
+    await createSystemLog({
+      taskId: id,
+      content: `Images updated by ${user.name}`,
+      authorId: user._id.toString(),
+    });
   }
 
   return NextResponse.json({ success: true, data: updated });

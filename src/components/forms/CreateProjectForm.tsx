@@ -302,8 +302,8 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
           <div className="border border-gray-200 bg-gray-50 p-4">
             <p className="text-xs text-gray-600 font-mono">
               <span className="font-bold text-gray-900">After creation:</span> {' '}
-              {4 * 3}+ workflow tasks will be auto-generated across all 4 departments
-              (Office Admin → Purchase → Store → Marketing) with dependency locking enforced.
+              active task templates will be copied department-wise into this project,
+              with each generated task keeping a reference to its source template.
             </p>
           </div>
         </div>

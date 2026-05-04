@@ -10,6 +10,14 @@ import {
   UserRole,
 } from '@/types';
 
+const OptionalDateSchema = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined || value === '') return value;
+    return value instanceof Date ? value : new Date(String(value));
+  },
+  z.date().nullable().optional()
+);
+
 // ============================================================
 // USER SCHEMAS
 // ============================================================
@@ -78,18 +86,40 @@ export const CreateTaskSchema = z.object({
   dueDate: z.string().optional(),
 });
 
+export const CreateTaskTemplateSchema = z.object({
+  department: z.nativeEnum(Department),
+  title: z.string().min(3, 'Task title must be at least 3 characters'),
+  description: z.string().min(10, 'Task description must be at least 10 characters'),
+  sequence: z.number().int().min(0).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const UpdateTaskTemplateSchema = CreateTaskTemplateSchema.partial();
+
 export const UpdateTaskSchema = z.object({
   status: z.nativeEnum(TaskStatus).optional(),
   assignedUser: z.string().nullable().optional(),
   startDate: z
-    .string()
-    .transform((str) => new Date(str))
+    .preprocess(
+      (value) => (value instanceof Date ? value : value ? new Date(String(value)) : value),
+      z.date().optional()
+    )
     .optional(),
-  dueDate: z
-    .string()
-    .transform((str) => new Date(str))
-    .optional(),
+  dueDate: OptionalDateSchema,
+  completedAt: OptionalDateSchema,
   description: z.string().optional(),
+  imageAttachments: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().min(1).max(160),
+        url: z.string().startsWith('data:image/'),
+        size: z.number().int().positive().max(2_500_000),
+        uploadedAt: z.string().transform((str) => new Date(str)),
+      })
+    )
+    .max(6)
+    .optional(),
 });
 
 export const TaskStatusTransitionSchema = z.object({
