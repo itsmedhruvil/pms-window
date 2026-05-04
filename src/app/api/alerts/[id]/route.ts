@@ -115,4 +115,35 @@ async function patchHandler(
   return NextResponse.json({ success: true, data: updated });
 }
 
+// DELETE /api/alerts/[id] - delete alert (admin only)
+async function deleteHandler(
+  req: NextRequest,
+  context: { params: Promise<Record<string, string>> },
+  { user }: { user: IUserDocument }
+) {
+  if (user.role === UserRole.DEPARTMENT_USER) {
+    return NextResponse.json(
+      { success: false, error: 'Only admins can delete alerts' },
+      { status: 403 }
+    );
+  }
+
+  await connectDB();
+
+  const params = await context.params;
+  const { id } = params;
+
+  const alert = await AlertModel.findByIdAndDelete(id);
+  if (!alert) {
+    return NextResponse.json({ success: false, error: 'Alert not found' }, { status: 404 });
+  }
+
+  // Also clean up associated comments
+  const CommentModel = (await import('@/models/Comment')).default;
+  await CommentModel.deleteMany({ alertId: id });
+
+  return NextResponse.json({ success: true, data: { id } });
+}
+
 export const PATCH = withAuth(patchHandler);
+export const DELETE = withAuth(deleteHandler);

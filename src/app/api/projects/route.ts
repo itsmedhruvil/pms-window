@@ -112,8 +112,16 @@ export const POST = withAuth(
         { session }
       );
 
-      // Auto-generate workflow tasks
-      await generateProjectTasks(project._id, user._id);
+      // Auto-generate workflow tasks from template groups (if window specs have them)
+      await generateProjectTasks(
+        project._id,
+        user._id,
+        projectData.windowSpecifications.map((ws) => ({
+          templateGroupId: ws.templateGroupId,
+          design: ws.design,
+          quantity: ws.quantity,
+        }))
+      );
 
       // Create system log
       await createSystemLog({

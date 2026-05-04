@@ -24,6 +24,7 @@ const BASE_NAV_ITEMS = [
 
 const ADMIN_NAV_ITEMS = [
   { href: '/tasks', label: 'Task Templates', icon: ClipboardList },
+  { href: '/template-groups', label: 'Template Groups', icon: ClipboardList },
 ];
 
 interface AppLayoutProps {
@@ -38,7 +39,7 @@ export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
   const isAdmin = user?.publicMetadata?.role === 'ADMIN' || user?.publicMetadata?.role === 'SUPER_ADMIN';
   const NAV_ITEMS = isAdmin ? [...BASE_NAV_ITEMS, ...ADMIN_NAV_ITEMS] : BASE_NAV_ITEMS;
   const isNavActive = (href: string) =>
-    href === '/tasks' ? pathname === '/tasks' : pathname.startsWith(href);
+    href === '/tasks' ? pathname === '/tasks' : href === '/template-groups' ? pathname === '/template-groups' : pathname.startsWith(href);
 
   return (
     <div className="flex h-screen bg-white overflow-hidden">

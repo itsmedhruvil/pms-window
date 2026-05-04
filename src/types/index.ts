@@ -68,6 +68,7 @@ export interface WindowSpec {
   glassType: string;
   quantity: number;
   notes?: string;
+  templateGroupId?: string;
 }
 
 export interface IUser {
@@ -237,6 +238,21 @@ export const DEPARTMENT_LABELS: Record<Department, string> = {
   [Department.STORE]: 'Store',
   [Department.SITE]: 'Site',
 };
+
+export interface ITemplateGroup {
+  _id: string;
+  name: string;
+  description: string;
+  tasks: Array<{
+    department: Department;
+    title: string;
+    description: string;
+    sequence: number;
+  }>;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export const DEFAULT_TASKS_PER_DEPARTMENT: Record<Department, Array<{ title: string; description: string }>> = {
   [Department.PRODUCTION]: [

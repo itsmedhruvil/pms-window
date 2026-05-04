@@ -48,6 +48,7 @@ export const WindowSpecSchema = z.object({
   glassType: z.string().min(1, 'Glass type is required'),
   quantity: z.number().int().positive('Quantity must be positive'),
   notes: z.string().optional(),
+  templateGroupId: z.string().optional(),
 });
 
 export const CreateProjectSchema = z.object({

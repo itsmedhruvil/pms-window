@@ -32,9 +32,26 @@ export async function ensureDefaultTaskTemplates() {
 
 /**
  * Generate all workflow tasks for a new project
- * Respects department sequence and creates dependency chain
+ * If windowSpecs contain templateGroupId references, generates per-window tasks from template groups.
+ * Otherwise falls back to the old behavior of generating from TaskTemplates.
  */
 export async function generateProjectTasks(
+  projectId: Types.ObjectId,
+  createdByUserId: Types.ObjectId,
+  windowSpecifications?: Array<{ templateGroupId?: string; design: string; quantity: number }>
+): Promise<void> {
+  if (windowSpecifications && windowSpecifications.some((ws) => ws.templateGroupId)) {
+    await generateFromTemplateGroups(projectId, createdByUserId, windowSpecifications);
+    return;
+  }
+
+  await generateFromTaskTemplates(projectId, createdByUserId);
+}
+
+/**
+ * Old behavior: generate tasks from active TaskTemplates
+ */
+async function generateFromTaskTemplates(
   projectId: Types.ObjectId,
   createdByUserId: Types.ObjectId
 ): Promise<void> {
@@ -54,9 +71,6 @@ export async function generateProjectTasks(
       const taskData = deptTasks[i];
       const taskId = new Types.ObjectId();
 
-      // Determine dependency:
-      // First task of a department depends on last task of previous department
-      // Subsequent tasks in same dept depend on previous task in same dept
       let dependencyTaskId: Types.ObjectId | null = null;
       if (i === 0 && previousDeptLastTaskId) {
         dependencyTaskId = previousDeptLastTaskId;
@@ -73,7 +87,7 @@ export async function generateProjectTasks(
         department: dept,
         title: taskData.title,
         description: taskData.description,
-        status: isLocked ? TaskStatus.TODO : TaskStatus.TODO,
+        status: TaskStatus.TODO,
         dependencyTaskId,
         isLocked,
         sequence: globalSequence++,
@@ -87,10 +101,95 @@ export async function generateProjectTasks(
 
   await TaskModel.insertMany(tasks);
 
-  // Log system comment
   await CommentModel.create({
     taskId: tasks[0]._id,
     content: `Project workflow initialized. ${tasks.length} tasks created across ${DEPARTMENT_SEQUENCE.length} departments.`,
+    author: createdByUserId,
+    isSystemLog: true,
+  });
+}
+
+/**
+ * New behavior: generate tasks from selected TemplateGroups per window specification.
+ * For each window spec that has a templateGroupId, replicate the group's tasks × quantity.
+ */
+async function generateFromTemplateGroups(
+  projectId: Types.ObjectId,
+  createdByUserId: Types.ObjectId,
+  windowSpecifications: Array<{ templateGroupId?: string; design: string; quantity: number }>
+): Promise<void> {
+  const TemplateGroupModel = (await import('@/models/TemplateGroup')).default;
+  const tasks = [];
+  let globalSequence = 0;
+  let previousDeptLastTaskId: Types.ObjectId | null = null;
+
+  // Process each window spec
+  for (const spec of windowSpecifications) {
+    if (!spec.templateGroupId) continue;
+
+    const group = await TemplateGroupModel.findById(spec.templateGroupId).lean();
+    if (!group) continue;
+
+    // For each quantity of this window type, generate the full department chain
+    for (let qty = 0; qty < (spec.quantity || 1); qty++) {
+      // Group tasks by department and sort by sequence
+      const deptMap = new Map<string, typeof group.tasks>();
+      for (const task of group.tasks) {
+        if (!deptMap.has(task.department)) {
+          deptMap.set(task.department, []);
+        }
+        deptMap.get(task.department)!.push(task);
+      }
+
+      for (const dept of DEPARTMENT_SEQUENCE) {
+        const deptTasks = (deptMap.get(dept) || []).sort((a, b) => a.sequence - b.sequence);
+        if (deptTasks.length === 0) continue;
+
+        let previousTaskIdInDept: Types.ObjectId | null = null;
+
+        for (let i = 0; i < deptTasks.length; i++) {
+          const taskData = deptTasks[i];
+          const taskId = new Types.ObjectId();
+
+          let dependencyTaskId: Types.ObjectId | null = null;
+          if (i === 0 && previousDeptLastTaskId) {
+            dependencyTaskId = previousDeptLastTaskId;
+          } else if (i > 0 && previousTaskIdInDept) {
+            dependencyTaskId = previousTaskIdInDept;
+          }
+
+          const isLocked = dependencyTaskId !== null;
+
+          tasks.push({
+            _id: taskId,
+            projectId,
+            department: dept as any,
+            title: `${taskData.title} — ${spec.design} #${qty + 1}`,
+            description: taskData.description,
+            status: TaskStatus.TODO,
+            dependencyTaskId,
+            isLocked,
+            sequence: globalSequence++,
+          });
+
+          previousTaskIdInDept = taskId;
+        }
+
+        previousDeptLastTaskId = previousTaskIdInDept;
+      }
+    }
+  }
+
+  // If no template groups matched, fall back to old behavior
+  if (tasks.length === 0) {
+    return generateFromTaskTemplates(projectId, createdByUserId);
+  }
+
+  await TaskModel.insertMany(tasks);
+
+  await CommentModel.create({
+    taskId: tasks[0]._id,
+    content: `Project workflow initialized from template groups. ${tasks.length} tasks created for ${windowSpecifications.filter((ws) => ws.templateGroupId).length} window types.`,
     author: createdByUserId,
     isSystemLog: true,
   });

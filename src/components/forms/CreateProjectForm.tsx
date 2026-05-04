@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Trash2, AlertCircle, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 import { cn, apiFetch } from '@/lib/utils';
 import { ProjectPriority } from '@/types';
-import type { WindowSpec } from '@/types';
+import type { WindowSpec, ITemplateGroup } from '@/types';
 
 const PRIORITIES = [
   { value: ProjectPriority.LOW, label: 'Low', desc: 'Standard timeline' },
@@ -60,6 +60,26 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
     windowSpecifications: [{ ...EMPTY_SPEC }],
   });
 
+  const [templateGroups, setTemplateGroups] = useState<ITemplateGroup[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoadingGroups(true);
+    apiFetch<ITemplateGroup[]>('/api/template-groups')
+      .then((result) => {
+        if (!mounted) return;
+        setLoadingGroups(false);
+        if (result.success && result.data) {
+          setTemplateGroups(result.data);
+        }
+      })
+      .catch(() => {
+        if (mounted) setLoadingGroups(false);
+      });
+    return () => { mounted = false; };
+  }, []);
+
   const totalWindows = form.windowSpecifications.reduce((s, sp) => s + (sp.quantity || 0), 0);
 
   // ── Step validation ──────────────────────────
@@ -91,6 +111,8 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
       specs[idx] = { ...specs[idx], [key]: value };
       return { ...f, windowSpecifications: specs };
     });
+
+  const selectedGroup = templateGroups.find((g) => g._id === form.windowSpecifications[0]?.templateGroupId);
 
   // ── Submit ────────────────────────────────────
   const handleSubmit = async () => {
@@ -240,6 +262,46 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             </span>
           </div>
 
+          {/* Template Group selector (applied to all specs) */}
+          <div className="border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
+                Task Template Group
+              </span>
+              {loadingGroups && <span className="text-[10px] text-gray-400 font-mono">Loading...</span>}
+            </div>
+            <p className="text-[11px] text-gray-500 font-mono mb-3">
+              Select a template group to auto-generate department tasks for each window type.
+            </p>
+            <select
+              value={selectedGroup?._id || ''}
+              onChange={(e) => {
+                const groupId = e.target.value;
+                setForm((f) => ({
+                  ...f,
+                  windowSpecifications: f.windowSpecifications.map((s) => ({
+                    ...s,
+                    templateGroupId: groupId || undefined,
+                  })),
+                }));
+              }}
+              className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white"
+            >
+              <option value="">No template group (use default tasks)</option>
+              {templateGroups.map((g) => (
+                <option key={g._id} value={g._id}>
+                  {g.name}{g.description ? ` — ${g.description}` : ''}
+                </option>
+              ))}
+            </select>
+            {selectedGroup && (
+              <div className="mt-2 text-[10px] text-gray-500 font-mono">
+                {selectedGroup.tasks.length} tasks across{' '}
+                {new Set(selectedGroup.tasks.map((t) => t.department)).size} departments
+              </div>
+            )}
+          </div>
+
           {form.windowSpecifications.map((spec, idx) => (
             <SpecRow
               key={idx}
@@ -299,13 +361,24 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             ))}
           </div>
 
-          <div className="border border-gray-200 bg-gray-50 p-4">
-            <p className="text-xs text-gray-600 font-mono">
-              <span className="font-bold text-gray-900">After creation:</span> {' '}
-              active task templates will be copied department-wise into this project,
-              with each generated task keeping a reference to its source template.
-            </p>
-          </div>
+          {selectedGroup && (
+            <div className="border border-gray-200 bg-gray-50 p-4">
+              <p className="text-xs text-gray-600 font-mono">
+                <span className="font-bold text-gray-900">After creation:</span> {' '}
+                each window will generate tasks from &ldquo;{selectedGroup.name}&rdquo; template group &times; quantity.
+              </p>
+            </div>
+          )}
+
+          {!selectedGroup && (
+            <div className="border border-gray-200 bg-gray-50 p-4">
+              <p className="text-xs text-gray-600 font-mono">
+                <span className="font-bold text-gray-900">After creation:</span> {' '}
+                active task templates will be copied department-wise into this project,
+                with each generated task keeping a reference to its source template.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

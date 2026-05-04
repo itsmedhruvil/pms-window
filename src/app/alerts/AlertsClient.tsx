@@ -54,6 +54,20 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
     }
   };
 
+  const handleDelete = async (alertId: string) => {
+    if (!window.confirm('Are you sure you want to delete this alert? This action cannot be undone.')) return;
+
+    setActionLoading(alertId + 'delete');
+    const result = await apiFetch(`/api/alerts/${alertId}`, {
+      method: 'DELETE',
+    });
+    setActionLoading(null);
+
+    if (result.success) {
+      setAlerts((prev) => prev.filter((a) => a._id !== alertId));
+    }
+  };
+
   return (
     <div className="p-6 max-w-screen-xl mx-auto">
       {/* Header */}
@@ -127,6 +141,7 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
               onToggle={() => setExpandedId(expandedId === alert._id ? null : alert._id)}
               onAcknowledge={() => handleAction(alert._id, 'acknowledge')}
               onResolve={() => handleAction(alert._id, 'resolve')}
+              onDelete={() => handleDelete(alert._id)}
               actionLoading={actionLoading}
               isAdmin={isAdmin}
               currentUserId={currentUserId}
@@ -145,6 +160,7 @@ function AlertRow({
   onToggle,
   onAcknowledge,
   onResolve,
+  onDelete,
   actionLoading,
   isAdmin,
   currentUserId,
@@ -155,6 +171,7 @@ function AlertRow({
   onToggle: () => void;
   onAcknowledge: () => void;
   onResolve: () => void;
+  onDelete: () => void;
   actionLoading: string | null;
   isAdmin: boolean;
   currentUserId: string;
@@ -267,6 +284,15 @@ function AlertRow({
                   className="px-3 py-1.5 text-[11px] font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 transition-colors disabled:opacity-50"
                 >
                   {actionLoading === alert._id + 'resolve' ? '...' : 'Mark Resolved'}
+                </button>
+              )}
+              {isAdmin && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                  disabled={actionLoading === alert._id + 'delete'}
+                  className="px-3 py-1.5 text-[11px] font-mono font-bold uppercase border border-red-300 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 ml-auto"
+                >
+                  {actionLoading === alert._id + 'delete' ? '...' : 'Delete'}
                 </button>
               )}
               {hasAcknowledgedMe && isActive && (
