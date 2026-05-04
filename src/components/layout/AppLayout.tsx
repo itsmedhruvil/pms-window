@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserButton } from '@clerk/nextjs';
+import { UserButton, useUser } from '@clerk/nextjs';
 import {
   LayoutDashboard,
   FolderKanban,
@@ -10,16 +10,21 @@ import {
   AlertTriangle,
   Users,
   Factory,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GlobalCreateButton } from '@/components/layout/GlobalCreateButton';
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
   { href: '/tasks', label: 'My Tasks', icon: ListTodo },
   { href: '/alerts', label: 'Alerts', icon: AlertTriangle },
   { href: '/users', label: 'Users', icon: Users },
+];
+
+const ADMIN_NAV_ITEMS = [
+  { href: '/tasks/manage', label: 'Task Management', icon: Settings },
 ];
 
 interface AppLayoutProps {
@@ -29,6 +34,10 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
   const pathname = usePathname();
+  const { user } = useUser();
+
+  const isAdmin = user?.publicMetadata?.role === 'ADMIN' || user?.publicMetadata?.role === 'SUPER_ADMIN';
+  const NAV_ITEMS = isAdmin ? [...BASE_NAV_ITEMS, ...ADMIN_NAV_ITEMS] : BASE_NAV_ITEMS;
 
   return (
     <div className="flex h-screen bg-white overflow-hidden">

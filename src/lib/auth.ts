@@ -138,7 +138,7 @@ export async function getCurrentUser(): Promise<IUserDocument | null> {
           name: fullName || "New User",
           avatar: clerkUserData.imageUrl,
           role: isMainAdmin ? UserRole.SUPER_ADMIN : UserRole.DEPARTMENT_USER,
-          department: Department.OFFICE_ADMIN,
+          department: Department.PRODUCTION,
           isActive: true,
         });
         console.log(`[JIT Sync] Successfully created user ${user._id}`);
@@ -161,7 +161,7 @@ export async function getCurrentUser(): Promise<IUserDocument | null> {
 
     if (user.email.toLowerCase() === MAIN_ADMIN_EMAIL && user.role !== UserRole.SUPER_ADMIN) {
       user.role = UserRole.SUPER_ADMIN;
-      user.department = Department.OFFICE_ADMIN;
+      user.department = Department.PRODUCTION;
       shouldSave = true;
     }
 

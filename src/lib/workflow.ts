@@ -1,4 +1,5 @@
-import mongoose from 'mongoose';
+import { Types } from 'mongoose';
+import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 import TaskModel from '@/models/Task';
 import ProjectModel from '@/models/Project';
 import AlertModel from '@/models/Alert';
@@ -16,25 +17,25 @@ import {
  * Respects department sequence and creates dependency chain
  */
 export async function generateProjectTasks(
-  projectId: mongoose.Types.ObjectId,
-  createdByUserId: mongoose.Types.ObjectId
+  projectId: Types.ObjectId,
+  createdByUserId: Types.ObjectId
 ): Promise<void> {
   const tasks = [];
   let globalSequence = 0;
-  let previousDeptLastTaskId: mongoose.Types.ObjectId | null = null;
+  let previousDeptLastTaskId: Types.ObjectId | null = null;
 
   for (const dept of DEPARTMENT_SEQUENCE) {
     const deptTasks = DEFAULT_TASKS_PER_DEPARTMENT[dept];
-    let previousTaskIdInDept: mongoose.Types.ObjectId | null = null;
+    let previousTaskIdInDept: Types.ObjectId | null = null;
 
     for (let i = 0; i < deptTasks.length; i++) {
       const taskData = deptTasks[i];
-      const taskId = new mongoose.Types.ObjectId();
+      const taskId = new Types.ObjectId();
 
       // Determine dependency:
       // First task of a department depends on last task of previous department
       // Subsequent tasks in same dept depend on previous task in same dept
-      let dependencyTaskId: mongoose.Types.ObjectId | null = null;
+      let dependencyTaskId: Types.ObjectId | null = null;
       if (i === 0 && previousDeptLastTaskId) {
         dependencyTaskId = previousDeptLastTaskId;
       } else if (i > 0 && previousTaskIdInDept) {
@@ -102,7 +103,7 @@ export async function unlockDependentTasks(completedTaskId: string): Promise<voi
  */
 export async function reconcileBlockedTasksWithAlerts(projectId?: string): Promise<void> {
   const projectIds = projectId
-    ? [new mongoose.Types.ObjectId(projectId)]
+    ? [new Types.ObjectId(projectId)]
     : await TaskModel.distinct('projectId', { status: TaskStatus.BLOCKED });
 
   await Promise.all(

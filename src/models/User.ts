@@ -63,6 +63,50 @@ const UserSchema = new Schema<IUserDocument>(
 UserSchema.index({ role: 1 });
 UserSchema.index({ department: 1, isActive: 1 });
 
+// Pre-save middleware to handle department migration from old enum values
+UserSchema.pre('save', function (next) {
+  const oldDepartmentMap: Record<string, Department> = {
+    'office_admin': Department.PRODUCTION,
+    'marketing': Department.SITE,
+  };
+
+  if (this.department && oldDepartmentMap[this.department as string]) {
+    this.department = oldDepartmentMap[this.department as string];
+  }
+
+  next();
+});
+
+// Post-find middleware to handle fetched documents
+UserSchema.post('find', function (docs) {
+  if (!Array.isArray(docs)) return;
+  
+  const oldDepartmentMap: Record<string, Department> = {
+    'office_admin': Department.PRODUCTION,
+    'marketing': Department.SITE,
+  };
+
+  docs.forEach((doc) => {
+    if (doc.department && oldDepartmentMap[doc.department as string]) {
+      doc.department = oldDepartmentMap[doc.department as string];
+    }
+  });
+});
+
+// Post-findOne middleware
+UserSchema.post('findOne', function (doc) {
+  if (!doc) return;
+  
+  const oldDepartmentMap: Record<string, Department> = {
+    'office_admin': Department.PRODUCTION,
+    'marketing': Department.SITE,
+  };
+
+  if (doc.department && oldDepartmentMap[doc.department as string]) {
+    doc.department = oldDepartmentMap[doc.department as string];
+  }
+});
+
 const UserModel: Model<IUserDocument> =
   mongoose.models.User || mongoose.model<IUserDocument>('User', UserSchema);
 

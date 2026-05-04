@@ -59,7 +59,7 @@ async function patchHandler(
       authorId: user._id.toString(),
     });
   } else if (action === 'resolve') {
-    // Only admin can resolve
+    // Only admins can resolve alerts
     if (user.role === UserRole.DEPARTMENT_USER) {
       return NextResponse.json(
         { success: false, error: 'Only admins can resolve alerts' },
@@ -67,6 +67,7 @@ async function patchHandler(
       );
     }
 
+    // Ensure alert has been acknowledged before allowing resolution
     if (alert.status === AlertStatus.ACTIVE) {
       return NextResponse.json(
         { success: false, error: 'Alert must be acknowledged before resolving' },
@@ -74,7 +75,7 @@ async function patchHandler(
       );
     }
 
-    // Check if comment thread exists (required before resolution)
+    // Require a discussion thread (at least two comments) before resolution
     const CommentModel = (await import('@/models/Comment')).default;
     const commentCount = await CommentModel.countDocuments({ alertId: id });
     if (commentCount < 2) {
@@ -84,13 +85,16 @@ async function patchHandler(
       );
     }
 
+    // Mark alert as resolved and record metadata
     alert.status = AlertStatus.RESOLVED;
     alert.resolvedAt = new Date();
     alert.resolvedBy = user._id;
     await alert.save();
 
+    // Restore workflow: unblock tasks, update project status, etc.
     await resolveAlertEffects(id);
 
+    // Log the resolution event for audit purposes
     await createSystemLog({
       alertId: id,
       content: `Alert resolved by ${user.name}. Workflow restored.`,

@@ -92,8 +92,18 @@ TaskSchema.index({ projectId: 1, status: 1 });
 TaskSchema.index({ assignedUser: 1, status: 1 });
 TaskSchema.index({ projectId: 1, sequence: 1 });
 
-// Pre-save middleware: auto-lock based on dependency
+// Pre-save middleware: auto-lock based on dependency and handle department migration
 TaskSchema.pre('save', async function (next) {
+  // Handle old department enum values
+  const oldDepartmentMap: Record<string, Department> = {
+    'office_admin': Department.PRODUCTION,
+    'marketing': Department.SITE,
+  };
+
+  if (this.department && oldDepartmentMap[this.department as string]) {
+    this.department = oldDepartmentMap[this.department as string];
+  }
+
   if (this.dependencyTaskId && this.isModified('dependencyTaskId')) {
     const depTask = await mongoose.model('Task').findById(this.dependencyTaskId);
     if (depTask && depTask.status !== TaskStatus.DONE) {
@@ -101,6 +111,36 @@ TaskSchema.pre('save', async function (next) {
     }
   }
   next();
+});
+
+// Post-find middleware to handle fetched documents
+TaskSchema.post('find', function (docs) {
+  if (!Array.isArray(docs)) return;
+  
+  const oldDepartmentMap: Record<string, Department> = {
+    'office_admin': Department.PRODUCTION,
+    'marketing': Department.SITE,
+  };
+
+  docs.forEach((doc) => {
+    if (doc.department && oldDepartmentMap[doc.department as string]) {
+      doc.department = oldDepartmentMap[doc.department as string];
+    }
+  });
+});
+
+// Post-findOne middleware
+TaskSchema.post('findOne', function (doc) {
+  if (!doc) return;
+  
+  const oldDepartmentMap: Record<string, Department> = {
+    'office_admin': Department.PRODUCTION,
+    'marketing': Department.SITE,
+  };
+
+  if (doc.department && oldDepartmentMap[doc.department as string]) {
+    doc.department = oldDepartmentMap[doc.department as string];
+  }
 });
 
 const TaskModel: Model<ITaskDocument> =

@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import {
   AlertTriangle, Calendar, Package, ChevronRight,
-  CheckCircle2
+  CheckCircle2, Copy
 } from 'lucide-react';
 import { cn, DEPARTMENT_LABELS, formatDate, timeAgo, ALERT_TYPE_LABEL } from '@/lib/utils';
 import {
@@ -55,6 +55,21 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
       }));
     }, []),
   });
+
+  const handleDuplicateProject = async () => {
+    try {
+      const response = await fetch(`/api/projects/${project._id}/duplicate`, {
+        method: 'POST',
+      });
+      const data = await response.json();
+      if (data.success) {
+        // Redirect to the new project or refresh
+        window.location.href = `/projects/${data.data.project._id}`;
+      }
+    } catch (error) {
+      console.error('Failed to duplicate project:', error);
+    }
+  };
 
   const activeAlerts = alerts.filter((a) => a.status !== AlertStatus.RESOLVED);
   const completedTasks = tasks.filter((t) => t.status === TaskStatus.DONE).length;
@@ -128,6 +143,13 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
                 >
                   <AlertTriangle className="w-3 h-3" />
                   Raise Alert
+                </button>
+                <button
+                  onClick={handleDuplicateProject}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold uppercase border border-blue-400 text-blue-600 hover:bg-blue-50 transition-colors"
+                >
+                  <Copy className="w-3 h-3" />
+                  Duplicate Project
                 </button>
               </div>
             )}

@@ -3,10 +3,12 @@
 // ============================================================
 
 export enum Department {
-  OFFICE_ADMIN = 'office_admin',
+  PRODUCTION = 'production',
   PURCHASE = 'purchase',
+  OPERATIONS = 'operations',
+  ACCOUNTS = 'accounts',
   STORE = 'store',
-  MARKETING = 'marketing',
+  SITE = 'site',
 }
 
 export enum UserRole {
@@ -198,24 +200,29 @@ export type RealtimeEvent =
 // ============================================================
 
 export const DEPARTMENT_SEQUENCE: Department[] = [
-  Department.OFFICE_ADMIN,
+  Department.PRODUCTION,
   Department.PURCHASE,
+  Department.OPERATIONS,
+  Department.ACCOUNTS,
   Department.STORE,
-  Department.MARKETING,
+  Department.SITE,
 ];
 
 export const DEPARTMENT_LABELS: Record<Department, string> = {
-  [Department.OFFICE_ADMIN]: 'Office Admin',
+  [Department.PRODUCTION]: 'Production',
   [Department.PURCHASE]: 'Purchase',
+  [Department.OPERATIONS]: 'Operations',
+  [Department.ACCOUNTS]: 'Accounts',
   [Department.STORE]: 'Store',
-  [Department.MARKETING]: 'Marketing',
+  [Department.SITE]: 'Site',
 };
 
 export const DEFAULT_TASKS_PER_DEPARTMENT: Record<Department, Array<{ title: string; description: string }>> = {
-  [Department.OFFICE_ADMIN]: [
-    { title: 'Order Intake & Verification', description: 'Verify client order details, specifications, and confirm requirements.' },
-    { title: 'Client Documentation', description: 'Prepare and send order confirmation, contracts, and specs to client.' },
-    { title: 'Production Briefing', description: 'Brief production team with final approved specifications.' },
+  [Department.PRODUCTION]: [
+    { title: 'Production Planning', description: 'Plan production schedule based on specifications.' },
+    { title: 'Frame Assembly', description: 'Assemble window frames according to design.' },
+    { title: 'Glass Installation', description: 'Install glass panels into frames.' },
+    { title: 'Quality Control', description: 'Perform quality checks on assembled windows.' },
   ],
   [Department.PURCHASE]: [
     { title: 'Material Requirement Planning', description: 'Calculate raw materials needed based on window specifications.' },
@@ -223,16 +230,26 @@ export const DEFAULT_TASKS_PER_DEPARTMENT: Record<Department, Array<{ title: str
     { title: 'Purchase Order Creation', description: 'Create and dispatch purchase orders to vendors.' },
     { title: 'Material Receipt Verification', description: 'Verify received materials against purchase orders.' },
   ],
+  [Department.OPERATIONS]: [
+    { title: 'Operations Coordination', description: 'Coordinate between departments for smooth workflow.' },
+    { title: 'Process Optimization', description: 'Monitor and optimize production processes.' },
+    { title: 'Resource Allocation', description: 'Allocate resources efficiently across projects.' },
+  ],
+  [Department.ACCOUNTS]: [
+    { title: 'Cost Estimation', description: 'Estimate project costs and prepare quotes.' },
+    { title: 'Invoice Preparation', description: 'Prepare invoices for completed work.' },
+    { title: 'Payment Tracking', description: 'Track payments and outstanding balances.' },
+  ],
   [Department.STORE]: [
     { title: 'Inventory Allocation', description: 'Allocate materials from inventory for this project.' },
     { title: 'Quality Inspection', description: 'Inspect all materials for quality compliance.' },
     { title: 'Production Handover', description: 'Hand over materials to production floor with documentation.' },
     { title: 'Dispatch Preparation', description: 'Package completed windows for dispatch.' },
   ],
-  [Department.MARKETING]: [
-    { title: 'Client Communication Update', description: 'Send progress update to client with timeline.' },
-    { title: 'Design Approval (if applicable)', description: 'Get design approval from client for custom specifications.' },
-    { title: 'Delivery Coordination', description: 'Coordinate delivery date and logistics with client.' },
-    { title: 'Post-Delivery Follow-up', description: 'Follow up with client post-delivery for satisfaction and feedback.' },
+  [Department.SITE]: [
+    { title: 'Site Survey', description: 'Conduct site survey for installation requirements.' },
+    { title: 'Installation Planning', description: 'Plan installation schedule and logistics.' },
+    { title: 'Window Installation', description: 'Install windows at client site.' },
+    { title: 'Post-Installation Check', description: 'Perform final checks after installation.' },
   ],
 };
