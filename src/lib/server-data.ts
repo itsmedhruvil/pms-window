@@ -349,21 +349,47 @@ export async function getDashboardData() {
 
 // ─── Serialization ────────────────────────────────────────────────────────────
 // Mongoose lean() returns BSON ObjectIds and Dates. Next.js requires plain
-// JSON-serializable objects when passing from Server → Client components.
-// This helper converts ObjectId → string and Date → ISO string recursively.
-// It also properly handles objects with custom toJSON methods.
-
+// JSON-serializable objects when passing from Server Components to Client
+// Components, and it rejects objects that still carry custom toJSON methods.
 export function serialize<T>(obj: T): T {
-  // Handle arrays by serializing each element
-  if (Array.isArray(obj)) {
-    return obj.map(item => serialize(item)) as T;
+  return toPlainValue(obj) as T;
+}
+
+function toPlainValue(value: unknown): unknown {
+  if (value == null) return value;
+
+  if (value instanceof Date) {
+    return value.toISOString();
   }
-  
-  // First, call toJSON on the object if it exists
-  if (obj && typeof obj === 'object' && 'toJSON' in obj && typeof obj.toJSON === 'function') {
-    obj = obj.toJSON() as T;
+
+  if (isObjectId(value)) {
+    return value.toHexString();
   }
-  
-  // Then use JSON.parse(JSON.stringify()) for the rest of the serialization
-  return JSON.parse(JSON.stringify(obj));
+
+  if (Array.isArray(value)) {
+    return value.map(toPlainValue);
+  }
+
+  if (typeof value !== 'object') {
+    return value;
+  }
+
+  const plain: Record<string, unknown> = {};
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (nestedValue !== undefined) {
+      plain[key] = toPlainValue(nestedValue);
+    }
+  }
+
+  return plain;
+}
+
+function isObjectId(value: unknown): value is { toHexString: () => string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'toHexString' in value &&
+    typeof value.toHexString === 'function' &&
+    ('_bsontype' in value || value.constructor?.name === 'ObjectId')
+  );
 }

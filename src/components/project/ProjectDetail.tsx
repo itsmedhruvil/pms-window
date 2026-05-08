@@ -6,7 +6,7 @@ import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import {
   AlertTriangle, Calendar, Package, ChevronRight,
-  CheckCircle2, Copy
+  CheckCircle2, Copy, Trash2
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 import { cn, DEPARTMENT_LABELS, formatDate, timeAgo, ALERT_TYPE_LABEL } from '@/lib/utils';
