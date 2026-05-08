@@ -8,17 +8,27 @@ import { AlertType, AlertSeverity, Department } from '@/types';
 interface CreateAlertFormProps {
   projectId: string;
   projectTitle: string;
+  taskId?: string;
+  defaultAffectedDepartments?: Department[];
+  title?: string;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export function CreateAlertForm({ projectId, projectTitle, onSuccess, onCancel }: CreateAlertFormProps) {
+export function CreateAlertForm({
+  projectId,
+  projectTitle,
+  taskId,
+  defaultAffectedDepartments = [],
+  title = 'Raise Alert',
+  onSuccess,
+  onCancel,
+}: CreateAlertFormProps) {
   const [form, setForm] = useState({
     type: '' as AlertType | '',
     severity: '' as AlertSeverity | '',
     message: '',
-    affectedDepartments: [] as Department[],
-    taskId: '',
+    affectedDepartments: defaultAffectedDepartments,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +60,7 @@ export function CreateAlertForm({ projectId, projectTitle, onSuccess, onCancel }
         severity: form.severity,
         message: form.message.trim(),
         affectedDepartments: form.affectedDepartments,
-        ...(form.taskId && { taskId: form.taskId }),
+        ...(taskId && { taskId }),
       }),
     });
 
@@ -71,7 +81,7 @@ export function CreateAlertForm({ projectId, projectTitle, onSuccess, onCancel }
         <div className="flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 text-white" />
           <span className="text-sm font-mono font-bold text-white uppercase tracking-wide">
-            Raise Alert
+            {title}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -90,8 +100,10 @@ export function CreateAlertForm({ projectId, projectTitle, onSuccess, onCancel }
         {/* Warning notice */}
         <div className="bg-red-50 border border-red-200 px-3 py-2.5">
           <p className="text-[11px] text-red-700 font-mono leading-relaxed">
-            <span className="font-bold">⚠ WARNING:</span> Raising an alert will immediately put the project
-            ON HOLD, block all tasks in affected departments, and require acknowledgment before work can resume.
+            <span className="font-bold">WARNING:</span>{' '}
+            {taskId
+              ? 'Raising a task alert will put the project on hold and block this task until the alert is resolved.'
+              : 'Raising a global alert will put the project on hold, block tasks in affected departments, and require resolution before work can resume.'}
           </p>
         </div>
 
@@ -253,7 +265,7 @@ export function CreateAlertForm({ projectId, projectTitle, onSuccess, onCancel }
             ) : (
               <>
                 <AlertTriangle className="w-3.5 h-3.5" />
-                Raise Alert
+                {title}
               </>
             )}
           </button>

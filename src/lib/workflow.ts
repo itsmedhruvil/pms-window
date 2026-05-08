@@ -1,5 +1,7 @@
-import mongoose from 'mongoose';
+import { Types } from 'mongoose';
+import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 import TaskModel from '@/models/Task';
+import TaskTemplateModel from '@/models/TaskTemplate';
 import ProjectModel from '@/models/Project';
 import AlertModel from '@/models/Alert';
 import CommentModel from '@/models/Comment';
@@ -11,47 +13,74 @@ import {
   DEFAULT_TASKS_PER_DEPARTMENT,
 } from '@/types';
 
+export async function ensureDefaultTaskTemplates() {
+  const existingCount = await TaskTemplateModel.estimatedDocumentCount();
+  if (existingCount > 0) return;
+
+  const templates = DEPARTMENT_SEQUENCE.flatMap((department) =>
+    DEFAULT_TASKS_PER_DEPARTMENT[department].map((task, index) => ({
+      department,
+      title: task.title,
+      description: task.description,
+      sequence: index,
+      isActive: true,
+    }))
+  );
+
+  await TaskTemplateModel.insertMany(templates);
+}
+
 /**
  * Generate all workflow tasks for a new project
- * Respects department sequence and creates dependency chain
+ * If windowSpecs contain templateGroupId references, generates per-window tasks from template groups.
+ * Otherwise falls back to the old behavior of generating from TaskTemplates.
  */
 export async function generateProjectTasks(
-  projectId: mongoose.Types.ObjectId,
-  createdByUserId: mongoose.Types.ObjectId
+  projectId: Types.ObjectId,
+  createdByUserId: Types.ObjectId,
+  windowSpecifications?: Array<{ templateGroupId?: string; design: string; quantity: number }>
 ): Promise<void> {
+  if (windowSpecifications && windowSpecifications.some((ws) => ws.templateGroupId)) {
+    await generateFromTemplateGroups(projectId, createdByUserId, windowSpecifications);
+    return;
+  }
+
+  await generateFromTaskTemplates(projectId, createdByUserId);
+}
+
+/**
+ * Old behavior: generate tasks from active TaskTemplates
+ */
+async function generateFromTaskTemplates(
+  projectId: Types.ObjectId,
+  createdByUserId: Types.ObjectId
+): Promise<void> {
+  await ensureDefaultTaskTemplates();
+
   const tasks = [];
   let globalSequence = 0;
-  let previousDeptLastTaskId: mongoose.Types.ObjectId | null = null;
+  let previousDeptLastTaskId: Types.ObjectId | null = null;
 
   for (const dept of DEPARTMENT_SEQUENCE) {
-    const deptTasks = DEFAULT_TASKS_PER_DEPARTMENT[dept];
-    let previousTaskIdInDept: mongoose.Types.ObjectId | null = null;
+    const deptTasks = await TaskTemplateModel.find({ department: dept, isActive: true })
+      .sort({ sequence: 1, createdAt: 1 })
+      .lean();
+    let previousTaskIdInDept: Types.ObjectId | null = null;
 
     for (let i = 0; i < deptTasks.length; i++) {
       const taskData = deptTasks[i];
-      const taskId = new mongoose.Types.ObjectId();
-
-      // Determine dependency:
-      // First task of a department depends on last task of previous department
-      // Subsequent tasks in same dept depend on previous task in same dept
-      let dependencyTaskId: mongoose.Types.ObjectId | null = null;
-      if (i === 0 && previousDeptLastTaskId) {
-        dependencyTaskId = previousDeptLastTaskId;
-      } else if (i > 0 && previousTaskIdInDept) {
-        dependencyTaskId = previousTaskIdInDept;
-      }
-
-      const isLocked = dependencyTaskId !== null;
+      const taskId = new Types.ObjectId();
 
       tasks.push({
         _id: taskId,
         projectId,
+        templateTaskId: taskData._id,
         department: dept,
         title: taskData.title,
         description: taskData.description,
-        status: isLocked ? TaskStatus.TODO : TaskStatus.TODO,
-        dependencyTaskId,
-        isLocked,
+        status: TaskStatus.TODO,
+        dependencyTaskId: null,
+        isLocked: false,
         sequence: globalSequence++,
       });
 
@@ -63,10 +92,84 @@ export async function generateProjectTasks(
 
   await TaskModel.insertMany(tasks);
 
-  // Log system comment
   await CommentModel.create({
     taskId: tasks[0]._id,
     content: `Project workflow initialized. ${tasks.length} tasks created across ${DEPARTMENT_SEQUENCE.length} departments.`,
+    author: createdByUserId,
+    isSystemLog: true,
+  });
+}
+
+/**
+ * New behavior: generate tasks from selected TemplateGroups per window specification.
+ * Task generation now creates one workflow chain per selected template group spec;
+ * quantity is no longer used to multiply tasks.
+ */
+async function generateFromTemplateGroups(
+  projectId: Types.ObjectId,
+  createdByUserId: Types.ObjectId,
+  windowSpecifications: Array<{ templateGroupId?: string; design: string; quantity: number }>
+): Promise<void> {
+  const TemplateGroupModel = (await import('@/models/TemplateGroup')).default;
+  const tasks = [];
+  let globalSequence = 0;
+  let previousDeptLastTaskId: Types.ObjectId | null = null;
+
+  // Process each window spec
+  for (const spec of windowSpecifications) {
+    if (!spec.templateGroupId) continue;
+
+    const group = await TemplateGroupModel.findById(spec.templateGroupId).lean();
+    if (!group) continue;
+
+    // Generate one full department chain for this window spec
+    const deptMap = new Map<string, typeof group.tasks>();
+    for (const task of group.tasks) {
+      if (!deptMap.has(task.department)) {
+        deptMap.set(task.department, []);
+      }
+      deptMap.get(task.department)!.push(task);
+    }
+
+    for (const dept of DEPARTMENT_SEQUENCE) {
+      const deptTasks = (deptMap.get(dept) || []).sort((a, b) => a.sequence - b.sequence);
+      if (deptTasks.length === 0) continue;
+
+      let previousTaskIdInDept: Types.ObjectId | null = null;
+
+      for (let i = 0; i < deptTasks.length; i++) {
+        const taskData = deptTasks[i];
+        const taskId = new Types.ObjectId();
+
+        tasks.push({
+          _id: taskId,
+          projectId,
+          department: dept as any,
+          title: `${taskData.title} — ${spec.design}`,
+          description: taskData.description,
+          status: TaskStatus.TODO,
+          dependencyTaskId: null,
+          isLocked: false,
+          sequence: globalSequence++,
+        });
+
+        previousTaskIdInDept = taskId;
+      }
+
+      previousDeptLastTaskId = previousTaskIdInDept;
+    }
+  }
+
+  // If no template groups matched, fall back to old behavior
+  if (tasks.length === 0) {
+    return generateFromTaskTemplates(projectId, createdByUserId);
+  }
+
+  await TaskModel.insertMany(tasks);
+
+  await CommentModel.create({
+    taskId: tasks[0]._id,
+    content: `Project workflow initialized from template groups. ${tasks.length} tasks created for ${windowSpecifications.filter((ws) => ws.templateGroupId).length} window types.`,
     author: createdByUserId,
     isSystemLog: true,
   });
@@ -102,7 +205,7 @@ export async function unlockDependentTasks(completedTaskId: string): Promise<voi
  */
 export async function reconcileBlockedTasksWithAlerts(projectId?: string): Promise<void> {
   const projectIds = projectId
-    ? [new mongoose.Types.ObjectId(projectId)]
+    ? [new Types.ObjectId(projectId)]
     : await TaskModel.distinct('projectId', { status: TaskStatus.BLOCKED });
 
   await Promise.all(
@@ -111,7 +214,7 @@ export async function reconcileBlockedTasksWithAlerts(projectId?: string): Promi
         projectId: id,
         status: { $ne: AlertStatus.RESOLVED },
       })
-        .select('_id affectedDepartments')
+        .select('_id taskId affectedDepartments')
         .lean();
 
       if (openAlerts.length === 0) {
@@ -125,8 +228,16 @@ export async function reconcileBlockedTasksWithAlerts(projectId?: string): Promi
         return;
       }
 
-      const blockedDepartments = [
-        ...new Set(openAlerts.flatMap((alert) => alert.affectedDepartments)),
+      const taskAlertTaskIds = openAlerts
+        .map((alert) => alert.taskId)
+        .filter((taskId): taskId is NonNullable<typeof taskId> => Boolean(taskId))
+        .map((id) => id.toString());
+      const globalAlertDepartments = [
+        ...new Set(
+          openAlerts
+            .filter((alert) => !alert.taskId)
+            .flatMap((alert) => alert.affectedDepartments)
+        ),
       ];
 
       await Promise.all([
@@ -134,7 +245,8 @@ export async function reconcileBlockedTasksWithAlerts(projectId?: string): Promi
           {
             projectId: id,
             status: TaskStatus.BLOCKED,
-            department: { $nin: blockedDepartments },
+            _id: { $nin: taskAlertTaskIds },
+            department: { $nin: globalAlertDepartments },
           },
           { $set: { status: TaskStatus.TODO } }
         ),
@@ -188,15 +300,21 @@ export async function applyAlertEffects(alertId: string): Promise<void> {
     $addToSet: { activeAlertIds: alert._id },
   });
 
-  // Block tasks in affected departments
-  await TaskModel.updateMany(
-    {
-      projectId: alert.projectId,
-      department: { $in: alert.affectedDepartments },
-      status: { $in: [TaskStatus.TODO, TaskStatus.IN_PROGRESS] },
-    },
-    { $set: { status: TaskStatus.BLOCKED } }
-  );
+  if (alert.taskId) {
+    await TaskModel.findByIdAndUpdate(alert.taskId, {
+      status: TaskStatus.BLOCKED,
+    });
+  } else {
+    // Global/project alert: block tasks in affected departments
+    await TaskModel.updateMany(
+      {
+        projectId: alert.projectId,
+        department: { $in: alert.affectedDepartments },
+        status: { $in: [TaskStatus.TODO, TaskStatus.IN_PROGRESS] },
+      },
+      { $set: { status: TaskStatus.BLOCKED } }
+    );
+  }
 
   // Global notification
   await triggerEvent(CHANNELS.global, EVENTS.ALERT_CREATED, {
@@ -257,10 +375,10 @@ export function validateTaskTransition(
   }
 
   const allowedTransitions: Record<TaskStatus, TaskStatus[]> = {
-    [TaskStatus.TODO]: [TaskStatus.IN_PROGRESS],
+    [TaskStatus.TODO]: [TaskStatus.IN_PROGRESS, TaskStatus.DONE],
     [TaskStatus.IN_PROGRESS]: [TaskStatus.DONE, TaskStatus.TODO],
     [TaskStatus.BLOCKED]: [], // Cannot transition from blocked
-    [TaskStatus.DONE]: [], // Cannot un-complete
+    [TaskStatus.DONE]: [TaskStatus.TODO, TaskStatus.IN_PROGRESS],
   };
 
   if (!allowedTransitions[currentStatus].includes(newStatus)) {

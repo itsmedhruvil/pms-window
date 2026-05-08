@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Trash2, AlertCircle, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 import { cn, apiFetch } from '@/lib/utils';
 import { ProjectPriority } from '@/types';
-import type { WindowSpec } from '@/types';
+import type { WindowSpec, ITemplateGroup } from '@/types';
 
 const PRIORITIES = [
   { value: ProjectPriority.LOW, label: 'Low', desc: 'Standard timeline' },
@@ -29,6 +29,9 @@ interface FormData {
   projectTitle: string;
   priority: ProjectPriority;
   deadline: string;
+  address: string;
+  contactPhone: string;
+  budget: number;
   windowSpecifications: WindowSpec[];
 }
 
@@ -57,16 +60,49 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
     projectTitle: '',
     priority: ProjectPriority.MEDIUM,
     deadline: '',
+    // new fields
+    address: '',
+    contactPhone: '',
+    budget: 0,
     windowSpecifications: [{ ...EMPTY_SPEC }],
   });
 
+  const [templateGroups, setTemplateGroups] = useState<ITemplateGroup[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoadingGroups(true);
+    apiFetch<ITemplateGroup[]>('/api/template-groups')
+      .then((result) => {
+        if (!mounted) return;
+        setLoadingGroups(false);
+        if (result.success && result.data) {
+          setTemplateGroups(result.data);
+        }
+      })
+      .catch(() => {
+        if (mounted) setLoadingGroups(false);
+      });
+    return () => { mounted = false; };
+  }, []);
+
   const totalWindows = form.windowSpecifications.reduce((s, sp) => s + (sp.quantity || 0), 0);
+
+  const tomorrowDate = new Date();
+  tomorrowDate.setHours(0, 0, 0, 0);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const minDeadline = tomorrowDate.toISOString().split('T')[0];
+  const deadlineIsFuture = form.deadline !== '' && new Date(form.deadline) >= tomorrowDate;
 
   // ── Step validation ──────────────────────────
   const step1Valid =
     form.clientName.trim().length >= 2 &&
     form.projectTitle.trim().length >= 3 &&
-    form.deadline !== '';
+    deadlineIsFuture &&
+    form.address.trim().length >= 5 &&
+    /^\+?[0-9]{7,15}$/.test(form.contactPhone) &&
+    form.budget > 0;
 
   const step2Valid = form.windowSpecifications.every(
     (s) => s.width > 0 && s.height > 0 && s.design && s.glassType && s.quantity >= 1
@@ -91,6 +127,8 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
       specs[idx] = { ...specs[idx], [key]: value };
       return { ...f, windowSpecifications: specs };
     });
+
+  const selectedGroup = templateGroups.find((g) => g._id === form.windowSpecifications[0]?.templateGroupId);
 
   // ── Submit ────────────────────────────────────
   const handleSubmit = async () => {
@@ -124,8 +162,8 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
       {/* Step indicator */}
       <div className="flex items-center gap-0 mb-8">
         {[
-          { n: 1, label: 'Order Details' },
-          { n: 2, label: 'Specifications' },
+          { n: 1, label: 'Project Details' },
+          { n: 2, label: 'Window Details' },
           { n: 3, label: 'Review' },
         ].map(({ n, label }, i, arr) => (
           <div key={n} className="flex items-center flex-1">
@@ -165,10 +203,10 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
         </div>
       )}
 
-      {/* ── Step 1: Order Details ─────────────────── */}
+      {/* ── Step 1: Project Details ─────────────────── */}
       {step === 1 && (
         <div className="space-y-5">
-          <SectionHeader title="Client & Order Information" />
+          <SectionHeader title="Project Information" />
 
           <Field label="Client Name" required>
             <input
@@ -190,11 +228,42 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             />
           </Field>
 
+          <Field label="Address" required>
+            <input
+              type="text"
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              placeholder="e.g. 123 Main St, City"
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Contact Phone" required>
+            <input
+              type="tel"
+              value={form.contactPhone}
+              onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
+              placeholder="e.g. +919876543210"
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Budget (₹)" required>
+            <input
+              type="number"
+              value={form.budget}
+              min={0}
+              onChange={(e) => setForm({ ...form, budget: Number(e.target.value) })}
+              placeholder="e.g. 500000"
+              className={inputClass}
+            />
+          </Field>
+
           <Field label="Deadline" required>
             <input
               type="date"
               value={form.deadline}
-              min={new Date().toISOString().split('T')[0]}
+              min={minDeadline}
               onChange={(e) => setForm({ ...form, deadline: e.target.value })}
               className={inputClass}
             />
@@ -230,35 +299,82 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
         </div>
       )}
 
-      {/* ── Step 2: Window Specs ──────────────────── */}
+      {/* ── Step 2: Window Details ─────────────────── */}
       {step === 2 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <SectionHeader title="Window Specifications" />
+            <SectionHeader title="Window Specifications & Task Templates" />
             <span className="text-xs font-mono text-gray-500">
               Total: <span className="font-bold text-gray-900">{totalWindows}</span> windows
             </span>
           </div>
 
-          {form.windowSpecifications.map((spec, idx) => (
-            <SpecRow
-              key={idx}
-              spec={spec}
-              index={idx}
-              canRemove={form.windowSpecifications.length > 1}
-              onUpdate={(key, val) => updateSpec(idx, key, val)}
-              onRemove={() => removeSpec(idx)}
-            />
-          ))}
+          {/* Task Template Selection - moved to top for prominence */}
+          <div className="border border-gray-200 p-4 bg-blue-50">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-700">
+                Task Template Group
+              </span>
+              {loadingGroups && <span className="text-[10px] text-gray-400 font-mono">Loading...</span>}
+            </div>
+            <p className="text-xs text-gray-600 font-mono mb-3">
+              <strong>Select a template group to automatically generate department tasks for each window type.</strong> Tasks will be allocated directly to departments after project creation.
+            </p>
+            <select
+              value={selectedGroup?._id || ''}
+              onChange={(e) => {
+                const groupId = e.target.value;
+                setForm((f) => ({
+                  ...f,
+                  windowSpecifications: f.windowSpecifications.map((s) => ({
+                    ...s,
+                    templateGroupId: groupId || undefined,
+                  })),
+                }));
+              }}
+              className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white"
+            >
+              <option value="">No template group (use default tasks)</option>
+              {templateGroups.map((g) => (
+                <option key={g._id} value={g._id}>
+                  {g.name}{g.description ? ` — ${g.description}` : ''}
+                </option>
+              ))}
+            </select>
+            {selectedGroup && (
+              <div className="mt-2 text-[10px] text-gray-600 font-mono">
+                ✓ {selectedGroup.tasks.length} tasks across{' '}
+                {new Set(selectedGroup.tasks.map((t) => t.department)).size} departments will be created
+              </div>
+            )}
+          </div>
 
-          <button
-            type="button"
-            onClick={addSpec}
-            className="w-full py-2.5 border-2 border-dashed border-gray-300 text-xs font-mono text-gray-500 hover:border-gray-500 hover:text-gray-700 transition-colors flex items-center justify-center gap-2"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Window Type
-          </button>
+          {/* Window Specifications */}
+          <div className="border-t border-gray-200 pt-4">
+            <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700 mb-3">
+              Window Specifications
+            </h3>
+
+            {form.windowSpecifications.map((spec, idx) => (
+              <SpecRow
+                key={idx}
+                spec={spec}
+                index={idx}
+                canRemove={form.windowSpecifications.length > 1}
+                onUpdate={(key, val) => updateSpec(idx, key, val)}
+                onRemove={() => removeSpec(idx)}
+              />
+            ))}
+
+            <button
+              type="button"
+              onClick={addSpec}
+              className="w-full mt-4 py-2.5 border-2 border-dashed border-gray-300 text-xs font-mono text-gray-500 hover:border-gray-500 hover:text-gray-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Window Type
+            </button>
+          </div>
         </div>
       )}
 
@@ -299,13 +415,24 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             ))}
           </div>
 
-          <div className="border border-gray-200 bg-gray-50 p-4">
-            <p className="text-xs text-gray-600 font-mono">
-              <span className="font-bold text-gray-900">After creation:</span> {' '}
-              {4 * 3}+ workflow tasks will be auto-generated across all 4 departments
-              (Office Admin → Purchase → Store → Marketing) with dependency locking enforced.
-            </p>
-          </div>
+          {selectedGroup && (
+            <div className="border border-gray-200 bg-gray-50 p-4">
+              <p className="text-xs text-gray-600 font-mono">
+                <span className="font-bold text-gray-900">After creation:</span> {' '}
+                each window will generate tasks from &ldquo;{selectedGroup.name}&rdquo; template group &times; quantity.
+              </p>
+            </div>
+          )}
+
+          {!selectedGroup && (
+            <div className="border border-gray-200 bg-gray-50 p-4">
+              <p className="text-xs text-gray-600 font-mono">
+                <span className="font-bold text-gray-900">After creation:</span> {' '}
+                active task templates will be copied department-wise into this project,
+                with each generated task keeping a reference to its source template.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

@@ -1,23 +1,22 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
-import { ProjectStatus, ProjectPriority } from '@/types';
-
-const WindowSpecSchema = new Schema(
-  {
-    width: { type: Number, required: true, min: 1 },
-    height: { type: Number, required: true, min: 1 },
-    design: { type: String, required: true, trim: true },
-    glassType: { type: String, required: true, trim: true },
-    quantity: { type: Number, required: true, min: 1 },
-    notes: { type: String, trim: true },
-  },
-  { _id: true }
-);
+import { ProjectPriority, ProjectStatus } from '@/types';
 
 export interface IProjectDocument extends Document {
-  clientName: string;
   projectTitle: string;
+  clientName: string;
   totalWindows: number;
-  windowSpecifications: typeof WindowSpecSchema[];
+  windowSpecifications: Array<{
+    width: number;
+    height: number;
+    design: string;
+    glassType: string;
+    quantity: number;
+    notes?: string;
+    templateGroupId?: mongoose.Types.ObjectId;
+  }>;
+  selectedTemplateGroupId?: mongoose.Types.ObjectId;
+  excelSheetName?: string;
+  excelRows?: Array<Record<string, string | number | null>>;
   priority: ProjectPriority;
   deadline: Date;
   status: ProjectStatus;
@@ -31,89 +30,37 @@ export interface IProjectDocument extends Document {
 
 const ProjectSchema = new Schema<IProjectDocument>(
   {
-    clientName: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    projectTitle: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    totalWindows: {
-      type: Number,
-      required: true,
-      min: 1,
-    },
-    windowSpecifications: {
-      type: [WindowSpecSchema],
-      required: true,
-      validate: {
-        validator: (v: unknown[]) => v.length > 0,
-        message: 'At least one window specification is required',
-      },
-    },
-    priority: {
-      type: String,
-      enum: Object.values(ProjectPriority),
-      required: true,
-      default: ProjectPriority.MEDIUM,
-    },
-    deadline: {
-      type: Date,
-      required: true,
-    },
-    status: {
-      type: String,
-      enum: Object.values(ProjectStatus),
-      required: true,
-      default: ProjectStatus.NEW,
-    },
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    assignedUsers: [
+    projectTitle: { type: String, required: true, trim: true },
+    clientName: { type: String, required: true, trim: true },
+    totalWindows: { type: Number, default: 0, min: 0 },
+    windowSpecifications: [
       {
-        type: Schema.Types.ObjectId,
-        ref: 'User',
+        width: { type: Number, default: 0 },
+        height: { type: Number, default: 0 },
+        design: { type: String, trim: true, default: '' },
+        glassType: { type: String, trim: true, default: '' },
+        quantity: { type: Number, default: 1, min: 1 },
+        notes: { type: String, trim: true },
+        templateGroupId: { type: Schema.Types.ObjectId, ref: 'TemplateGroup' },
       },
     ],
-    activeAlertIds: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: 'Alert',
-      },
-    ],
-    completionPercentage: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 100,
-    },
+    selectedTemplateGroupId: { type: Schema.Types.ObjectId, ref: 'TemplateGroup' },
+    excelSheetName: { type: String, trim: true },
+    excelRows: [{ type: Schema.Types.Mixed }],
+    priority: { type: String, enum: Object.values(ProjectPriority), required: true, default: ProjectPriority.MEDIUM },
+    deadline: { type: Date, required: true },
+    status: { type: String, enum: Object.values(ProjectStatus), required: true, default: ProjectStatus.NEW },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    assignedUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    activeAlertIds: [{ type: Schema.Types.ObjectId, ref: 'Alert' }],
+    completionPercentage: { type: Number, default: 0, min: 0, max: 100 },
   },
-  {
-    timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
-  }
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
-// Indexes
 ProjectSchema.index({ status: 1 });
-ProjectSchema.index({ priority: 1, deadline: 1 });
+ProjectSchema.index({ deadline: 1 });
 ProjectSchema.index({ createdBy: 1 });
-ProjectSchema.index({ deadline: 1, status: 1 });
-
-// Virtual: isOverdue
-ProjectSchema.virtual('isOverdue').get(function () {
-  return (
-    this.deadline < new Date() &&
-    ![ProjectStatus.COMPLETED, ProjectStatus.DISPATCHED].includes(this.status)
-  );
-});
 
 const ProjectModel: Model<IProjectDocument> =
   mongoose.models.Project || mongoose.model<IProjectDocument>('Project', ProjectSchema);

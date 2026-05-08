@@ -10,6 +10,14 @@ import {
   UserRole,
 } from '@/types';
 
+const OptionalDateSchema = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined || value === '') return value;
+    return value instanceof Date ? value : new Date(String(value));
+  },
+  z.date().nullable().optional()
+);
+
 // ============================================================
 // USER SCHEMAS
 // ============================================================
@@ -40,24 +48,38 @@ export const WindowSpecSchema = z.object({
   glassType: z.string().min(1, 'Glass type is required'),
   quantity: z.number().int().positive('Quantity must be positive'),
   notes: z.string().optional(),
+  templateGroupId: z.string().optional(),
 });
 
 export const CreateProjectSchema = z.object({
   clientName: z.string().min(2, 'Client name must be at least 2 characters'),
   projectTitle: z.string().min(3, 'Project title must be at least 3 characters'),
   totalWindows: z.number().int().positive('Total windows must be positive'),
-  windowSpecifications: z
-    .array(WindowSpecSchema)
-    .min(1, 'At least one window specification required'),
+  selectedTemplateGroupId: z.string().optional(),
+  windowSpecifications: z.array(WindowSpecSchema).min(1).optional(),
   priority: z.nativeEnum(ProjectPriority),
-  deadline: z.string().transform((str) => new Date(str)),
+  deadline: z.string()
+    .refine((str) => {
+      const date = new Date(str);
+      if (Number.isNaN(date.valueOf())) return false;
+      const tomorrow = new Date();
+      tomorrow.setHours(0, 0, 0, 0);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return date >= tomorrow;
+    }, { message: 'Deadline must be in the future' })
+    .transform((str) => new Date(str)),
 });
 
 export const UpdateProjectSchema = z.object({
   clientName: z.string().min(2).optional(),
   projectTitle: z.string().min(3).optional(),
   totalWindows: z.number().int().positive().optional(),
+  selectedTemplateGroupId: z.string().optional(),
   windowSpecifications: z.array(WindowSpecSchema).min(1).optional(),
+  excelSheetName: z.string().optional(),
+  excelRows: z
+    .array(z.record(z.union([z.string(), z.number(), z.null()])))
+    .optional(),
   priority: z.nativeEnum(ProjectPriority).optional(),
   deadline: z
     .string()
@@ -78,18 +100,40 @@ export const CreateTaskSchema = z.object({
   dueDate: z.string().optional(),
 });
 
+export const CreateTaskTemplateSchema = z.object({
+  department: z.nativeEnum(Department),
+  title: z.string().min(3, 'Task title must be at least 3 characters'),
+  description: z.string().min(10, 'Task description must be at least 10 characters'),
+  sequence: z.number().int().min(0).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const UpdateTaskTemplateSchema = CreateTaskTemplateSchema.partial();
+
 export const UpdateTaskSchema = z.object({
   status: z.nativeEnum(TaskStatus).optional(),
   assignedUser: z.string().nullable().optional(),
   startDate: z
-    .string()
-    .transform((str) => new Date(str))
+    .preprocess(
+      (value) => (value instanceof Date ? value : value ? new Date(String(value)) : value),
+      z.date().optional()
+    )
     .optional(),
-  dueDate: z
-    .string()
-    .transform((str) => new Date(str))
-    .optional(),
+  dueDate: OptionalDateSchema,
+  completedAt: OptionalDateSchema,
   description: z.string().optional(),
+  imageAttachments: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().min(1).max(160),
+        url: z.string().startsWith('data:image/'),
+        size: z.number().int().positive().max(2_500_000),
+        uploadedAt: z.string().transform((str) => new Date(str)),
+      })
+    )
+    .max(6)
+    .optional(),
 });
 
 export const TaskStatusTransitionSchema = z.object({

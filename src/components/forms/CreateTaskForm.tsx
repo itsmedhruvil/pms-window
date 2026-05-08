@@ -9,6 +9,8 @@ import type { IProject, ITask } from '@/types';
 interface CreateTaskFormProps {
   onSuccess?: (task: ITask) => void;
   onCancel: () => void;
+  department?: Department;
+  task?: ITask; // for editing
 }
 
 interface FormData {
@@ -19,16 +21,16 @@ interface FormData {
   dueDate: string;
 }
 
-export function CreateTaskForm({ onSuccess, onCancel }: CreateTaskFormProps) {
+export function CreateTaskForm({ onSuccess, onCancel, department, task }: CreateTaskFormProps) {
   const [projects, setProjects] = useState<IProject[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>({
-    title: '',
-    description: '',
-    projectId: '',
-    department: Department.OFFICE_ADMIN,
-    dueDate: '',
+    title: task?.title || '',
+    description: task?.description || '',
+    projectId: typeof task?.projectId === 'string' ? task.projectId : task?.projectId?._id || '',
+    department: department || task?.department || Department.PRODUCTION,
+    dueDate: task?.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
   });
 
   useEffect(() => {
@@ -67,15 +69,18 @@ export function CreateTaskForm({ onSuccess, onCancel }: CreateTaskFormProps) {
     setLoading(true);
     setError(null);
 
-    const result = await apiFetch<ITask>('/api/tasks', {
-      method: 'POST',
+    const url = task ? `/api/tasks/${task._id}` : '/api/tasks';
+    const method = task ? 'PATCH' : 'POST';
+
+    const result = await apiFetch<ITask>(url, {
+      method,
       body: JSON.stringify(form),
     });
 
     setLoading(false);
 
     if (!result.success) {
-      setError(result.error || 'Failed to create task');
+      setError(result.error || `Failed to ${task ? 'update' : 'create'} task`);
       return;
     }
 
@@ -86,7 +91,7 @@ export function CreateTaskForm({ onSuccess, onCancel }: CreateTaskFormProps) {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-black text-gray-900">Create New Task</h2>
+          <h2 className="text-lg font-black text-gray-900">{task ? 'Edit Task' : 'Create New Task'}</h2>
           <p className="text-xs text-gray-500 font-mono">Add a task and assign it to a project and department.</p>
         </div>
       </div>

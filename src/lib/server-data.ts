@@ -12,6 +12,7 @@
 import connectDB from '@/lib/db';
 import ProjectModel from '@/models/Project';
 import TaskModel from '@/models/Task';
+import TaskTemplateModel from '@/models/TaskTemplate';
 import AlertModel from '@/models/Alert';
 import UserModel from '@/models/User';
 import {
@@ -23,7 +24,7 @@ import {
   UserRole,
 } from '@/types';
 import { subDays } from 'date-fns';
-import { reconcileBlockedTasksWithAlerts } from '@/lib/workflow';
+import { ensureDefaultTaskTemplates, reconcileBlockedTasksWithAlerts } from '@/lib/workflow';
 
 // ─── Projects ────────────────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ export async function getProjectDetail(id: string) {
       .populate('assignedUsers', 'name email department')
       .lean(),
     TaskModel.find({ projectId: id })
+      .populate('templateTaskId', 'title department sequence')
       .populate('assignedUser', 'name email department avatar')
       .populate('dependencyTaskId', 'title status department')
       .sort({ sequence: 1 })
@@ -98,7 +100,7 @@ export async function getProjectDetail(id: string) {
 
 export interface TaskListFilters {
   department?: Department;
-  projectId?: string;
+  projectId?: string | null;
   status?: TaskStatus;
   assignedUserId?: string;
   isAdmin?: boolean;
@@ -110,10 +112,16 @@ export async function getTasks(filters: TaskListFilters = {}) {
 
   const { department, projectId, status, assignedUserId, isAdmin = true, limit = 100 } = filters;
 
-  await reconcileBlockedTasksWithAlerts(projectId);
+  await reconcileBlockedTasksWithAlerts(projectId === null ? undefined : projectId);
 
   const query: Record<string, unknown> = {};
-  if (projectId) query.projectId = projectId;
+  if (projectId !== undefined) {
+    if (projectId === null) {
+      query.projectId = null; // Internal tasks only
+    } else {
+      query.projectId = projectId;
+    }
+  }
   if (status) query.status = status;
 
   if (!isAdmin && department) {
@@ -126,10 +134,35 @@ export async function getTasks(filters: TaskListFilters = {}) {
   }
 
   return TaskModel.find(query)
+    .populate('projectId', 'projectTitle clientName')
+    .populate('templateTaskId', 'title department sequence')
     .populate('assignedUser', 'name email department avatar')
     .populate('dependencyTaskId', 'title status department')
     .sort({ sequence: 1 })
     .limit(limit)
+    .lean();
+}
+
+export async function getTaskDetail(id: string) {
+  await connectDB();
+
+  return TaskModel.findById(id)
+    .populate('projectId', 'projectTitle clientName status deadline')
+    .populate('templateTaskId', 'title department sequence')
+    .populate('assignedUser', 'name email department avatar')
+    .populate('dependencyTaskId', 'title status department sequence')
+    .lean();
+}
+
+export async function getTaskTemplates(filters: { department?: Department } = {}) {
+  await connectDB();
+  await ensureDefaultTaskTemplates();
+
+  const query: Record<string, unknown> = {};
+  if (filters.department) query.department = filters.department;
+
+  return TaskTemplateModel.find(query)
+    .sort({ department: 1, sequence: 1, createdAt: 1 })
     .lean();
 }
 
@@ -203,6 +236,7 @@ export async function getDashboardData() {
     ]),
 
     AlertModel.aggregate([
+      { $match: { status: { $ne: AlertStatus.RESOLVED } } },
       { $group: { _id: '$type', count: { $sum: 1 } } },
     ]),
 
@@ -315,9 +349,47 @@ export async function getDashboardData() {
 
 // ─── Serialization ────────────────────────────────────────────────────────────
 // Mongoose lean() returns BSON ObjectIds and Dates. Next.js requires plain
-// JSON-serializable objects when passing from Server → Client components.
-// This helper converts ObjectId → string and Date → ISO string recursively.
-
+// JSON-serializable objects when passing from Server Components to Client
+// Components, and it rejects objects that still carry custom toJSON methods.
 export function serialize<T>(obj: T): T {
-  return JSON.parse(JSON.stringify(obj));
+  return toPlainValue(obj) as T;
+}
+
+function toPlainValue(value: unknown): unknown {
+  if (value == null) return value;
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (isObjectId(value)) {
+    return value.toHexString();
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(toPlainValue);
+  }
+
+  if (typeof value !== 'object') {
+    return value;
+  }
+
+  const plain: Record<string, unknown> = {};
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (nestedValue !== undefined) {
+      plain[key] = toPlainValue(nestedValue);
+    }
+  }
+
+  return plain;
+}
+
+function isObjectId(value: unknown): value is { toHexString: () => string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'toHexString' in value &&
+    typeof value.toHexString === 'function' &&
+    ('_bsontype' in value || value.constructor?.name === 'ObjectId')
+  );
 }

@@ -2,7 +2,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DashboardMetrics } from '@/components/dashboard/DashboardMetrics';
-import { getDashboardData } from '@/lib/server-data';
+import { getDashboardData, serialize } from '@/lib/server-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +12,7 @@ export default async function DashboardPage() {
 
   let data: Awaited<ReturnType<typeof getDashboardData>> | null = null;
   try {
-    data = await getDashboardData();
+    data = serialize(await getDashboardData());
   } catch {
     // data stays null — shown as empty state below
   }
@@ -36,7 +36,7 @@ export default async function DashboardPage() {
         </div>
 
         {data ? (
-          <DashboardMetrics data={data} />
+          <DashboardMetrics data={{ metrics: data.metrics, charts: data.charts }} />
         ) : (
           <div className="border border-gray-200 p-12 text-center">
             <p className="text-sm text-gray-500 font-mono">No data available yet.</p>

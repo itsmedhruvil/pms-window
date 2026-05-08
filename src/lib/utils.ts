@@ -123,10 +123,12 @@ export const ALERT_STATUS_LABEL: Record<AlertStatus, string> = {
 export { DEPARTMENT_LABELS };
 
 export const DEPARTMENT_ABBR: Record<Department, string> = {
-  [Department.OFFICE_ADMIN]: 'OA',
+  [Department.PRODUCTION]: 'PROD',
   [Department.PURCHASE]: 'PUR',
+  [Department.OPERATIONS]: 'OPS',
+  [Department.ACCOUNTS]: 'ACC',
   [Department.STORE]: 'STR',
-  [Department.MARKETING]: 'MKT',
+  [Department.SITE]: 'SITE',
 };
 
 // ============================================================

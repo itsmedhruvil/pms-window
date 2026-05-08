@@ -1,10 +1,10 @@
 import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { TasksClient } from './TasksClient';
-import { getTasks, getAlerts, serialize } from '@/lib/server-data';
+import { TaskTemplatesClient } from './TaskTemplatesClient';
+import { getTaskTemplates, getAlerts, serialize } from '@/lib/server-data';
 import { UserRole, AlertStatus } from '@/types';
-import type { ITask } from '@/types';
+import type { ITaskTemplate } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,34 +13,21 @@ export default async function TasksPage() {
   if (!user) redirect('/sign-in');
 
   const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
+  if (!isAdmin) redirect('/projects');
 
-  const [rawTasks, rawAlerts] = await Promise.all([
-    getTasks({
-      isAdmin,
-      department: user.department,
-      assignedUserId: user._id.toString(),
-      limit: 200,
-    }),
+  const [rawTemplates, rawAlerts] = await Promise.all([
+    getTaskTemplates(),
     getAlerts({ isAdmin, department: user.department, limit: 100 }),
   ]);
 
-  const tasks = serialize(rawTasks) as unknown as ITask[];
+  const templates = serialize(rawTemplates) as unknown as ITaskTemplate[];
   const activeAlertCount = rawAlerts.filter(
     (a: { status: string }) => a.status === AlertStatus.ACTIVE
   ).length;
 
   return (
     <AppLayout activeAlertCount={activeAlertCount}>
-      <TasksClient
-        initialTasks={tasks}
-        currentUser={{
-          _id: user._id.toString(),
-          name: user.name,
-          department: user.department,
-          role: user.role,
-        }}
-        isAdmin={isAdmin}
-      />
+      <TaskTemplatesClient initialTemplates={templates} />
     </AppLayout>
   );
 }

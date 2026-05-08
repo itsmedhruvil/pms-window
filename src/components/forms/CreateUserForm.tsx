@@ -25,7 +25,7 @@ export function CreateUserForm({ onSuccess, onCancel }: CreateUserFormProps) {
     email: '',
     name: '',
     role: UserRole.DEPARTMENT_USER,
-    department: Department.OFFICE_ADMIN,
+    department: Department.PRODUCTION,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
