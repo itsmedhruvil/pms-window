@@ -100,7 +100,7 @@ export async function getProjectDetail(id: string) {
 
 export interface TaskListFilters {
   department?: Department;
-  projectId?: string;
+  projectId?: string | null;
   status?: TaskStatus;
   assignedUserId?: string;
   isAdmin?: boolean;
@@ -112,10 +112,16 @@ export async function getTasks(filters: TaskListFilters = {}) {
 
   const { department, projectId, status, assignedUserId, isAdmin = true, limit = 100 } = filters;
 
-  await reconcileBlockedTasksWithAlerts(projectId);
+  await reconcileBlockedTasksWithAlerts(projectId === null ? undefined : projectId);
 
   const query: Record<string, unknown> = {};
-  if (projectId) query.projectId = projectId;
+  if (projectId !== undefined) {
+    if (projectId === null) {
+      query.projectId = null; // Internal tasks only
+    } else {
+      query.projectId = projectId;
+    }
+  }
   if (status) query.status = status;
 
   if (!isAdmin && department) {
@@ -348,6 +354,11 @@ export async function getDashboardData() {
 // It also properly handles objects with custom toJSON methods.
 
 export function serialize<T>(obj: T): T {
+  // Handle arrays by serializing each element
+  if (Array.isArray(obj)) {
+    return obj.map(item => serialize(item)) as T;
+  }
+  
   // First, call toJSON on the object if it exists
   if (obj && typeof obj === 'object' && 'toJSON' in obj && typeof obj.toJSON === 'function') {
     obj = obj.toJSON() as T;

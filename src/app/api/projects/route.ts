@@ -82,10 +82,10 @@ export const POST = withAuth(
     const projectData = parsed.data;
 
     // Validate total windows matches specs
-    const specTotal = projectData.windowSpecifications.reduce(
+    const specTotal = projectData.windowSpecifications?.reduce(
       (sum, spec) => sum + spec.quantity,
       0
-    );
+    ) ?? 0;
     if (specTotal !== projectData.totalWindows) {
       return NextResponse.json(
         {
@@ -113,15 +113,17 @@ export const POST = withAuth(
       );
 
       // Auto-generate workflow tasks from template groups (if window specs have them)
-      await generateProjectTasks(
-        project._id,
-        user._id,
-        projectData.windowSpecifications.map((ws) => ({
-          templateGroupId: ws.templateGroupId,
-          design: ws.design,
-          quantity: ws.quantity,
-        }))
-      );
+      if (projectData.windowSpecifications && projectData.windowSpecifications.length > 0) {
+        await generateProjectTasks(
+          project._id,
+          user._id,
+          projectData.windowSpecifications.map((ws) => ({
+            templateGroupId: ws.templateGroupId,
+            design: ws.design,
+            quantity: ws.quantity,
+          }))
+        );
+      }
 
       // Create system log
       await createSystemLog({

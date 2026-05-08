@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, type ChangeEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import * as XLSX from 'xlsx';
 import {
   AlertTriangle, Calendar, Package, ChevronRight,
   CheckCircle2, Copy
 } from 'lucide-react';
+import { apiFetch } from '@/lib/utils';
 import { cn, DEPARTMENT_LABELS, formatDate, timeAgo, ALERT_TYPE_LABEL } from '@/lib/utils';
 import {
   ProjectStatusBadge, PriorityBadge, TaskStatusBadge, AlertSeverityBadge, AlertStatusBadge
@@ -13,13 +16,14 @@ import {
 import { CommentThread } from '@/components/comment/CommentThread';
 import { useProjectRealtime } from '@/hooks/useRealtime';
 import { ProjectStatusControl } from '@/components/project/ProjectStatusControl';
+import { TasksClient } from '@/app/tasks/TasksClient';
 import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
 import { Modal } from '@/components/ui/Modal';
 import type { IProject, ITask, IAlert, IUser } from '@/types';
-import { TaskStatus, AlertStatus, DEPARTMENT_SEQUENCE } from '@/types';
+import { TaskStatus, AlertStatus, DEPARTMENT_SEQUENCE, Department } from '@/types';
 
-// Component to display windows in a table
-function ProjectWindowsTab({ windows, progress }: { windows: any[]; progress?: number }) {
+// Component to display windows in a grid
+function ProjectWindowsTab({ windows, tasks, projectId }: { windows: any[]; tasks: ITask[]; projectId: string }) {
   if (!windows || windows.length === 0) {
     return (
       <div className="border border-dashed border-gray-200 p-12 text-center">
@@ -28,41 +32,114 @@ function ProjectWindowsTab({ windows, progress }: { windows: any[]; progress?: n
     );
   }
 
+  // Group tasks by window (based on title containing window design and quantity)
+  const getWindowTasks = (windowSpec: any, index: number) => {
+    return tasks.filter(task =>
+      task.title.includes(`${windowSpec.design}`) &&
+      task.title.includes(`#${index + 1}`)
+    );
+  };
+
+  const getWindowProgress = (windowTasks: ITask[]) => {
+    if (windowTasks.length === 0) return 0;
+    const completedTasks = windowTasks.filter(task => task.status === TaskStatus.DONE).length;
+    return Math.round((completedTasks / windowTasks.length) * 100);
+  };
+
   return (
-    <div className="border border-gray-200 overflow-hidden max-w-5xl">
-      <table className="erp-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Size (W×H mm)</th>
-            <th>Design</th>
-            <th>Glass Type</th>
-            <th>Quantity</th>
-            <th>Notes</th>
-          </tr>
-        </thead>
-        <tbody>
-          {windows.map((w, i) => (
-            <tr key={i}>
-              <td className="font-mono">#{i + 1}</td>
-              <td className="font-mono">{w.width}×{w.height}</td>
-              <td className="font-mono">{w.design}</td>
-              <td className="font-mono">{w.glassType}</td>
-              <td className="font-mono">{w.quantity}</td>
-              <td className="font-mono">{w.notes}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {/* Progress bar for windows */}
-      {typeof progress === 'number' && (
-        <div className="mt-4 h-1.5 bg-gray-100">
-          <div
-            className="h-full bg-black transition-all duration-700"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      )}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold text-gray-900">Project Windows</h2>
+        <span className="text-sm text-gray-500 font-mono">
+          {windows.length} window type{windows.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {windows.map((windowSpec, index) => {
+          const windowTasks = getWindowTasks(windowSpec, index);
+          const progress = getWindowProgress(windowTasks);
+          const completedTasks = windowTasks.filter(t => t.status === TaskStatus.DONE).length;
+          const totalTasks = windowTasks.length;
+
+          return (
+            <div
+              key={index}
+              className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 hover:shadow-sm transition-all cursor-pointer bg-white"
+              onClick={() => {
+                // Navigate to window view - we'll implement this route
+                window.location.href = `/projects/${projectId}/windows/${index + 1}`;
+              }}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm">
+                    {windowSpec.design} #{index + 1}
+                  </h3>
+                  <p className="text-xs text-gray-500 font-mono mt-1">
+                    {windowSpec.width}×{windowSpec.height}mm × {windowSpec.quantity}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-black font-mono text-gray-900">
+                    {progress}%
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {completedTasks}/{totalTasks} tasks
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div className="h-2 bg-gray-100 rounded-full mb-3">
+                <div
+                  className="h-full bg-black rounded-full transition-all duration-500"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+
+              {/* Window details */}
+              <div className="space-y-1 text-xs text-gray-600">
+                <div className="flex justify-between">
+                  <span>Glass:</span>
+                  <span className="font-mono">{windowSpec.glassType}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Quantity:</span>
+                  <span className="font-mono">{windowSpec.quantity}</span>
+                </div>
+                {windowSpec.notes && (
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-500 italic">{windowSpec.notes}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Task status indicators */}
+              <div className="flex gap-1 mt-3">
+                {windowTasks.slice(0, 5).map((task, taskIndex) => (
+                  <div
+                    key={task._id}
+                    className={cn(
+                      'w-2 h-2 rounded-full',
+                      task.status === TaskStatus.DONE ? 'bg-green-500' :
+                      task.status === TaskStatus.IN_PROGRESS ? 'bg-blue-500' :
+                      task.status === TaskStatus.BLOCKED ? 'bg-red-500' :
+                      'bg-gray-300'
+                    )}
+                    title={`${task.title} - ${task.status}`}
+                  />
+                ))}
+                {windowTasks.length > 5 && (
+                  <div className="w-2 h-2 rounded-full bg-gray-200 flex items-center justify-center">
+                    <span className="text-[8px] text-gray-500 font-mono">+</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -74,14 +151,40 @@ interface ProjectDetailProps {
   isAdmin: boolean;
 }
 
-type TabId = 'overview' | 'windows' | 'alerts' | 'timeline';
+type TabId = 'overview' | 'tasks' | 'alerts';
 
 export function ProjectDetail({ project: initialProject, tasks: initialTasks, alerts: initialAlerts, isAdmin }: ProjectDetailProps) {
+  const router = useRouter();
   const [project, setProject] = useState(initialProject);
   const [tasks, setTasks] = useState(initialTasks);
   const [alerts, setAlerts] = useState(initialAlerts);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [activeTaskDepartment, setActiveTaskDepartment] = useState<Department | 'all'>('all');
   const [alertModalOpen, setAlertModalOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const openProjectTasks = useCallback((department: Department | 'all') => {
+    setActiveTaskDepartment(department);
+    setActiveTab('tasks');
+  }, []);
+
+  const handleExcelUpload = async (file: File) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+
+    const result = await apiFetch(`/api/projects/${project._id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ excelSheetName: sheetName, excelRows: rows }),
+    });
+
+    if (result.success && result.data) {
+      setProject(result.data as IProject);
+    }
+  };
 
   // Realtime updates
   useProjectRealtime(project._id, {
@@ -118,16 +221,36 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
     }
   };
 
+  const handleDeleteProject = async () => {
+    if (!window.confirm('Delete this project? This cannot be undone.')) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    const result = await apiFetch(`/api/projects/${project._id}`, {
+      method: 'DELETE',
+    });
+
+    setIsDeleting(false);
+
+    if (!result.success) {
+      setDeleteError(typeof result.error === 'string' ? result.error : 'Failed to delete project');
+      return;
+    }
+
+    router.push('/projects');
+  };
+
   const activeAlerts = alerts.filter((a) => a.status !== AlertStatus.RESOLVED);
   const completedTasks = tasks.filter((t) => t.status === TaskStatus.DONE).length;
   const hasActiveAlerts = activeAlerts.length > 0;
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'overview', label: 'Overview' },
-    // Replace Tasks tab with Windows tab
-    { id: 'windows', label: 'Windows', count: project.totalWindows },
+    { id: 'tasks', label: 'Tasks', count: tasks.length },
     { id: 'alerts', label: 'Alerts', count: alerts.length },
-    { id: 'timeline', label: 'Workflow' },
   ];
 
   return (
@@ -199,6 +322,17 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
                   <Copy className="w-3 h-3" />
                   Duplicate Project
                 </button>
+                <button
+                  onClick={handleDeleteProject}
+                  disabled={isDeleting}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold uppercase border border-red-400 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  {isDeleting ? 'Deleting…' : 'Delete Project'}
+                </button>
+                {deleteError && (
+                  <p className="text-xs font-mono text-red-600">{deleteError}</p>
+                )}
               </div>
             )}
           </div>
@@ -261,16 +395,25 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
       {/* Tab content */}
       <div className="p-6">
         {activeTab === 'overview' && (
-          <OverviewTab project={project} tasks={tasks} alerts={alerts} />
+          <OverviewTab
+            project={project}
+            tasks={tasks}
+            alerts={alerts}
+            onOpenTasks={openProjectTasks}
+            onUploadExcel={handleExcelUpload}
+          />
         )}
-        {activeTab === 'windows' && (
-          <ProjectWindowsTab windows={project.windowSpecifications} progress={project.completionPercentage} />
+        {activeTab === 'tasks' && (
+          <TasksClient
+            initialTasks={activeTaskDepartment === 'all'
+              ? tasks
+              : tasks.filter((task) => task.department === activeTaskDepartment)}
+            isAdmin={isAdmin}
+            selectedDepartment={activeTaskDepartment === 'all' ? undefined : activeTaskDepartment}
+          />
         )}
         {activeTab === 'alerts' && (
           <AlertsTab alerts={alerts} />
-        )}
-        {activeTab === 'timeline' && (
-          <WorkflowTimeline tasks={tasks} />
         )}
       </div>
 
@@ -294,72 +437,173 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
   );
 }
 
-function OverviewTab({ project, tasks, alerts }: { project: IProject; tasks: ITask[]; alerts: IAlert[] }) {
+function OverviewTab({ project, tasks, alerts, onOpenTasks, onUploadExcel }: {
+  project: IProject;
+  tasks: ITask[];
+  alerts: IAlert[];
+  onOpenTasks: (department: Department | 'all') => void;
+  onUploadExcel: (file: File) => Promise<void>;
+}) {
   const activeAlerts = alerts.filter(a => a.status !== AlertStatus.RESOLVED);
+  const headers = project.excelRows?.[0] ? Object.keys(project.excelRows[0]) : [];
+
+  const handleFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await onUploadExcel(file);
+  };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Window specifications */}
-      <div className="lg:col-span-2 space-y-4">
-        <div className="border border-gray-200 p-4">
-          <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500 mb-3">
-            Window Specifications
-          </h3>
-          <div className="space-y-2">
-            {project.windowSpecifications?.map((spec, i) => (
-              <div key={i} className="flex items-center gap-4 py-2 border-b border-gray-100 last:border-0 text-xs">
-                <span className="font-mono font-bold text-gray-900 w-6">#{i + 1}</span>
-                <span className="text-gray-700 font-mono">{spec.width}×{spec.height}mm</span>
-                <span className="text-gray-500">{spec.design}</span>
-                <span className="text-gray-500">{spec.glassType}</span>
-                <span className="ml-auto font-bold text-gray-900">×{spec.quantity}</span>
+    <div className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
+        <div className="rounded-3xl border border-gray-200 bg-white p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-black text-gray-900">Excel Upload</h3>
+              <p className="text-xs text-gray-500 font-mono mt-1">
+                Upload a spreadsheet and render the first sheet directly in the project overview.
+              </p>
+            </div>
+            <label className="inline-flex items-center gap-2 px-4 py-2 text-xs font-mono font-bold uppercase tracking-wide border border-gray-200 rounded-full cursor-pointer hover:bg-gray-50">
+              Upload File
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+            </label>
+          </div>
+
+          {project.excelRows && project.excelRows.length > 0 ? (
+            <div className="overflow-x-auto rounded-2xl border border-gray-200">
+              <table className="min-w-full text-left text-xs font-mono">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {headers.map((header) => (
+                      <th key={header} className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider">
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {project.excelRows.map((row, rowIndex) => (
+                    <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      {headers.map((header) => (
+                        <td key={`${rowIndex}-${header}`} className="px-3 py-2 align-top text-gray-700">
+                          {row[header] ?? '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-dashed border-gray-200 p-10 text-center text-sm text-gray-500">
+              No spreadsheet uploaded yet. Upload an Excel file to preview data here.
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <p className="text-xs font-mono uppercase tracking-widest text-gray-500">Project Overview</p>
+                <h3 className="text-lg font-black text-gray-900">{project.projectTitle}</h3>
               </div>
-            ))}
+              <div className="text-right">
+                <p className="text-sm font-black text-gray-900">{project.totalWindows}</p>
+                <p className="text-[10px] font-mono uppercase tracking-wide text-gray-500">windows</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm text-gray-600">
+              <div className="rounded-2xl bg-white p-3 border border-gray-100">
+                <p className="text-[10px] uppercase tracking-widest text-gray-400">Completion</p>
+                <p className="mt-2 font-black text-gray-900">{project.completionPercentage}%</p>
+              </div>
+              <div className="rounded-2xl bg-white p-3 border border-gray-100">
+                <p className="text-[10px] uppercase tracking-widest text-gray-400">Due</p>
+                <p className="mt-2 font-black text-gray-900">{formatDate(project.deadline)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-gray-200 bg-white p-5">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <p className="text-xs font-mono uppercase tracking-widest text-gray-500">Alerts</p>
+                <h3 className="text-sm font-black text-gray-900">Active incidents</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => onOpenTasks('all')}
+                className="text-[10px] font-mono uppercase tracking-wide text-blue-600 hover:text-blue-800"
+              >
+                View all tasks
+              </button>
+            </div>
+            {activeAlerts.length > 0 ? (
+              <div className="space-y-3">
+                {activeAlerts.slice(0, 3).map((alert) => (
+                  <div key={alert._id} className="rounded-2xl border border-red-100 bg-red-50 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-bold uppercase tracking-wide text-red-700">{ALERT_TYPE_LABEL[alert.type]}</p>
+                      <AlertSeverityBadge severity={alert.severity} />
+                    </div>
+                    <p className="mt-2 text-xs text-gray-700">{alert.message}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500">No active alerts on this project.</p>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Alert summary */}
-      <div className="space-y-4">
-        {activeAlerts.length > 0 && (
-          <div className="border border-red-200 bg-red-50 p-4">
-            <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-red-700 mb-3 flex items-center gap-2">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              Active Alerts
-            </h3>
-            <div className="space-y-3">
-              {activeAlerts.slice(0, 3).map((alert) => (
-                <div key={alert._id} className="bg-white border border-red-200 p-2.5">
-                  <div className="flex items-center gap-2 mb-1">
-                    <AlertSeverityBadge severity={alert.severity} />
-                  </div>
-                  <p className="text-xs font-medium text-red-700">{ALERT_TYPE_LABEL[alert.type]}</p>
-                  <p className="text-[11px] text-gray-600 mt-1 line-clamp-2">{alert.message}</p>
-                </div>
-              ))}
-            </div>
+      <div className="rounded-3xl border border-gray-200 bg-white p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <div>
+            <p className="text-xs font-mono uppercase tracking-widest text-gray-500">Department Progress</p>
+            <h3 className="text-lg font-black text-gray-900">Task completion by team</h3>
           </div>
-        )}
+          <button
+            type="button"
+            onClick={() => onOpenTasks('all')}
+            className="text-[10px] font-mono uppercase tracking-wide text-black border border-black px-3 py-2 rounded-full hover:bg-black hover:text-white transition-colors"
+          >
+            View All
+          </button>
+        </div>
 
-        {/* Task summary by dept */}
-        <div className="border border-gray-200 p-4">
-          <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500 mb-3">
-            Progress by Department
-          </h3>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {DEPARTMENT_SEQUENCE.map((dept) => {
             const deptTasks = tasks.filter((t) => t.department === dept);
             const done = deptTasks.filter((t) => t.status === TaskStatus.DONE).length;
             const pct = deptTasks.length > 0 ? Math.round((done / deptTasks.length) * 100) : 0;
             return (
-              <div key={dept} className="mb-3 last:mb-0">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px] font-mono text-gray-600">{DEPARTMENT_LABELS[dept]}</span>
-                  <span className="text-[11px] font-mono font-bold text-gray-900">{done}/{deptTasks.length}</span>
+              <button
+                key={dept}
+                type="button"
+                onClick={() => onOpenTasks(dept)}
+                className="group rounded-3xl border border-gray-200 p-4 text-left hover:border-black hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div>
+                    <p className="text-xs font-mono uppercase tracking-widest text-gray-500">{DEPARTMENT_LABELS[dept]}</p>
+                    <p className="mt-1 text-lg font-black text-gray-900">{pct}%</p>
+                  </div>
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-[10px] font-mono uppercase text-gray-600">
+                    {done}/{deptTasks.length}
+                  </span>
                 </div>
-                <div className="h-1 bg-gray-100">
-                  <div className="h-full bg-black transition-all" style={{ width: `${pct}%` }} />
+                <div className="h-2 rounded-full bg-gray-100">
+                  <div className="h-full rounded-full bg-black transition-all" style={{ width: `${pct}%` }} />
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>

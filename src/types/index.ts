@@ -91,6 +91,9 @@ export interface IProject {
   projectTitle: string;
   totalWindows: number;
   windowSpecifications: WindowSpec[];
+  selectedTemplateGroupId?: string;
+  excelSheetName?: string;
+  excelRows?: Array<Record<string, string | number | null>>;
   priority: ProjectPriority;
   deadline: Date;
   status: ProjectStatus;

@@ -29,6 +29,9 @@ interface FormData {
   projectTitle: string;
   priority: ProjectPriority;
   deadline: string;
+  address: string;
+  contactPhone: string;
+  budget: number;
   windowSpecifications: WindowSpec[];
 }
 
@@ -86,11 +89,17 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
 
   const totalWindows = form.windowSpecifications.reduce((s, sp) => s + (sp.quantity || 0), 0);
 
+  const tomorrowDate = new Date();
+  tomorrowDate.setHours(0, 0, 0, 0);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const minDeadline = tomorrowDate.toISOString().split('T')[0];
+  const deadlineIsFuture = form.deadline !== '' && new Date(form.deadline) >= tomorrowDate;
+
   // ── Step validation ──────────────────────────
   const step1Valid =
     form.clientName.trim().length >= 2 &&
     form.projectTitle.trim().length >= 3 &&
-    form.deadline !== '' &&
+    deadlineIsFuture &&
     form.address.trim().length >= 5 &&
     /^\+?[0-9]{7,15}$/.test(form.contactPhone) &&
     form.budget > 0;
@@ -153,8 +162,8 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
       {/* Step indicator */}
       <div className="flex items-center gap-0 mb-8">
         {[
-          { n: 1, label: 'Order Details' },
-          { n: 2, label: 'Specifications' },
+          { n: 1, label: 'Project Details' },
+          { n: 2, label: 'Window Details' },
           { n: 3, label: 'Review' },
         ].map(({ n, label }, i, arr) => (
           <div key={n} className="flex items-center flex-1">
@@ -194,10 +203,10 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
         </div>
       )}
 
-      {/* ── Step 1: Order Details ─────────────────── */}
+      {/* ── Step 1: Project Details ─────────────────── */}
       {step === 1 && (
         <div className="space-y-5">
-          <SectionHeader title="Client & Order Information" />
+          <SectionHeader title="Project Information" />
 
           <Field label="Client Name" required>
             <input
@@ -219,11 +228,42 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             />
           </Field>
 
+          <Field label="Address" required>
+            <input
+              type="text"
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              placeholder="e.g. 123 Main St, City"
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Contact Phone" required>
+            <input
+              type="tel"
+              value={form.contactPhone}
+              onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
+              placeholder="e.g. +919876543210"
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Budget (₹)" required>
+            <input
+              type="number"
+              value={form.budget}
+              min={0}
+              onChange={(e) => setForm({ ...form, budget: Number(e.target.value) })}
+              placeholder="e.g. 500000"
+              className={inputClass}
+            />
+          </Field>
+
           <Field label="Deadline" required>
             <input
               type="date"
               value={form.deadline}
-              min={new Date().toISOString().split('T')[0]}
+              min={minDeadline}
               onChange={(e) => setForm({ ...form, deadline: e.target.value })}
               className={inputClass}
             />
@@ -259,55 +299,26 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
         </div>
       )}
 
-      {/* ── Step 2: Window Specs ──────────────────── */}
+      {/* ── Step 2: Window Details ─────────────────── */}
       {step === 2 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <SectionHeader title="Window Specifications" />
+            <SectionHeader title="Window Specifications & Task Templates" />
             <span className="text-xs font-mono text-gray-500">
               Total: <span className="font-bold text-gray-900">{totalWindows}</span> windows
             </span>
           </div>
 
-          {/* New Project Detail Fields */}
-          <Field label="Address" required>
-            <input
-              type="text"
-              value={form.address}
-              onChange={(e) => setForm({ ...form, address: e.target.value })}
-              placeholder="e.g. 123 Main St, City"
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Contact Phone" required>
-            <input
-              type="tel"
-              value={form.contactPhone}
-              onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
-              placeholder="e.g. +919876543210"
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Budget (₹)" required>
-            <input
-              type="number"
-              value={form.budget}
-              min={0}
-              onChange={(e) => setForm({ ...form, budget: Number(e.target.value) })}
-              placeholder="e.g. 500000"
-              className={inputClass}
-            />
-          </Field>
-          {/* Template Group selector (applied to all specs) */}
-          <div className="border border-gray-200 p-4">
+          {/* Task Template Selection - moved to top for prominence */}
+          <div className="border border-gray-200 p-4 bg-blue-50">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-700">
                 Task Template Group
               </span>
               {loadingGroups && <span className="text-[10px] text-gray-400 font-mono">Loading...</span>}
             </div>
-            <p className="text-[11px] text-gray-500 font-mono mb-3">
-              Select a template group to auto-generate department tasks for each window type.
+            <p className="text-xs text-gray-600 font-mono mb-3">
+              <strong>Select a template group to automatically generate department tasks for each window type.</strong> Tasks will be allocated directly to departments after project creation.
             </p>
             <select
               value={selectedGroup?._id || ''}
@@ -331,32 +342,39 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               ))}
             </select>
             {selectedGroup && (
-              <div className="mt-2 text-[10px] text-gray-500 font-mono">
-                {selectedGroup.tasks.length} tasks across{' '}
-                {new Set(selectedGroup.tasks.map((t) => t.department)).size} departments
+              <div className="mt-2 text-[10px] text-gray-600 font-mono">
+                ✓ {selectedGroup.tasks.length} tasks across{' '}
+                {new Set(selectedGroup.tasks.map((t) => t.department)).size} departments will be created
               </div>
             )}
           </div>
 
-          {form.windowSpecifications.map((spec, idx) => (
-            <SpecRow
-              key={idx}
-              spec={spec}
-              index={idx}
-              canRemove={form.windowSpecifications.length > 1}
-              onUpdate={(key, val) => updateSpec(idx, key, val)}
-              onRemove={() => removeSpec(idx)}
-            />
-          ))}
+          {/* Window Specifications */}
+          <div className="border-t border-gray-200 pt-4">
+            <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700 mb-3">
+              Window Specifications
+            </h3>
 
-          <button
-            type="button"
-            onClick={addSpec}
-            className="w-full py-2.5 border-2 border-dashed border-gray-300 text-xs font-mono text-gray-500 hover:border-gray-500 hover:text-gray-700 transition-colors flex items-center justify-center gap-2"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Window Type
-          </button>
+            {form.windowSpecifications.map((spec, idx) => (
+              <SpecRow
+                key={idx}
+                spec={spec}
+                index={idx}
+                canRemove={form.windowSpecifications.length > 1}
+                onUpdate={(key, val) => updateSpec(idx, key, val)}
+                onRemove={() => removeSpec(idx)}
+              />
+            ))}
+
+            <button
+              type="button"
+              onClick={addSpec}
+              className="w-full mt-4 py-2.5 border-2 border-dashed border-gray-300 text-xs font-mono text-gray-500 hover:border-gray-500 hover:text-gray-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Window Type
+            </button>
+          </div>
         </div>
       )}
 

@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Users,
   Factory,
+  Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GlobalCreateButton } from '@/components/layout/GlobalCreateButton';
@@ -18,12 +19,14 @@ import { DEPARTMENT_LABELS, DEPARTMENT_SEQUENCE } from '@/types';
 const BASE_NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
+  { href: '/internal-tasks', label: 'Internal Tasks', icon: ClipboardList },
   { href: '/templates', label: 'Templates', icon: ClipboardList },
   { href: '/alerts', label: 'Alerts', icon: AlertTriangle },
   { href: '/users', label: 'Users', icon: Users },
 ];
 
 const ADMIN_NAV_ITEMS = [
+  { href: '/projects/new', label: 'Create Project', icon: Plus },
   { href: '/tasks', label: 'Task Templates', icon: ClipboardList },
 ];
 

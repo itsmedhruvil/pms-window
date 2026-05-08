@@ -2,12 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, AlertTriangle, Calendar, Package } from 'lucide-react';
+import { AlertTriangle, Calendar, Package } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { CreateProjectForm } from '@/components/forms/CreateProjectForm';
 import { ProjectStatusBadge, PriorityBadge } from '@/components/ui/badges';
 import { formatDate, isOverdue, isDueSoon, cn } from '@/lib/utils';
-import { Modal } from '@/components/ui/Modal';
 import type { IProject } from '@/types';
 
 interface ProjectsPageClientProps {
@@ -17,8 +15,6 @@ interface ProjectsPageClientProps {
 }
 
 export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: ProjectsPageClientProps) {
-  const [modalOpen, setModalOpen] = useState(false);
-
   return (
     <AppLayout activeAlertCount={activeAlertCount}>
       <div className="p-6 max-w-screen-xl mx-auto">
@@ -29,30 +25,12 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: Proj
               {projects.length} client order{projects.length !== 1 ? 's' : ''}
             </p>
           </div>
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => setModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-black text-white text-xs font-mono font-bold uppercase tracking-wide hover:bg-gray-800 transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              New Order
-            </button>
-          )}
         </div>
 
         {projects.length === 0 ? (
           <div className="border border-dashed border-gray-200 p-16 text-center">
             <Package className="w-8 h-8 text-gray-300 mx-auto mb-3" />
             <p className="text-sm font-mono text-gray-400">No projects yet</p>
-            {isAdmin && (
-              <button
-                onClick={() => setModalOpen(true)}
-                className="mt-2 text-xs font-mono text-black underline"
-              >
-                Create your first project →
-              </button>
-            )}
           </div>
         ) : (
           <div className="border border-gray-200 overflow-hidden">
@@ -137,10 +115,6 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: Proj
           </div>
         )}
       </div>
-
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} size="lg">
-        <CreateProjectForm />
-      </Modal>
     </AppLayout>
   );
 }

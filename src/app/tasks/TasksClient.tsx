@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, AlertTriangle, Plus } from 'lucide-react';
+import { Lock, AlertTriangle, Plus, CheckSquare, Square, Search, Trash2 } from 'lucide-react';
 import { cn, DEPARTMENT_LABELS, formatDate } from '@/lib/utils';
 import { TaskStatusBadge } from '@/components/ui/badges';
 import { Modal } from '@/components/ui/Modal';
@@ -19,7 +19,9 @@ interface TasksClientProps {
 export function TasksClient({ initialTasks, isAdmin, selectedDepartment }: TasksClientProps) {
   const [tasks, setTasks] = useState<ITask[]>(initialTasks);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
+  const [searchText, setSearchText] = useState('');
   const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const router = useRouter();
 
   const handleTaskCreated = useCallback((task: ITask) => {
@@ -29,6 +31,17 @@ export function TasksClient({ initialTasks, isAdmin, selectedDepartment }: Tasks
 
   const filtered = tasks.filter((t) => {
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+    if (searchText.trim().length > 0) {
+      const query = searchText.trim().toLowerCase();
+      return (
+        t.title.toLowerCase().includes(query) ||
+        t.description.toLowerCase().includes(query) ||
+        t.department.toLowerCase().includes(query) ||
+        (typeof t.projectId === 'object' && 'projectTitle' in t.projectId
+          ? t.projectId.projectTitle.toLowerCase().includes(query)
+          : false)
+      );
+    }
     return true;
   });
 
@@ -39,8 +52,77 @@ export function TasksClient({ initialTasks, isAdmin, selectedDepartment }: Tasks
     done: tasks.filter((t) => t.status === TaskStatus.DONE).length,
   };
 
+  const handleBulkMarkDone = async () => {
+    if (selectedTasks.size === 0) return;
+
+    try {
+      const updates = Array.from(selectedTasks).map(taskId => ({
+        taskId,
+        status: TaskStatus.DONE,
+        completedAt: new Date(),
+      }));
+
+      const response = await fetch('/api/tasks/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update tasks');
+
+      // Update local state
+      setTasks(prev => prev.map(task =>
+        selectedTasks.has(task._id)
+          ? { ...task, status: TaskStatus.DONE, completedAt: new Date() }
+          : task
+      ));
+      setSelectedTasks(new Set());
+    } catch (error) {
+      console.error('Failed to bulk update tasks:', error);
+      alert('Failed to update tasks. Please try again.');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTasks.size === 0) return;
+    if (!window.confirm(`Delete ${selectedTasks.size} selected task${selectedTasks.size === 1 ? '' : 's'}? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/tasks/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskIds: Array.from(selectedTasks) }),
+      });
+
+      if (!response.ok) throw new Error('Failed to delete tasks');
+
+      setTasks(prev => prev.filter(task => !selectedTasks.has(task._id)));
+      setSelectedTasks(new Set());
+    } catch (error) {
+      console.error('Failed to bulk delete tasks:', error);
+      alert('Failed to delete tasks. Please try again.');
+    }
+  };
+
+  const toggleTaskSelection = (taskId: string) => {
+    const newSelected = new Set(selectedTasks);
+    if (newSelected.has(taskId)) {
+      newSelected.delete(taskId);
+    } else {
+      newSelected.add(taskId);
+    }
+    setSelectedTasks(newSelected);
+  };
+
+  const selectAll = () => {
+    const allTaskIds = filtered.map(task => task._id);
+    setSelectedTasks(new Set(allTaskIds));
+  };
+
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex min-h-[640px] overflow-hidden">
       {/* Main panel */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200">
@@ -55,6 +137,24 @@ export function TasksClient({ initialTasks, isAdmin, selectedDepartment }: Tasks
             </div>
 
             <div className="flex items-center gap-2">
+              {isAdmin && selectedTasks.size > 0 && (
+                <>
+                  <button
+                    onClick={handleBulkMarkDone}
+                    className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 transition-colors"
+                  >
+                    <CheckSquare className="w-3.5 h-3.5" />
+                    Mark Done ({selectedTasks.size})
+                  </button>
+                  <button
+                    onClick={handleBulkDelete}
+                    className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-red-600 text-white hover:bg-red-700 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete ({selectedTasks.size})
+                  </button>
+                </>
+              )}
               {isAdmin && (
                 <button
                   type="button"
@@ -83,7 +183,17 @@ export function TasksClient({ initialTasks, isAdmin, selectedDepartment }: Tasks
           </div>
         </div>
 
-        <div className="flex-shrink-0 px-6 py-2.5 border-b border-gray-100 flex items-center gap-3 bg-gray-50">
+        <div className="flex-shrink-0 px-6 py-2.5 border-b border-gray-100 flex flex-col gap-3 bg-gray-50 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Search className="w-4 h-4 text-gray-400" />
+            <input
+              type="search"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Search tasks..."
+              className="text-[10px] font-mono border border-gray-200 px-2 py-1 bg-white focus:outline-none focus:border-black w-full sm:w-64"
+            />
+          </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as TaskStatus | 'all')}
@@ -94,14 +204,27 @@ export function TasksClient({ initialTasks, isAdmin, selectedDepartment }: Tasks
               <option key={s} value={s}>{s.replace('_', ' ')}</option>
             ))}
           </select>
-          <span className="text-[10px] text-gray-500 font-mono ml-auto">
-            {filtered.length} tasks
-          </span>
+          <div className="flex items-center gap-3 flex-wrap">
+            {isAdmin && (
+              <button
+                onClick={selectAll}
+                className="text-[10px] font-mono text-blue-600 hover:text-blue-800 underline"
+              >
+                Select all
+              </button>
+            )}
+            <span className="text-[10px] text-gray-500 font-mono">
+              {selectedTasks.size > 0 ? `${selectedTasks.size} selected • ` : ''}{filtered.length} tasks
+            </span>
+          </div>
         </div>
         <div className="flex-1 overflow-auto p-6">
           <TaskListView
             tasks={filtered}
+            selectedTasks={selectedTasks}
+            onToggleSelection={toggleTaskSelection}
             onOpenTask={(task) => router.push(`/tasks/${task._id}`)}
+            isAdmin={isAdmin}
           />
         </div>
       </div>
@@ -119,10 +242,16 @@ export function TasksClient({ initialTasks, isAdmin, selectedDepartment }: Tasks
 
 function TaskListView({
   tasks,
+  selectedTasks,
+  onToggleSelection,
   onOpenTask,
+  isAdmin,
 }: {
   tasks: ITask[];
+  selectedTasks: Set<string>;
+  onToggleSelection: (taskId: string) => void;
   onOpenTask: (task: ITask) => void;
+  isAdmin: boolean;
 }) {
   if (tasks.length === 0) {
     return (
@@ -137,6 +266,7 @@ function TaskListView({
       <table className="erp-table">
         <thead>
           <tr>
+            {isAdmin && <th className="w-12"></th>}
             <th>Task</th>
             <th>Department</th>
             <th>Status</th>
@@ -157,10 +287,32 @@ function TaskListView({
                 className={cn(
                   'cursor-pointer transition-colors',
                   task.status === TaskStatus.BLOCKED ? 'bg-red-50/30' : '',
-                  task.isLocked ? 'opacity-60' : ''
+                  task.isLocked ? 'opacity-60' : '',
+                  selectedTasks.has(task._id) ? 'bg-blue-50' : ''
                 )}
-                onClick={() => onOpenTask(task)}
+                onClick={(e) => {
+                  // Don't trigger row click if checkbox was clicked
+                  if ((e.target as HTMLElement).closest('[data-checkbox]')) return;
+                  onOpenTask(task);
+                }}
               >
+                {isAdmin && (
+                  <td data-checkbox>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleSelection(task._id);
+                      }}
+                      className="flex items-center justify-center w-5 h-5"
+                    >
+                      {selectedTasks.has(task._id) ? (
+                        <CheckSquare className="w-4 h-4 text-blue-600" />
+                      ) : (
+                        <Square className="w-4 h-4 text-gray-300" />
+                      )}
+                    </button>
+                  </td>
+                )}
                 <td>
                   <div className="flex items-center gap-2">
                     {task.isLocked && <Lock className="w-3 h-3 text-gray-400 flex-shrink-0" />}

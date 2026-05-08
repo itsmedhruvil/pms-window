@@ -55,18 +55,31 @@ export const CreateProjectSchema = z.object({
   clientName: z.string().min(2, 'Client name must be at least 2 characters'),
   projectTitle: z.string().min(3, 'Project title must be at least 3 characters'),
   totalWindows: z.number().int().positive('Total windows must be positive'),
-  windowSpecifications: z
-    .array(WindowSpecSchema)
-    .min(1, 'At least one window specification required'),
+  selectedTemplateGroupId: z.string().optional(),
+  windowSpecifications: z.array(WindowSpecSchema).min(1).optional(),
   priority: z.nativeEnum(ProjectPriority),
-  deadline: z.string().transform((str) => new Date(str)),
+  deadline: z.string()
+    .refine((str) => {
+      const date = new Date(str);
+      if (Number.isNaN(date.valueOf())) return false;
+      const tomorrow = new Date();
+      tomorrow.setHours(0, 0, 0, 0);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return date >= tomorrow;
+    }, { message: 'Deadline must be in the future' })
+    .transform((str) => new Date(str)),
 });
 
 export const UpdateProjectSchema = z.object({
   clientName: z.string().min(2).optional(),
   projectTitle: z.string().min(3).optional(),
   totalWindows: z.number().int().positive().optional(),
+  selectedTemplateGroupId: z.string().optional(),
   windowSpecifications: z.array(WindowSpecSchema).min(1).optional(),
+  excelSheetName: z.string().optional(),
+  excelRows: z
+    .array(z.record(z.union([z.string(), z.number(), z.null()])))
+    .optional(),
   priority: z.nativeEnum(ProjectPriority).optional(),
   deadline: z
     .string()
