@@ -22,6 +22,7 @@ enum UserRole { SUPER_ADMIN = 'super_admin', ADMIN = 'admin', DEPARTMENT_USER = 
 enum ProjectStatus { NEW = 'new', IN_PRODUCTION = 'in_production', ON_HOLD = 'on_hold', COMPLETED = 'completed', DISPATCHED = 'dispatched' }
 enum ProjectPriority { LOW = 'low', MEDIUM = 'medium', HIGH = 'high', URGENT = 'urgent' }
 enum TaskStatus { TODO = 'todo', IN_PROGRESS = 'in_progress', BLOCKED = 'blocked', DONE = 'done' }
+enum TaskFrequency { DAILY = 'daily', WEEKLY = 'weekly', MONTHLY = 'monthly', PROJECT = 'project', NEED_BASIS = 'need_basis', PROJECT_RECURRING = 'project_recurring' }
 enum AlertType { DESIGN_CHANGE = 'design_change', CLIENT_ESCALATION = 'client_escalation', PRODUCTION_ISSUE = 'production_issue', MATERIAL_ISSUE = 'material_issue' }
 enum AlertStatus { ACTIVE = 'active', ACKNOWLEDGED = 'acknowledged', RESOLVED = 'resolved' }
 enum AlertSeverity { HIGH = 'high', CRITICAL = 'critical' }
@@ -84,6 +85,7 @@ const TaskSchema = new mongoose.Schema({
   title: String,
   description: String,
   status: { type: String, default: TaskStatus.TODO },
+  frequency: { type: String, default: TaskFrequency.PROJECT },
   dependencyTaskId: mongoose.Schema.Types.ObjectId,
   assignedUser: mongoose.Schema.Types.ObjectId,
   startDate: Date,

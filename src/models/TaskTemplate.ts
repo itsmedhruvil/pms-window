@@ -1,11 +1,12 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
-import { Department } from '@/types';
+import { Department, TaskFrequency } from '@/types';
 
 export interface ITaskTemplateDocument extends Document {
   department: Department;
   title: string;
   description: string;
   sequence: number;
+  frequency: TaskFrequency;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -33,6 +34,12 @@ const TaskTemplateSchema = new Schema<ITaskTemplateDocument>(
       type: Number,
       required: true,
       index: true,
+    },
+    frequency: {
+      type: String,
+      enum: Object.values(TaskFrequency),
+      required: true,
+      default: TaskFrequency.PROJECT,
     },
     isActive: {
       type: Boolean,

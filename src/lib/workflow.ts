@@ -23,6 +23,7 @@ export async function ensureDefaultTaskTemplates() {
       title: task.title,
       description: task.description,
       sequence: index,
+      frequency: 'project',
       isActive: true,
     }))
   );
@@ -79,6 +80,7 @@ async function generateFromTaskTemplates(
         title: taskData.title,
         description: taskData.description,
         status: TaskStatus.TODO,
+        frequency: (taskData as any).frequency || 'project',
         dependencyTaskId: null,
         isLocked: false,
         sequence: globalSequence++,
@@ -148,6 +150,7 @@ async function generateFromTemplateGroups(
           title: `${taskData.title} — ${spec.design}`,
           description: taskData.description,
           status: TaskStatus.TODO,
+          frequency: 'project',
           dependencyTaskId: null,
           isLocked: false,
           sequence: globalSequence++,

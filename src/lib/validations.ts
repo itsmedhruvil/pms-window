@@ -4,6 +4,7 @@ import {
   ProjectPriority,
   ProjectStatus,
   TaskStatus,
+  TaskFrequency,
   AlertType,
   AlertSeverity,
   AlertStatus,
@@ -97,6 +98,7 @@ export const CreateTaskSchema = z.object({
   description: z.string().min(10, 'Task description must be at least 10 characters'),
   projectId: z.string().min(1, 'Project is required'),
   department: z.nativeEnum(Department),
+  frequency: z.nativeEnum(TaskFrequency).optional(),
   dueDate: z.string().optional(),
 });
 
@@ -105,6 +107,7 @@ export const CreateTaskTemplateSchema = z.object({
   title: z.string().min(3, 'Task title must be at least 3 characters'),
   description: z.string().min(10, 'Task description must be at least 10 characters'),
   sequence: z.number().int().min(0).optional(),
+  frequency: z.nativeEnum(TaskFrequency).optional(),
   isActive: z.boolean().optional(),
 });
 
