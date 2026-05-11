@@ -13,21 +13,31 @@ import {
   Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { GlobalCreateButton } from '@/components/layout/GlobalCreateButton';
-import { DEPARTMENT_LABELS, DEPARTMENT_SEQUENCE } from '@/types';
+import { DEPARTMENT_LABELS, DEPARTMENT_SEQUENCE, UserRole } from '@/types';
+import { useEffect, useMemo, useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
 
-const BASE_NAV_ITEMS = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  prominent?: boolean;
+}
+
+const ADMIN_NAV_ITEMS: NavItem[] = [
+  { href: '/projects/new', label: 'Create Project', icon: Plus, prominent: true },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
   { href: '/internal-tasks', label: 'Internal Tasks', icon: ClipboardList },
-  { href: '/templates', label: 'Templates', icon: ClipboardList },
+  { href: '/template-groups', label: 'Template Groups', icon: ClipboardList },
   { href: '/alerts', label: 'Alerts', icon: AlertTriangle },
   { href: '/users', label: 'Users', icon: Users },
 ];
 
-const ADMIN_NAV_ITEMS = [
-  { href: '/projects/new', label: 'Create Project', icon: Plus },
-  { href: '/tasks', label: 'Task Templates', icon: ClipboardList },
+const DEPT_USER_NAV_ITEMS: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/projects', label: 'Projects', icon: FolderKanban },
+  { href: '/alerts', label: 'Alerts', icon: AlertTriangle },
 ];
 
 interface AppLayoutProps {
@@ -37,12 +47,47 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
   const pathname = usePathname();
-  const { user } = useUser();
+  const { user, isSignedIn } = useUser();
+  const [dbRole, setDbRole] = useState<string | null>(null);
+  const [dbDepartment, setDbDepartment] = useState<string | null>(null);
 
-  const isAdmin = user?.publicMetadata?.role === 'ADMIN' || user?.publicMetadata?.role === 'SUPER_ADMIN';
-  const NAV_ITEMS = isAdmin ? [...BASE_NAV_ITEMS, ...ADMIN_NAV_ITEMS] : BASE_NAV_ITEMS;
+  // Fetch role directly from DB to override potentially stale Clerk metadata
+  useEffect(() => {
+    if (!isSignedIn) return;
+    fetch('/api/users/me')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data) {
+          setDbRole(data.data.role);
+          setDbDepartment(data.data.department);
+        }
+      })
+      .catch(() => {
+        // Fallback to Clerk metadata if API fails
+      });
+  }, [isSignedIn]);
+
+  const effectiveRole = dbRole || user?.publicMetadata?.role as string | undefined;
+  const effectiveDepartment = dbDepartment || user?.publicMetadata?.department as string | undefined;
+
+  const isAdmin = effectiveRole === UserRole.ADMIN || effectiveRole === UserRole.SUPER_ADMIN;
+  const userDepartment = effectiveDepartment;
+
+  const NAV_ITEMS = isAdmin ? ADMIN_NAV_ITEMS : DEPT_USER_NAV_ITEMS;
+
   const isNavActive = (href: string) =>
-    href === '/tasks' ? pathname === '/tasks' : href === '/templates' ? pathname === '/templates' : href === '/template-groups' ? pathname === '/template-groups' : pathname.startsWith(href);
+    href === '/tasks' ? pathname === '/tasks'
+    : href === '/template-groups' ? pathname.startsWith('/template-groups')
+    : pathname.startsWith(href);
+
+  // For department users, only show their own department in sidebar
+  const visibleDepartments = useMemo(() => {
+    if (isAdmin) return DEPARTMENT_SEQUENCE;
+    if (userDepartment && DEPARTMENT_SEQUENCE.includes(userDepartment as any)) {
+      return [userDepartment] as typeof DEPARTMENT_SEQUENCE;
+    }
+    return [];
+  }, [isAdmin, userDepartment]);
 
   return (
     <div className="flex h-screen bg-white overflow-hidden">
@@ -65,6 +110,19 @@ export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
             const isActive = isNavActive(item.href);
             const Icon = item.icon;
             const isAlert = item.href === '/alerts';
+
+            if (item.prominent) {
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-bold bg-black text-white hover:bg-gray-900 transition-colors uppercase tracking-wide"
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            }
 
             return (
               <Link
@@ -91,33 +149,51 @@ export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
             );
           })}
 
+          {/* Access Summary link for all users */}
           <div className="pt-3 mt-3 border-t border-gray-100">
-            <p className="px-3 pb-2 text-[9px] font-mono font-bold uppercase tracking-widest text-gray-400">
-              Department Tasks
-            </p>
-            <div className="space-y-0.5">
-              {DEPARTMENT_SEQUENCE.map((department) => {
-                const href = `/tasks/departments/${department}`;
-                const isActive = pathname === href;
-
-                return (
-                  <Link
-                    key={department}
-                    href={href}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2 text-xs font-mono font-medium transition-colors',
-                      isActive
-                        ? 'bg-black text-white'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    )}
-                  >
-                    <ClipboardList className="w-4 h-4 flex-shrink-0" />
-                    <span>{DEPARTMENT_LABELS[department]}</span>
-                  </Link>
-                );
-              })}
-            </div>
+            <Link
+              href="/access"
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors',
+                pathname === '/access'
+                  ? 'bg-black text-white'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              )}
+            >
+              <Users className="w-4 h-4 flex-shrink-0" />
+              <span>Access Summary</span>
+            </Link>
           </div>
+
+          {visibleDepartments.length > 0 && (
+            <div className="pt-3 mt-3 border-t border-gray-100">
+              <p className="px-3 pb-2 text-[9px] font-mono font-bold uppercase tracking-widest text-gray-400">
+                {isAdmin ? 'Department Tasks' : 'My Tasks'}
+              </p>
+              <div className="space-y-0.5">
+                {visibleDepartments.map((department) => {
+                  const href = `/tasks/departments/${department}`;
+                  const isActive = pathname === href;
+
+                  return (
+                    <Link
+                      key={department}
+                      href={href}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2 text-xs font-mono font-medium transition-colors',
+                        isActive
+                          ? 'bg-black text-white'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      )}
+                    >
+                      <ClipboardList className="w-4 h-4 flex-shrink-0" />
+                      <span>{DEPARTMENT_LABELS[department]}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </nav>
 
         {/* User */}
@@ -136,7 +212,6 @@ export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
       <main className="flex-1 overflow-auto">
         {children}
       </main>
-      {pathname.startsWith('/dashboard') && <GlobalCreateButton />}
     </div>
   );
 }

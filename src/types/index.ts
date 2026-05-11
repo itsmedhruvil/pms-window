@@ -39,6 +39,15 @@ export enum TaskStatus {
   DONE = 'done',
 }
 
+export enum TaskFrequency {
+  DAILY = 'daily',
+  WEEKLY = 'weekly',
+  MONTHLY = 'monthly',
+  PROJECT = 'project',
+  NEED_BASIS = 'need_basis',
+  PROJECT_RECURRING = 'project_recurring',
+}
+
 export enum AlertType {
   DESIGN_CHANGE = 'design_change',
   CLIENT_ESCALATION = 'client_escalation',
@@ -101,6 +110,9 @@ export interface IProject {
   assignedUsers: string[] | IUser[];
   activeAlertIds: string[];
   completionPercentage: number;
+  address: string;
+  contactPhone: string;
+  budget: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -113,6 +125,7 @@ export interface ITask {
   title: string;
   description: string;
   status: TaskStatus;
+  frequency: TaskFrequency;
   dependencyTaskId?: string | ITask;
   assignedUser?: string | IUser;
   startDate?: Date;
@@ -131,6 +144,7 @@ export interface ITaskTemplate {
   title: string;
   description: string;
   sequence: number;
+  frequency: TaskFrequency;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -252,6 +266,7 @@ export interface ITemplateGroup {
     title: string;
     description: string;
     sequence: number;
+    frequency: TaskFrequency;
   }>;
   isActive: boolean;
   createdAt: Date;

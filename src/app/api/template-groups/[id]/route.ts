@@ -41,11 +41,12 @@ async function patchHandler(
     {
       name: name.trim(),
       description: description?.trim() || '',
-      tasks: tasks.map((t: { department: string; title: string; description: string }, i: number) => ({
+      tasks: tasks.map((t: { department: string; title: string; description: string; frequency?: string }, i: number) => ({
         department: t.department,
         title: t.title.trim(),
         description: t.description.trim(),
         sequence: i,
+        frequency: t.frequency || 'project',
       })),
     },
     { new: true }

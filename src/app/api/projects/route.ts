@@ -3,7 +3,7 @@ import connectDB from '@/lib/db';
 import ProjectModel from '@/models/Project';
 import { withAuth } from '@/lib/auth';
 import { CreateProjectSchema, ProjectFiltersSchema } from '@/lib/validations';
-import { generateProjectTasks } from '@/lib/workflow';
+import { generateProjectTasks, generateFromSelectedTemplateGroup } from '@/lib/workflow';
 import { ProjectStatus, UserRole } from '@/types';
 import mongoose from 'mongoose';
 import { createSystemLog } from '@/lib/workflow';
@@ -81,19 +81,21 @@ export const POST = withAuth(
 
     const projectData = parsed.data;
 
-    // Validate total windows matches specs
-    const specTotal = projectData.windowSpecifications?.reduce(
-      (sum, spec) => sum + spec.quantity,
-      0
-    ) ?? 0;
-    if (specTotal !== projectData.totalWindows) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Total windows (${projectData.totalWindows}) must match sum of specifications (${specTotal})`,
-        },
-        { status: 400 }
+    // Validate total windows matches specs only when specs are provided
+    if (projectData.windowSpecifications && projectData.windowSpecifications.length > 0) {
+      const specTotal = projectData.windowSpecifications.reduce(
+        (sum, spec) => sum + spec.quantity,
+        0
       );
+      if (specTotal !== projectData.totalWindows) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Total windows (${projectData.totalWindows}) must match sum of specifications (${specTotal})`,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     const session = await mongoose.startSession();
@@ -112,7 +114,10 @@ export const POST = withAuth(
         { session }
       );
 
-      // Auto-generate workflow tasks from template groups (if window specs have them)
+      // Auto-generate workflow tasks:
+      // 1. If window specifications with template groups exist, generate per-window tasks
+      // 2. If a selectedTemplateGroupId is provided (but no window specs), generate department tasks from that template group
+      // 3. Otherwise generate from active task templates (fallback)
       if (projectData.windowSpecifications && projectData.windowSpecifications.length > 0) {
         await generateProjectTasks(
           project._id,
@@ -123,6 +128,14 @@ export const POST = withAuth(
             quantity: ws.quantity,
           }))
         );
+      } else if (projectData.selectedTemplateGroupId) {
+        await generateFromSelectedTemplateGroup(
+          project._id,
+          user._id,
+          projectData.selectedTemplateGroupId
+        );
+      } else {
+        await generateProjectTasks(project._id, user._id);
       }
 
       // Create system log

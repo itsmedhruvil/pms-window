@@ -2,33 +2,27 @@ import { getCurrentUser } from '@/lib/auth';
 import { notFound, redirect } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TasksClient } from '../../TasksClient';
-import { getAlerts, getTasks, getProjects, serialize } from '@/lib/server-data';
-import { AlertStatus, DEPARTMENT_SEQUENCE, Department, UserRole } from '@/types';
+import { getTasks, getAlerts, getProjects, serialize } from '@/lib/server-data';
+import { AlertStatus, UserRole } from '@/types';
 import type { ITask, IProject } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function DepartmentTasksPage(
-  props: { params: Promise<{ department: string }> }
+export default async function ProjectTasksPage(
+  props: { params: Promise<{ projectId: string }> }
 ) {
   const params = await props.params;
-  const department = params.department as Department;
-  if (!DEPARTMENT_SEQUENCE.includes(department)) notFound();
-
   const user = await getCurrentUser();
   if (!user) redirect('/sign-in');
 
   const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
-  if (!isAdmin && user.department !== department) {
-    redirect(`/tasks/departments/${user.department}`);
-  }
 
   const [rawTasks, rawAlerts, rawProjects] = await Promise.all([
     getTasks({
       isAdmin,
-      department,
+      projectId: params.projectId,
       assignedUserId: user._id.toString(),
-      limit: 300,
+      limit: 500,
     }),
     getAlerts({ isAdmin, department: user.department, limit: 100 }),
     getProjects({
@@ -47,13 +41,21 @@ export default async function DepartmentTasksPage(
     (a: { status: string }) => a.status === AlertStatus.ACTIVE
   ).length;
 
+  const currentProject = projectsResult.items.find(
+    (p: IProject) => p._id === params.projectId
+  );
+
+  if (!currentProject) notFound();
+
   return (
     <AppLayout activeAlertCount={activeAlertCount}>
       <TasksClient
         initialTasks={tasks}
         isAdmin={isAdmin}
-        selectedDepartment={department}
         allProjects={projectsResult.items}
+        initialProjectFilter={params.projectId}
+        pageTitle={`${currentProject.projectTitle} — Tasks`}
+        showDepartmentColumn
       />
     </AppLayout>
   );

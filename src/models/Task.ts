@@ -1,5 +1,5 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
-import { Department, TaskStatus } from '@/types';
+import { Department, TaskStatus, TaskFrequency } from '@/types';
 
 interface TaskImageAttachment {
   id: string;
@@ -16,6 +16,7 @@ export interface ITaskDocument extends Document {
   title: string;
   description: string;
   status: TaskStatus;
+  frequency: TaskFrequency;
   dependencyTaskId?: mongoose.Types.ObjectId;
   assignedUser?: mongoose.Types.ObjectId;
   startDate?: Date;
@@ -63,6 +64,12 @@ const TaskSchema = new Schema<ITaskDocument>(
       enum: Object.values(TaskStatus),
       required: true,
       default: TaskStatus.TODO,
+    },
+    frequency: {
+      type: String,
+      enum: Object.values(TaskFrequency),
+      required: true,
+      default: TaskFrequency.PROJECT,
     },
     dependencyTaskId: {
       type: Schema.Types.ObjectId,

@@ -4,6 +4,7 @@ import {
   ProjectPriority,
   ProjectStatus,
   TaskStatus,
+  TaskFrequency,
   AlertType,
   AlertSeverity,
   AlertStatus,
@@ -58,6 +59,8 @@ export const CreateProjectSchema = z.object({
   selectedTemplateGroupId: z.string().optional(),
   windowSpecifications: z.array(WindowSpecSchema).min(1).optional(),
   priority: z.nativeEnum(ProjectPriority),
+  address: z.string().min(5, 'Address must be at least 5 characters'),
+  contactPhone: z.string().min(7, 'Contact phone must be at least 7 digits'),
   deadline: z.string()
     .refine((str) => {
       const date = new Date(str);
@@ -66,7 +69,7 @@ export const CreateProjectSchema = z.object({
       tomorrow.setHours(0, 0, 0, 0);
       tomorrow.setDate(tomorrow.getDate() + 1);
       return date >= tomorrow;
-    }, { message: 'Deadline must be in the future' })
+    }, { message: 'Deadline must be a future date — please select a date from tomorrow onwards' })
     .transform((str) => new Date(str)),
 });
 
@@ -95,8 +98,9 @@ export const UpdateProjectSchema = z.object({
 export const CreateTaskSchema = z.object({
   title: z.string().min(3, 'Task title must be at least 3 characters'),
   description: z.string().min(10, 'Task description must be at least 10 characters'),
-  projectId: z.string().min(1, 'Project is required'),
+  projectId: z.string().optional(),
   department: z.nativeEnum(Department),
+  frequency: z.nativeEnum(TaskFrequency).optional(),
   dueDate: z.string().optional(),
 });
 
@@ -105,6 +109,7 @@ export const CreateTaskTemplateSchema = z.object({
   title: z.string().min(3, 'Task title must be at least 3 characters'),
   description: z.string().min(10, 'Task description must be at least 10 characters'),
   sequence: z.number().int().min(0).optional(),
+  frequency: z.nativeEnum(TaskFrequency).optional(),
   isActive: z.boolean().optional(),
 });
 
