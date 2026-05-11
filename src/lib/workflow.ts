@@ -12,6 +12,7 @@ import {
   DEPARTMENT_SEQUENCE,
   DEFAULT_TASKS_PER_DEPARTMENT,
 } from '@/types';
+import type { Department } from '@/types';
 
 export async function ensureDefaultTaskTemplates() {
   const existingCount = await TaskTemplateModel.estimatedDocumentCount();
@@ -47,6 +48,67 @@ export async function generateProjectTasks(
   }
 
   await generateFromTaskTemplates(projectId, createdByUserId);
+}
+
+/**
+ * Generate tasks from a selected template group (project-level, no window specs)
+ */
+export async function generateFromSelectedTemplateGroup(
+  projectId: Types.ObjectId,
+  createdByUserId: Types.ObjectId,
+  templateGroupId: string
+): Promise<void> {
+  const TemplateGroupModel = (await import('@/models/TemplateGroup')).default;
+  const group = await TemplateGroupModel.findById(templateGroupId).lean();
+  if (!group || !group.tasks.length) {
+    // Fall back to default task templates
+    return generateFromTaskTemplates(projectId, createdByUserId);
+  }
+
+  const tasks = [];
+  let globalSequence = 0;
+
+  // Group tasks by department
+  const deptMap = new Map<string, typeof group.tasks>();
+  for (const task of group.tasks) {
+    if (!deptMap.has(task.department)) {
+      deptMap.set(task.department, []);
+    }
+    deptMap.get(task.department)!.push(task);
+  }
+
+  // Process departments in order
+  for (const dept of DEPARTMENT_SEQUENCE) {
+    const deptTasks = (deptMap.get(dept) || []).sort((a, b) => a.sequence - b.sequence);
+    if (deptTasks.length === 0) continue;
+
+    for (let i = 0; i < deptTasks.length; i++) {
+      const taskData = deptTasks[i];
+      const taskId = new Types.ObjectId();
+
+      tasks.push({
+        _id: taskId,
+        projectId,
+        department: dept as Department,
+        title: taskData.title,
+        description: taskData.description,
+        status: TaskStatus.TODO,
+        frequency: (taskData as any).frequency || 'project',
+        dependencyTaskId: null,
+        isLocked: false,
+        sequence: globalSequence++,
+      });
+    }
+  }
+
+  await TaskModel.insertMany(tasks);
+
+  await CommentModel.create({
+    taskId: tasks[0]._id,
+    content: `Project workflow initialized from template group "${group.name}". ${tasks.length} tasks created across ${new Set(group.tasks.map((t: any) => t.department)).size} departments.`,
+    author: createdByUserId,
+    isSystemLog: true,
+  });
 }
 
 /**
@@ -150,7 +212,7 @@ async function generateFromTemplateGroups(
           title: `${taskData.title} — ${spec.design}`,
           description: taskData.description,
           status: TaskStatus.TODO,
-          frequency: 'project',
+          frequency: (taskData as any).frequency || 'project',
           dependencyTaskId: null,
           isLocked: false,
           sequence: globalSequence++,

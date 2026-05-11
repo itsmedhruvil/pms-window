@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { ClipboardList, AlertTriangle, CheckSquare, Square } from 'lucide-react';
+import { ClipboardList, AlertTriangle, CheckSquare, Square, Plus } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TaskStatusBadge } from '@/components/ui/badges';
+import { Modal } from '@/components/ui/Modal';
+import { CreateInternalTaskForm } from '@/components/forms/CreateInternalTaskForm';
 import { formatDate, DEPARTMENT_LABELS, cn } from '@/lib/utils';
 import type { ITask, Department } from '@/types';
 import { TaskStatus } from '@/types';
@@ -23,6 +24,7 @@ export function InternalTasksPageClient({
   userDepartment
 }: InternalTasksPageClientProps) {
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
 
   // Group tasks by department
   const tasksByDepartment = tasks.reduce((acc, task) => {
@@ -80,15 +82,27 @@ export function InternalTasksPageClient({
             </p>
           </div>
 
-          {isAdmin && selectedTasks.size > 0 && (
-            <button
-              onClick={handleBulkMarkDone}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 transition-colors"
-            >
-              <CheckSquare className="w-3.5 h-3.5" />
-              Mark Done ({selectedTasks.size})
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {isAdmin && selectedTasks.size > 0 && (
+              <button
+                onClick={handleBulkMarkDone}
+                className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 transition-colors"
+              >
+                <CheckSquare className="w-3.5 h-3.5" />
+                Mark Done ({selectedTasks.size})
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setTaskModalOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                New Task
+              </button>
+            )}
+          </div>
         </div>
 
         {Object.keys(tasksByDepartment).length === 0 ? (
@@ -214,6 +228,17 @@ export function InternalTasksPageClient({
           </div>
         )}
       </div>
+
+      <Modal open={taskModalOpen} onClose={() => setTaskModalOpen(false)} size="lg">
+        <CreateInternalTaskForm
+          department={userDepartment}
+          onSuccess={() => {
+            setTaskModalOpen(false);
+            window.location.reload();
+          }}
+          onCancel={() => setTaskModalOpen(false)}
+        />
+      </Modal>
     </AppLayout>
   );
 }

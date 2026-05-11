@@ -24,6 +24,9 @@ export interface IProjectDocument extends Document {
   assignedUsers: mongoose.Types.ObjectId[];
   activeAlertIds: mongoose.Types.ObjectId[];
   completionPercentage: number;
+  address: string;
+  contactPhone: string;
+  budget: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,6 +56,9 @@ const ProjectSchema = new Schema<IProjectDocument>(
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     assignedUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     activeAlertIds: [{ type: Schema.Types.ObjectId, ref: 'Alert' }],
+    address: { type: String, trim: true, default: '' },
+    contactPhone: { type: String, trim: true, default: '' },
+    budget: { type: Number, default: 0, min: 0 },
     completionPercentage: { type: Number, default: 0, min: 0, max: 100 },
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }

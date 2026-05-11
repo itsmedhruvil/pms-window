@@ -1,11 +1,12 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
-import { Department } from '@/types';
+import { Department, TaskFrequency } from '@/types';
 
 interface ITemplateGroupTask {
   department: Department;
   title: string;
   description: string;
   sequence: number;
+  frequency: TaskFrequency;
 }
 
 export interface ITemplateGroupDocument extends Document {
@@ -37,6 +38,11 @@ const TemplateGroupTaskSchema = new Schema<ITemplateGroupTask>(
     sequence: {
       type: Number,
       required: true,
+    },
+    frequency: {
+      type: String,
+      enum: Object.values(TaskFrequency),
+      default: TaskFrequency.PROJECT,
     },
   },
   { _id: false }

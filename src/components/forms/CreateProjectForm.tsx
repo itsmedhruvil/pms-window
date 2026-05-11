@@ -2,26 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Trash2, AlertCircle, ChevronRight, ChevronLeft, Check } from 'lucide-react';
+import { AlertCircle, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 import { cn, apiFetch } from '@/lib/utils';
 import { ProjectPriority } from '@/types';
-import type { WindowSpec, ITemplateGroup } from '@/types';
+import type { ITemplateGroup } from '@/types';
 
 const PRIORITIES = [
   { value: ProjectPriority.LOW, label: 'Low', desc: 'Standard timeline' },
   { value: ProjectPriority.MEDIUM, label: 'Medium', desc: 'Normal priority' },
   { value: ProjectPriority.HIGH, label: 'High', desc: 'Accelerated schedule' },
   { value: ProjectPriority.URGENT, label: 'Urgent', desc: 'Immediate attention required' },
-];
-
-const GLASS_TYPES = [
-  'Clear Float', 'Tinted', 'Tempered', 'Laminated',
-  'Double Glazed', 'Triple Glazed', 'Frosted', 'Low-E',
-];
-
-const DESIGNS = [
-  'Casement', 'Sliding', 'Fixed', 'Awning',
-  'Tilt & Turn', 'Bay', 'Bow', 'Skylight',
 ];
 
 interface FormData {
@@ -31,18 +21,9 @@ interface FormData {
   deadline: string;
   address: string;
   contactPhone: string;
-  budget: number;
-  windowSpecifications: WindowSpec[];
+  totalWindows: number;
+  templateGroupId?: string;
 }
-
-const EMPTY_SPEC: WindowSpec = {
-  width: 0,
-  height: 0,
-  design: '',
-  glassType: '',
-  quantity: 1,
-  notes: '',
-};
 
 interface CreateProjectFormProps {
   onSuccess?: (project: { _id: string; projectTitle: string }) => void;
@@ -60,11 +41,10 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
     projectTitle: '',
     priority: ProjectPriority.MEDIUM,
     deadline: '',
-    // new fields
     address: '',
     contactPhone: '',
-    budget: 0,
-    windowSpecifications: [{ ...EMPTY_SPEC }],
+    totalWindows: 0,
+    templateGroupId: undefined,
   });
 
   const [templateGroups, setTemplateGroups] = useState<ITemplateGroup[]>([]);
@@ -87,8 +67,6 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
     return () => { mounted = false; };
   }, []);
 
-  const totalWindows = form.windowSpecifications.reduce((s, sp) => s + (sp.quantity || 0), 0);
-
   const tomorrowDate = new Date();
   tomorrowDate.setHours(0, 0, 0, 0);
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
@@ -102,42 +80,51 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
     deadlineIsFuture &&
     form.address.trim().length >= 5 &&
     /^\+?[0-9]{7,15}$/.test(form.contactPhone) &&
-    form.budget > 0;
+    form.totalWindows > 0;
 
-  const step2Valid = form.windowSpecifications.every(
-    (s) => s.width > 0 && s.height > 0 && s.design && s.glassType && s.quantity >= 1
-  );
+  const [dateError, setDateError] = useState<string | null>(null);
+  const handleDateChange = (value: string) => {
+    setForm({ ...form, deadline: value });
+    if (value) {
+      const d = new Date(value);
+      const tomorrow = new Date();
+      tomorrow.setHours(0, 0, 0, 0);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      if (d < tomorrow) {
+        setDateError('Deadline must be a future date — please select a date from tomorrow onwards');
+      } else {
+        setDateError(null);
+      }
+    } else {
+      setDateError(null);
+    }
+  };
 
-  // ── Spec helpers ─────────────────────────────
-  const addSpec = () =>
-    setForm((f) => ({
-      ...f,
-      windowSpecifications: [...f.windowSpecifications, { ...EMPTY_SPEC }],
-    }));
-
-  const removeSpec = (idx: number) =>
-    setForm((f) => ({
-      ...f,
-      windowSpecifications: f.windowSpecifications.filter((_, i) => i !== idx),
-    }));
-
-  const updateSpec = (idx: number, key: keyof WindowSpec, value: string | number) =>
-    setForm((f) => {
-      const specs = [...f.windowSpecifications];
-      specs[idx] = { ...specs[idx], [key]: value };
-      return { ...f, windowSpecifications: specs };
-    });
-
-  const selectedGroup = templateGroups.find((g) => g._id === form.windowSpecifications[0]?.templateGroupId);
+  const selectedGroup = templateGroups.find((g) => g._id === form.templateGroupId);
 
   // ── Submit ────────────────────────────────────
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
 
+    const body: Record<string, unknown> = {
+      clientName: form.clientName,
+      projectTitle: form.projectTitle,
+      priority: form.priority,
+      deadline: form.deadline,
+      address: form.address,
+      contactPhone: form.contactPhone,
+      totalWindows: form.totalWindows,
+    };
+
+    // If a template group is selected, pass it along (window specifications will be populated from excel later)
+    if (form.templateGroupId) {
+      body.selectedTemplateGroupId = form.templateGroupId;
+    }
+
     const result = await apiFetch<{ _id: string; projectTitle: string }>('/api/projects', {
       method: 'POST',
-      body: JSON.stringify({ ...form, totalWindows }),
+      body: JSON.stringify(body),
     });
 
     setLoading(false);
@@ -163,8 +150,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
       <div className="flex items-center gap-0 mb-8">
         {[
           { n: 1, label: 'Project Details' },
-          { n: 2, label: 'Window Details' },
-          { n: 3, label: 'Review' },
+          { n: 2, label: 'Review & Create' },
         ].map(({ n, label }, i, arr) => (
           <div key={n} className="flex items-center flex-1">
             <div className="flex items-center gap-2 flex-1">
@@ -248,15 +234,19 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             />
           </Field>
 
-          <Field label="Budget (₹)" required>
+          {/* New Number of Windows field */}
+          <Field label="Number of Windows" required>
             <input
               type="number"
-              value={form.budget}
-              min={0}
-              onChange={(e) => setForm({ ...form, budget: Number(e.target.value) })}
-              placeholder="e.g. 500000"
+              value={form.totalWindows || ''}
+              min={1}
+              onChange={(e) => setForm({ ...form, totalWindows: Number(e.target.value) })}
+              placeholder="e.g. 100"
               className={inputClass}
             />
+            <p className="mt-1 text-[10px] font-mono text-gray-400">
+              Window specifications (sizes, designs, glass types) can be uploaded later via Excel in the project detail view.
+            </p>
           </Field>
 
           <Field label="Deadline" required>
@@ -264,9 +254,15 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               type="date"
               value={form.deadline}
               min={minDeadline}
-              onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+              onChange={(e) => handleDateChange(e.target.value)}
               className={inputClass}
             />
+            {dateError && (
+              <p className="mt-1 text-[10px] font-mono text-red-600 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                {dateError}
+              </p>
+            )}
           </Field>
 
           <Field label="Priority" required>
@@ -296,42 +292,21 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               ))}
             </div>
           </Field>
-        </div>
-      )}
 
-      {/* ── Step 2: Window Details ─────────────────── */}
-      {step === 2 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <SectionHeader title="Window Specifications & Task Templates" />
-            <span className="text-xs font-mono text-gray-500">
-              Total: <span className="font-bold text-gray-900">{totalWindows}</span> windows
-            </span>
-          </div>
-
-          {/* Task Template Selection - moved to top for prominence */}
+          {/* Task Template Group */}
           <div className="border border-gray-200 p-4 bg-blue-50">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-700">
-                Task Template Group
+                Task Template Group (optional)
               </span>
               {loadingGroups && <span className="text-[10px] text-gray-400 font-mono">Loading...</span>}
             </div>
             <p className="text-xs text-gray-600 font-mono mb-3">
-              <strong>Select a template group to automatically generate department tasks for each window type.</strong> Tasks will be allocated directly to departments after project creation.
+              Select a template group to automatically generate department tasks. Tasks will be allocated directly to departments after project creation.
             </p>
             <select
-              value={selectedGroup?._id || ''}
-              onChange={(e) => {
-                const groupId = e.target.value;
-                setForm((f) => ({
-                  ...f,
-                  windowSpecifications: f.windowSpecifications.map((s) => ({
-                    ...s,
-                    templateGroupId: groupId || undefined,
-                  })),
-                }));
-              }}
+              value={form.templateGroupId || ''}
+              onChange={(e) => setForm({ ...form, templateGroupId: e.target.value || undefined })}
               className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white"
             >
               <option value="">No template group (use default tasks)</option>
@@ -348,43 +323,21 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               </div>
             )}
           </div>
-
-          {/* Window Specifications */}
-          <div className="border-t border-gray-200 pt-4">
-            <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700 mb-3">
-              Window Specifications
-            </h3>
-
-            {form.windowSpecifications.map((spec, idx) => (
-              <SpecRow
-                key={idx}
-                spec={spec}
-                index={idx}
-                canRemove={form.windowSpecifications.length > 1}
-                onUpdate={(key, val) => updateSpec(idx, key, val)}
-                onRemove={() => removeSpec(idx)}
-              />
-            ))}
-
-            <button
-              type="button"
-              onClick={addSpec}
-              className="w-full mt-4 py-2.5 border-2 border-dashed border-gray-300 text-xs font-mono text-gray-500 hover:border-gray-500 hover:text-gray-700 transition-colors flex items-center justify-center gap-2"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Window Type
-            </button>
-          </div>
         </div>
       )}
 
-      {/* ── Step 3: Review ────────────────────────── */}
-      {step === 3 && (
+      {/* ── Step 2: Review ────────────────────────── */}
+      {step === 2 && (
         <div className="space-y-5">
           <SectionHeader title="Order Summary" />
 
           <ReviewBlock label="Client">{form.clientName}</ReviewBlock>
           <ReviewBlock label="Project">{form.projectTitle}</ReviewBlock>
+          <ReviewBlock label="Address">{form.address}</ReviewBlock>
+          <ReviewBlock label="Contact">{form.contactPhone}</ReviewBlock>
+          <ReviewBlock label="Total Windows">
+            <span className="font-bold">{form.totalWindows}</span>
+          </ReviewBlock>
           <ReviewBlock label="Priority">
             <span className={cn(
               'font-mono font-bold uppercase text-xs',
@@ -396,30 +349,13 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
           <ReviewBlock label="Deadline">
             {new Date(form.deadline).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}
           </ReviewBlock>
-          <ReviewBlock label="Total Windows">{totalWindows}</ReviewBlock>
-
-          <div className="border border-gray-200 divide-y divide-gray-100">
-            <div className="px-3 py-2 bg-gray-50">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
-                Window Specifications
-              </span>
-            </div>
-            {form.windowSpecifications.map((spec, i) => (
-              <div key={i} className="px-3 py-2.5 flex items-center gap-4 text-xs">
-                <span className="font-mono text-gray-400 w-5">#{i + 1}</span>
-                <span className="font-mono font-bold text-gray-900">{spec.width}×{spec.height}mm</span>
-                <span className="text-gray-600">{spec.design}</span>
-                <span className="text-gray-500">{spec.glassType}</span>
-                <span className="ml-auto font-bold">×{spec.quantity}</span>
-              </div>
-            ))}
-          </div>
 
           {selectedGroup && (
             <div className="border border-gray-200 bg-gray-50 p-4">
               <p className="text-xs text-gray-600 font-mono">
                 <span className="font-bold text-gray-900">After creation:</span> {' '}
-                each window will generate tasks from &ldquo;{selectedGroup.name}&rdquo; template group &times; quantity.
+                tasks from &ldquo;{selectedGroup.name}&rdquo; template group will be generated across departments.
+                Window specifications can be uploaded via Excel in the project details.
               </p>
             </div>
           )}
@@ -428,11 +364,18 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             <div className="border border-gray-200 bg-gray-50 p-4">
               <p className="text-xs text-gray-600 font-mono">
                 <span className="font-bold text-gray-900">After creation:</span> {' '}
-                active task templates will be copied department-wise into this project,
-                with each generated task keeping a reference to its source template.
+                active task templates will be copied department-wise into this project.
+                Window specifications can be uploaded via Excel in the project details.
               </p>
             </div>
           )}
+
+          <div className="border border-gray-200 bg-amber-50 p-4">
+            <p className="text-xs text-gray-700 font-mono">
+              <span className="font-bold">Note:</span> Window specifications (sizes, designs, glass types) will be uploaded
+              via an Excel file after project creation. Navigate to the project detail page to upload.
+            </p>
+          </div>
         </div>
       )}
 
@@ -459,11 +402,11 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
           </button>
         </div>
 
-        {step < 3 ? (
+        {step < 2 ? (
           <button
             type="button"
             onClick={() => setStep((s) => s + 1)}
-            disabled={step === 1 ? !step1Valid : !step2Valid}
+            disabled={!step1Valid}
             className="flex items-center gap-2 px-5 py-2 text-xs font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Continue
@@ -496,106 +439,15 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function SpecRow({
-  spec, index, canRemove, onUpdate, onRemove,
-}: {
-  spec: WindowSpec;
-  index: number;
-  canRemove: boolean;
-  onUpdate: (key: keyof WindowSpec, val: string | number) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="border border-gray-200 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
-          Window Type #{index + 1}
-        </span>
-        {canRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="text-gray-400 hover:text-red-600 transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Width (mm)" required compact>
-          <input
-            type="number"
-            value={spec.width || ''}
-            min={1}
-            onChange={(e) => onUpdate('width', Number(e.target.value))}
-            className={inputClass}
-            placeholder="e.g. 1200"
-          />
-        </Field>
-        <Field label="Height (mm)" required compact>
-          <input
-            type="number"
-            value={spec.height || ''}
-            min={1}
-            onChange={(e) => onUpdate('height', Number(e.target.value))}
-            className={inputClass}
-            placeholder="e.g. 900"
-          />
-        </Field>
-        <Field label="Design" required compact>
-          <select
-            value={spec.design}
-            onChange={(e) => onUpdate('design', e.target.value)}
-            className={inputClass}
-          >
-            <option value="">Select design</option>
-            {DESIGNS.map((d) => <option key={d} value={d}>{d}</option>)}
-          </select>
-        </Field>
-        <Field label="Glass Type" required compact>
-          <select
-            value={spec.glassType}
-            onChange={(e) => onUpdate('glassType', e.target.value)}
-            className={inputClass}
-          >
-            <option value="">Select glass</option>
-            {GLASS_TYPES.map((g) => <option key={g} value={g}>{g}</option>)}
-          </select>
-        </Field>
-        <Field label="Quantity" required compact>
-          <input
-            type="number"
-            value={spec.quantity || ''}
-            min={1}
-            onChange={(e) => onUpdate('quantity', Number(e.target.value))}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Notes" compact>
-          <input
-            type="text"
-            value={spec.notes || ''}
-            onChange={(e) => onUpdate('notes', e.target.value)}
-            className={inputClass}
-            placeholder="Optional"
-          />
-        </Field>
-      </div>
-    </div>
-  );
-}
-
 function Field({
-  label, required, compact, children,
+  label, required, children,
 }: {
   label: string;
   required?: boolean;
-  compact?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className={compact ? '' : 'space-y-1.5'}>
+    <div className="space-y-1.5">
       <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}

@@ -110,6 +110,9 @@ export interface IProject {
   assignedUsers: string[] | IUser[];
   activeAlertIds: string[];
   completionPercentage: number;
+  address: string;
+  contactPhone: string;
+  budget: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -263,6 +266,7 @@ export interface ITemplateGroup {
     title: string;
     description: string;
     sequence: number;
+    frequency: TaskFrequency;
   }>;
   isActive: boolean;
   createdAt: Date;

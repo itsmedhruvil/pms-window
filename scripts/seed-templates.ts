@@ -53,6 +53,21 @@ TaskTemplateSchema.index({ department: 1, sequence: 1 });
 
 const TaskTemplate = mongoose.models.TaskTemplate || mongoose.model('TaskTemplate', TaskTemplateSchema);
 
+const TemplateGroupSchema = new mongoose.Schema({
+  name: { type: String, required: true, unique: true, trim: true },
+  description: { type: String, default: '', trim: true },
+  tasks: [{
+    department: { type: String, required: true },
+    title: { type: String, required: true, trim: true },
+    description: { type: String, required: true, trim: true },
+    sequence: { type: Number, required: true },
+    frequency: { type: String, default: TaskFrequency.PROJECT },
+  }],
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
+
+const TemplateGroup = mongoose.models.TemplateGroup || mongoose.model('TemplateGroup', TemplateGroupSchema);
+
 // ── Template Data from Excel ───────────────────────────────────────────────────
 
 interface TemplateTaskDef {
@@ -624,6 +639,51 @@ async function seedTemplates() {
     const freqSummary = freqCounts.map((f: { _id: string; count: number }) => `${f._id}: ${f.count}`).join(', ');
     console.log(`    ${dept.padEnd(15)} ${count} tasks (${freqSummary})`);
   }
+  // ── Seed Template Group ──────────────────────────────────────────────────────
+  console.log('\n📦 Creating template group from UA Master Template...');
+  
+  // Build all tasks with department info for the template group
+  const allGroupTasks: Array<{
+    department: string;
+    title: string;
+    description: string;
+    sequence: number;
+    frequency: string;
+  }> = [];
+
+  for (const dept of Object.values(Department)) {
+    const tasks = DEPARTMENT_TASKS[dept];
+    if (!tasks) continue;
+    tasks.forEach((task, idx) => {
+      // For seed ID, use a consistent ordering
+      allGroupTasks.push({
+        department: dept,
+        title: task.title,
+        description: task.description,
+        sequence: allGroupTasks.length,
+        frequency: task.frequency,
+      });
+    });
+  }
+
+  // Check if template group already exists
+  const existingGroup = await TemplateGroup.findOne({ name: 'UA Master Template — Complete' });
+  if (existingGroup) {
+    console.log('  ⚠️  Template group already exists, updating...');
+    existingGroup.tasks = allGroupTasks as any;
+    existingGroup.description = 'Complete role-wise task template for all departments — seeded from UA Master Role Task Template v2';
+    await existingGroup.save();
+    console.log(`  ✅ Updated template group with ${allGroupTasks.length} tasks`);
+  } else {
+    await TemplateGroup.create({
+      name: 'UA Master Template — Complete',
+      description: 'Complete role-wise task template for all departments — seeded from UA Master Role Task Template v2',
+      tasks: allGroupTasks,
+      isActive: true,
+    });
+    console.log(`  ✅ Created template group with ${allGroupTasks.length} tasks`);
+  }
+
   console.log('─'.repeat(55));
 
   await mongoose.disconnect();

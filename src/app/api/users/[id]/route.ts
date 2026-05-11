@@ -5,6 +5,7 @@ import TaskModel from '@/models/Task';
 import { withAuth } from '@/lib/auth';
 import { UpdateUserSchema } from '@/lib/validations';
 import { UserRole } from '@/types';
+import { clerkClient } from '@clerk/nextjs/server';
 
 // GET /api/users/[id]
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
@@ -18,6 +19,26 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
 
   return NextResponse.json({ success: true, data: user });
 });
+
+/**
+ * Sync a user's role + department to Clerk's publicMetadata
+ * so client-side useUser() picks up changes immediately.
+ */
+async function syncClerkMetadata(clerkUserId: string, role: string, department: string) {
+  try {
+    const client = await clerkClient();
+    const clerkUser = await client.users.getUser(clerkUserId);
+    await client.users.updateUser(clerkUser.id, {
+      publicMetadata: {
+        ...clerkUser.publicMetadata,
+        role,
+        department,
+      },
+    });
+  } catch (err) {
+    console.warn('[syncClerkMetadata] Failed:', err);
+  }
+}
 
 // PATCH /api/users/[id]
 export const PATCH = withAuth(
@@ -59,6 +80,15 @@ export const PATCH = withAuth(
 
     if (!updated) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
+    }
+
+    // Sync changes to Clerk metadata (non-blocking, fire-and-forget)
+    if (updated.clerkId && (parsed.data.role || parsed.data.department)) {
+      syncClerkMetadata(
+        updated.clerkId,
+        parsed.data.role || String(updated.role),
+        parsed.data.department || String(updated.department),
+      );
     }
 
     return NextResponse.json({ success: true, data: updated });

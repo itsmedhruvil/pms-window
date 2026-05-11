@@ -159,13 +159,44 @@ export async function getCurrentUser(): Promise<IUserDocument | null> {
       shouldSave = true;
     }
 
-    if (user.email.toLowerCase() === MAIN_ADMIN_EMAIL && user.role !== UserRole.SUPER_ADMIN) {
-      user.role = UserRole.SUPER_ADMIN;
-      user.department = Department.PRODUCTION;
-      shouldSave = true;
+    // Force super admin role if email matches — always enforce on every login
+    if (user.email.toLowerCase() === MAIN_ADMIN_EMAIL) {
+      if (user.role !== UserRole.SUPER_ADMIN) {
+        user.role = UserRole.SUPER_ADMIN;
+        shouldSave = true;
+      }
+      if (user.department !== Department.PRODUCTION) {
+        user.department = Department.PRODUCTION;
+        shouldSave = true;
+      }
     }
 
     if (shouldSave) await user.save();
+
+    // Always sync role and department to Clerk's publicMetadata so the
+    // client-side useUser() hook reads the correct values.
+    try {
+      const client = await clerkClient();
+      const clerkUserData2 = await client.users.getUser(clerkUserId);
+      const currentMeta = clerkUserData2.publicMetadata || {};
+
+      if (
+        currentMeta.role !== user.role ||
+        currentMeta.department !== user.department
+      ) {
+        console.log(`[Auth] Syncing Clerk metadata for ${user.email}: role=${user.role}, dept=${user.department}`);
+        await client.users.updateUser(clerkUserId, {
+          publicMetadata: {
+            ...currentMeta,
+            role: user.role,
+            department: user.department,
+          },
+        });
+      }
+    } catch (metaError) {
+      // Non-critical — metadata sync is best-effort
+      console.warn('[Auth] Failed to sync Clerk metadata:', metaError);
+    }
 
     return user;
   } catch (error) {
