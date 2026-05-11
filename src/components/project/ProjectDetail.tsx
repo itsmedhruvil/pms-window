@@ -147,14 +147,6 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
 
           {/* Right side stats + actions */}
           <div className="flex-shrink-0 flex flex-col items-end gap-3">
-            {project.budget > 0 && (
-              <div className="text-right mb-2">
-                <div className="text-lg font-black font-mono text-gray-900">
-                  ₹{project.budget.toLocaleString('en-IN')}
-                </div>
-                <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wide">Budget</div>
-              </div>
-            )}
             <div className="text-right">
               <div className="text-4xl font-black font-mono text-gray-900">
                 {project.completionPercentage}%
@@ -230,8 +222,6 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
               <p className="text-xs text-gray-900">{project.totalWindows}</p>
             </div>
             <div>
-              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">Budget</p>
-              <p className="text-xs text-gray-900">₹{project.budget ? project.budget.toLocaleString('en-IN') : '—'}</p>
             </div>
           </div>
 

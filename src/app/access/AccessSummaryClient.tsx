@@ -41,7 +41,7 @@ const PERMISSIONS: PermissionRow[] = [
   },
   {
     feature: 'Create Project',
-    description: 'Create new project with client info, total windows count, budget, deadline. Window specifications added later via Excel upload',
+    description: 'Create new project with client info, total windows count, deadline. Window specifications added later via Excel upload',
     superAdmin: 'Full access — create projects with optional template group',
     admin: 'Full access — create projects with optional template group',
     deptUser: 'No access',
