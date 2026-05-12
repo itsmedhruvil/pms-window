@@ -149,22 +149,6 @@ export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
             );
           })}
 
-          {/* Access Summary link for all users */}
-          <div className="pt-3 mt-3 border-t border-gray-100">
-            <Link
-              href="/access"
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors',
-                pathname === '/access'
-                  ? 'bg-black text-white'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              )}
-            >
-              <Users className="w-4 h-4 flex-shrink-0" />
-              <span>Access Summary</span>
-            </Link>
-          </div>
-
           {visibleDepartments.length > 0 && (
             <div className="pt-3 mt-3 border-t border-gray-100">
               <p className="px-3 pb-2 text-[9px] font-mono font-bold uppercase tracking-widest text-gray-400">
@@ -195,6 +179,23 @@ export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
             </div>
           )}
         </nav>
+
+        {isAdmin && (
+          <div className="px-4 py-3 border-t border-gray-200">
+            <Link
+              href="/access"
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors',
+                pathname === '/access'
+                  ? 'bg-black text-white'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              )}
+            >
+              <Users className="w-4 h-4 flex-shrink-0" />
+              <span>Access Summary</span>
+            </Link>
+          </div>
+        )}
 
         {/* User */}
         <div className="p-4 border-t border-gray-200">

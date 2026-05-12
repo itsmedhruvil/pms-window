@@ -6,7 +6,7 @@ import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import {
   AlertTriangle, Calendar, Package, ChevronRight,
-  CheckCircle2, Copy, Trash2, ArrowRight, Clock, ArrowUpRight,
+  CheckCircle2, Copy, Trash2, ArrowUpRight,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 import { cn, DEPARTMENT_LABELS, formatDate, timeAgo, ALERT_TYPE_LABEL } from '@/lib/utils';
@@ -344,71 +344,112 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
               <h2 className="text-sm font-black uppercase tracking-widest text-gray-700">Workflow Timeline</h2>
               <p className="text-xs text-gray-400 font-mono mt-0.5">Task status across all departments</p>
             </div>
-            <Link
+            <a
               href={`/tasks/project/${project._id}`}
-              className="text-xs font-mono text-black border border-black px-3 py-1.5 rounded-md hover:bg-black hover:text-white transition-colors flex items-center gap-1"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-mono text-white bg-black border border-black px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors flex items-center gap-1.5"
             >
-              Full Task View <ArrowRight className="w-3 h-3" />
-            </Link>
+              Open Full View <ArrowUpRight className="w-3 h-3" />
+            </a>
           </div>
 
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {DEPARTMENT_SEQUENCE.map((dept, deptIdx) => {
               const deptTasks = tasks.filter((t) => t.department === dept).sort((a, b) => a.sequence - b.sequence);
               if (deptTasks.length === 0) return null;
 
               const deptDone = deptTasks.filter((t) => t.status === TaskStatus.DONE).length;
               const deptTotal = deptTasks.length;
+              const deptPct = Math.round((deptDone / deptTotal) * 100);
+              const blockedCount = deptTasks.filter((t) => t.status === TaskStatus.BLOCKED).length;
+              const inProgressCount = deptTasks.filter((t) => t.status === TaskStatus.IN_PROGRESS).length;
 
               return (
-                <div key={dept} className="border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
-                    <span className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700">
-                      {deptIdx + 1}. {DEPARTMENT_LABELS[dept]}
-                    </span>
-                    <span className="text-[10px] font-mono text-gray-500">
-                      {deptDone}/{deptTotal} tasks
-                    </span>
+                <div key={dept} className="border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col">
+                  {/* Header */}
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700">
+                        {deptIdx + 1}. {DEPARTMENT_LABELS[dept]}
+                      </span>
+                      <span className="text-[11px] font-black font-mono">{deptPct}%</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={cn(
+                          'h-full rounded-full transition-all duration-500',
+                          blockedCount > 0 ? 'bg-red-500' : 'bg-black'
+                        )}
+                        style={{ width: `${deptPct}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2.5 mt-1.5 text-[10px] font-mono text-gray-400">
+                      <span className="text-green-600 font-bold">{deptDone}</span>/<span>{deptTotal}</span> done
+                      {inProgressCount > 0 && (
+                        <span className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                          {inProgressCount} active
+                        </span>
+                      )}
+                      {blockedCount > 0 && (
+                        <span className="flex items-center gap-1 text-red-500">
+                          <AlertTriangle className="w-2.5 h-2.5" />
+                          {blockedCount} blocked
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="divide-y divide-gray-50">
+
+                  {/* Task list */}
+                  <div className="divide-y divide-gray-50 flex-1">
                     {deptTasks.map((task) => (
                       <Link
                         key={task._id}
                         href={`/tasks/${task._id}`}
                         className={cn(
-                          'flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors',
-                          task.isLocked && 'opacity-50'
+                          'flex items-start gap-2.5 px-4 py-2.5 hover:bg-gray-50 transition-colors group',
+                          task.isLocked && 'opacity-40 pointer-events-none'
                         )}
                       >
-                        <div className={cn(
-                          'w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0',
-                          task.status === TaskStatus.DONE ? 'bg-green-500 border-green-500' :
-                          task.status === TaskStatus.IN_PROGRESS ? 'border-blue-500' :
-                          task.status === TaskStatus.BLOCKED ? 'bg-red-100 border-red-400' :
-                          'border-gray-300'
-                        )}>
-                          {task.status === TaskStatus.DONE && <CheckCircle2 className="w-3 h-3 text-white" />}
-                          {task.status === TaskStatus.BLOCKED && <AlertTriangle className="w-2.5 h-2.5 text-red-500" />}
+                        {/* Status dot */}
+                        <div className="mt-0.5 flex-shrink-0">
+                          <div className={cn(
+                            'w-2.5 h-2.5 rounded-full border-2',
+                            task.status === TaskStatus.DONE ? 'bg-green-500 border-green-500' :
+                            task.status === TaskStatus.IN_PROGRESS ? 'bg-blue-500 border-blue-500' :
+                            task.status === TaskStatus.BLOCKED ? 'bg-red-500 border-red-500' :
+                            'border-gray-300'
+                          )} />
                         </div>
+
+                        {/* Content */}
                         <div className="flex-1 min-w-0">
-                          <span className={cn(
-                            'text-xs font-medium',
-                            task.status === TaskStatus.DONE ? 'text-gray-500 line-through' :
-                            task.status === TaskStatus.BLOCKED ? 'text-red-600' :
-                            'text-gray-900'
-                          )}>
-                            {task.title}
-                          </span>
-                          <p className="text-[10px] text-gray-400 truncate mt-0.5">{task.description}</p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {task.assignedUser && typeof task.assignedUser === 'object' && (
-                            <span className="text-[10px] font-mono text-gray-400">
-                              {(task.assignedUser as IUser).name?.split(' ')[0]}
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              'text-xs font-medium leading-tight',
+                              task.status === TaskStatus.DONE ? 'text-gray-400 line-through' :
+                              task.status === TaskStatus.BLOCKED ? 'text-red-600' :
+                              'text-gray-900'
+                            )}>
+                              {task.title}
                             </span>
-                          )}
-                          <TaskStatusBadge status={task.status} size="sm" />
+                            {task.isLocked && (
+                              <span className="text-[9px] font-mono text-gray-300 uppercase tracking-wider">Locked</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            {task.assignedUser && typeof task.assignedUser === 'object' && (
+                              <span className="text-[9px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                                {(task.assignedUser as IUser).name?.split(' ')[0]}
+                              </span>
+                            )}
+                            <TaskStatusBadge status={task.status} size="sm" />
+                          </div>
                         </div>
+
+                        {/* Arrow indicator */}
+                        <ArrowUpRight className="w-3 h-3 text-gray-300 group-hover:text-gray-600 transition-colors flex-shrink-0 mt-0.5" />
                       </Link>
                     ))}
                   </div>
