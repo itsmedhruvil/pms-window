@@ -103,7 +103,7 @@ export const PATCH = withAuth(
 
     return NextResponse.json({ success: true, data: updated });
   },
-  [UserRole.SUPER_ADMIN, UserRole.ADMIN]
+  [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.DEPARTMENT_USER]
 );
 
 // DELETE /api/projects/[id]

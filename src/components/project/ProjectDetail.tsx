@@ -6,7 +6,8 @@ import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import {
   AlertTriangle, Calendar, Package, ChevronRight,
-  CheckCircle2, Copy, Trash2, ArrowUpRight,
+  CheckCircle2, Copy, Trash2, ArrowUpRight, Edit3,
+  X, Save,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 import { cn, DEPARTMENT_LABELS, formatDate, timeAgo, ALERT_TYPE_LABEL } from '@/lib/utils';
@@ -19,7 +20,7 @@ import { ProjectStatusControl } from '@/components/project/ProjectStatusControl'
 import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
 import { Modal } from '@/components/ui/Modal';
 import type { IProject, ITask, IAlert, IUser } from '@/types';
-import { TaskStatus, AlertStatus, DEPARTMENT_SEQUENCE, Department } from '@/types';
+import { TaskStatus, AlertStatus, DEPARTMENT_SEQUENCE, Department, ProjectPriority } from '@/types';
 
 interface ProjectDetailProps {
   project: IProject;
@@ -36,6 +37,18 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
   const [alertModalOpen, setAlertModalOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    clientName: initialProject.clientName,
+    projectTitle: initialProject.projectTitle,
+    address: initialProject.address || '',
+    contactPhone: initialProject.contactPhone || '',
+    totalWindows: initialProject.totalWindows,
+    deadline: initialProject.deadline ? new Date(initialProject.deadline).toISOString().split('T')[0] : '',
+    priority: initialProject.priority,
+  });
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const handleExcelUpload = async (file: File) => {
     const arrayBuffer = await file.arrayBuffer();
@@ -101,6 +114,45 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
     }
 
     router.push('/projects');
+  };
+
+  const handleSaveEdit = async () => {
+    setSaving(true);
+    setEditError(null);
+    const result = await apiFetch(`/api/projects/${project._id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        clientName: editForm.clientName,
+        projectTitle: editForm.projectTitle,
+        address: editForm.address,
+        contactPhone: editForm.contactPhone,
+        totalWindows: editForm.totalWindows,
+        deadline: editForm.deadline,
+        priority: editForm.priority,
+      }),
+    });
+    setSaving(false);
+    if (!result.success) {
+      setEditError(typeof result.error === 'string' ? result.error : 'Failed to update project');
+      return;
+    }
+    setProject(result.data as IProject);
+    setEditModalOpen(false);
+    router.refresh();
+  };
+
+  const openEditModal = () => {
+    setEditForm({
+      clientName: project.clientName,
+      projectTitle: project.projectTitle,
+      address: project.address || '',
+      contactPhone: project.contactPhone || '',
+      totalWindows: project.totalWindows,
+      deadline: project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : '',
+      priority: project.priority,
+    });
+    setEditError(null);
+    setEditModalOpen(true);
   };
 
   const activeAlerts = alerts.filter((a) => a.status !== AlertStatus.RESOLVED);
@@ -207,6 +259,13 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-black uppercase tracking-widest text-gray-700">Project Details</h2>
+            <button
+              onClick={openEditModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-800 hover:text-black transition-colors rounded-md"
+            >
+              <Edit3 className="w-3 h-3" />
+              Edit
+            </button>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
@@ -257,6 +316,64 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
               </div>
             </div>
           )}
+        </div>
+
+        {/* Excel Upload Section — directly below Project Details */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <details className="group">
+            <summary className="flex items-center justify-between cursor-pointer list-none">
+              <div>
+                <h2 className="text-sm font-black uppercase tracking-widest text-gray-700">Excel Data</h2>
+                <p className="text-xs text-gray-400 font-mono mt-0.5">
+                  {project.excelRows ? `${project.excelRows.length} rows uploaded` : 'No spreadsheet uploaded'}
+                </p>
+              </div>
+              <div className="text-gray-400 group-open:rotate-180 transition-transform">
+                <ChevronRight className="w-4 h-4" />
+              </div>
+            </summary>
+
+            <div className="mt-4">
+              {!project.excelRows && (
+                <ExcelUpload onUpload={handleExcelUpload} />
+              )}
+
+              {project.excelRows && project.excelRows.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono text-gray-500">
+                      Sheet: {project.excelSheetName || 'Imported'}
+                    </span>
+                    <ExcelUpload onUpload={handleExcelUpload} />
+                  </div>
+                  <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                    <table className="min-w-full text-left text-xs font-mono">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          {Object.keys(project.excelRows[0]).map((header) => (
+                            <th key={header} className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">
+                              {header}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {project.excelRows.map((row, rowIndex) => (
+                          <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            {Object.keys(project.excelRows![0]).map((header) => (
+                              <td key={`${rowIndex}-${header}`} className="px-3 py-2 text-gray-700">
+                                {row[header] ?? '-'}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          </details>
         </div>
 
         {/* Department Progress + Alerts */}
@@ -459,63 +576,6 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
           </div>
         </div>
 
-        {/* Excel Upload Section — collapsed by default but available */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <details className="group">
-            <summary className="flex items-center justify-between cursor-pointer list-none">
-              <div>
-                <h2 className="text-sm font-black uppercase tracking-widest text-gray-700">Excel Data</h2>
-                <p className="text-xs text-gray-400 font-mono mt-0.5">
-                  {project.excelRows ? `${project.excelRows.length} rows uploaded` : 'No spreadsheet uploaded'}
-                </p>
-              </div>
-              <div className="text-gray-400 group-open:rotate-180 transition-transform">
-                <ChevronRight className="w-4 h-4" />
-              </div>
-            </summary>
-
-            <div className="mt-4">
-              {!project.excelRows && (
-                <ExcelUpload onUpload={handleExcelUpload} />
-              )}
-
-              {project.excelRows && project.excelRows.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-gray-500">
-                      Sheet: {project.excelSheetName || 'Imported'}
-                    </span>
-                    <ExcelUpload onUpload={handleExcelUpload} />
-                  </div>
-                  <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                    <table className="min-w-full text-left text-xs font-mono">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          {Object.keys(project.excelRows[0]).map((header) => (
-                            <th key={header} className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">
-                              {header}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {project.excelRows.map((row, rowIndex) => (
-                          <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                            {Object.keys(project.excelRows![0]).map((header) => (
-                              <td key={`${rowIndex}-${header}`} className="px-3 py-2 text-gray-700">
-                                {row[header] ?? '-'}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          </details>
-        </div>
       </div>
 
       {/* Raise Alert modal */}
@@ -527,6 +587,139 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
           onSuccess={() => setAlertModalOpen(false)}
           onCancel={() => setAlertModalOpen(false)}
         />
+      </Modal>
+
+      {/* Edit Project modal */}
+      <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)} size="md">
+        <div className="p-6 max-h-[80vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-sm font-black uppercase tracking-widest text-gray-900">Edit Project</h2>
+            <button onClick={() => setEditModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {editError && (
+            <div className="flex items-center gap-2 p-3 mb-4 border border-red-300 bg-red-50">
+              <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
+              <p className="text-xs text-red-700 font-mono">{editError}</p>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Client Name</label>
+              <input
+                type="text"
+                value={editForm.clientName}
+                onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
+                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Project Title</label>
+              <input
+                type="text"
+                value={editForm.projectTitle}
+                onChange={(e) => setEditForm({ ...editForm, projectTitle: e.target.value })}
+                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Address</label>
+              <input
+                type="text"
+                value={editForm.address}
+                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Contact Phone</label>
+              <input
+                type="tel"
+                value={editForm.contactPhone}
+                onChange={(e) => setEditForm({ ...editForm, contactPhone: e.target.value })}
+                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Total Windows</label>
+              <input
+                type="number"
+                value={editForm.totalWindows}
+                min={1}
+                onChange={(e) => setEditForm({ ...editForm, totalWindows: Number(e.target.value) })}
+                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Deadline</label>
+              <input
+                type="date"
+                value={editForm.deadline}
+                onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })}
+                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Priority</label>
+              <div className="grid grid-cols-2 gap-2">
+                {([ProjectPriority.LOW, ProjectPriority.MEDIUM, ProjectPriority.HIGH, ProjectPriority.URGENT] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setEditForm({ ...editForm, priority: p })}
+                    className={cn(
+                      'text-left p-3 border text-xs transition-colors uppercase font-mono font-bold',
+                      editForm.priority === p
+                        ? p === ProjectPriority.URGENT
+                          ? 'border-red-500 bg-red-50 text-red-700'
+                          : 'border-black bg-black text-white'
+                        : 'border-gray-200 hover:border-gray-400 text-gray-600'
+                    )}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 mt-6 pt-5 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={() => setEditModalOpen(false)}
+              className="px-4 py-2 text-xs font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 hover:text-black transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveEdit}
+              disabled={saving}
+              className="flex items-center gap-2 px-5 py-2 text-xs font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 disabled:opacity-60 transition-colors"
+            >
+              {saving ? (
+                <>
+                  <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  Save Changes
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

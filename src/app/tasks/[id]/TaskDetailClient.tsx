@@ -303,6 +303,9 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
               )}
               <DetailRow icon={User} label="Assigned To" value={assignedUser?.name ?? 'Unassigned'} />
               {task.dueDate && <DetailRow icon={Calendar} label="Due Date" value={formatDate(task.dueDate)} />}
+              {task.startDate && <DetailRow icon={PlayCircle} label="Started At" value={formatDateTime(task.startDate)} />}
+              {task.completedAt && <DetailRow icon={CheckCircle2} label="Completed At" value={formatDateTime(task.completedAt)} />}
+              <DetailRow icon={Calendar} label="Created At" value={formatDateTime(task.createdAt)} />
               {task.isLocked && (
                 <div className="flex items-center gap-2 text-[11px] font-mono text-gray-500">
                   <Lock className="w-3.5 h-3.5" />

@@ -37,6 +37,7 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
 const DEPT_USER_NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
+  { href: '/internal-tasks', label: 'Internal Tasks', icon: ClipboardList },
   { href: '/alerts', label: 'Alerts', icon: AlertTriangle },
 ];
 
@@ -200,7 +201,7 @@ export function AppLayout({ children, activeAlertCount = 0 }: AppLayoutProps) {
         {/* User */}
         <div className="p-4 border-t border-gray-200">
           <div className="flex items-center gap-3">
-            <UserButton />
+            <UserButton afterSignOutUrl="/sign-in" />
             <div className="min-w-0">
               <p className="text-xs font-medium text-gray-900 truncate">Account</p>
               <p className="text-[10px] text-gray-500 font-mono truncate">Settings</p>
