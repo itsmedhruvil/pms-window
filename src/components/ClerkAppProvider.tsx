@@ -9,7 +9,10 @@ interface ClerkAppProviderProps {
 
 export default function ClerkAppProvider({ children }: ClerkAppProviderProps) {
   return (
-    <ClerkProvider publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!}>
+    <ClerkProvider
+      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!}
+      afterSignOutUrl="/sign-in"
+    >
       {children}
     </ClerkProvider>
   );
