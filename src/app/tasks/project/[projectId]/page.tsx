@@ -20,6 +20,7 @@ export default async function ProjectTasksPage(
   const [rawTasks, rawAlerts, rawProjects] = await Promise.all([
     getTasks({
       isAdmin,
+      department: isAdmin ? undefined : user.department,
       projectId: params.projectId,
       assignedUserId: user._id.toString(),
       limit: 500,

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AlertTriangle, X, Check } from 'lucide-react';
 import { cn, apiFetch, ALERT_TYPE_LABEL, DEPARTMENT_LABELS } from '@/lib/utils';
 import { AlertType, AlertSeverity, Department } from '@/types';
+import type { IAlert } from '@/types';
 
 interface CreateAlertFormProps {
   projectId: string;
@@ -11,7 +12,7 @@ interface CreateAlertFormProps {
   taskId?: string;
   defaultAffectedDepartments?: Department[];
   title?: string;
-  onSuccess?: () => void;
+  onSuccess?: (alert: IAlert) => void;
   onCancel?: () => void;
 }
 
@@ -52,7 +53,7 @@ export function CreateAlertForm({
     setLoading(true);
     setError(null);
 
-    const result = await apiFetch('/api/alerts', {
+    const result = await apiFetch<IAlert>('/api/alerts', {
       method: 'POST',
       body: JSON.stringify({
         projectId,
@@ -71,7 +72,10 @@ export function CreateAlertForm({
       return;
     }
 
-    onSuccess?.();
+    if (result.data) {
+      window.dispatchEvent(new CustomEvent('erp-alert-created', { detail: result.data }));
+      onSuccess?.(result.data);
+    }
   };
 
   return (

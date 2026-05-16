@@ -20,16 +20,23 @@ import { ProjectStatusControl } from '@/components/project/ProjectStatusControl'
 import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
 import { Modal } from '@/components/ui/Modal';
 import type { IProject, ITask, IAlert, IUser } from '@/types';
-import { TaskStatus, AlertStatus, DEPARTMENT_SEQUENCE, Department, ProjectPriority } from '@/types';
+import { TaskStatus, AlertStatus, AlertType, DEPARTMENT_SEQUENCE, Department, ProjectPriority, ProjectStatus } from '@/types';
 
 interface ProjectDetailProps {
   project: IProject;
   tasks: ITask[];
   alerts: IAlert[];
   isAdmin: boolean;
+  currentUserDepartment?: Department;
 }
 
-export function ProjectDetail({ project: initialProject, tasks: initialTasks, alerts: initialAlerts, isAdmin }: ProjectDetailProps) {
+export function ProjectDetail({
+  project: initialProject,
+  tasks: initialTasks,
+  alerts: initialAlerts,
+  isAdmin,
+  currentUserDepartment,
+}: ProjectDetailProps) {
   const router = useRouter();
   const [project, setProject] = useState(initialProject);
   const [tasks, setTasks] = useState(initialTasks);
@@ -73,7 +80,7 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
       setTasks((prev) => prev.map((t) => t._id === updatedTask._id ? updatedTask : t));
     }, []),
     onAlertCreated: useCallback((alert: IAlert) => {
-      setAlerts((prev) => [alert, ...prev]);
+      setAlerts((prev) => (prev.some((a) => a._id === alert._id) ? prev : [alert, ...prev]));
     }, []),
     onAlertUpdated: useCallback((updatedAlert: IAlert) => {
       setAlerts((prev) => prev.map((a) => a._id === updatedAlert._id ? updatedAlert : a));
@@ -155,8 +162,16 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
     setEditModalOpen(true);
   };
 
+  const visibleDepartments = isAdmin
+    ? DEPARTMENT_SEQUENCE
+    : currentUserDepartment
+      ? [currentUserDepartment]
+      : DEPARTMENT_SEQUENCE;
   const activeAlerts = alerts.filter((a) => a.status !== AlertStatus.RESOLVED);
   const completedTasks = tasks.filter((t) => t.status === TaskStatus.DONE).length;
+  const visibleCompletionPercentage = tasks.length > 0
+    ? Math.round((completedTasks / tasks.length) * 100)
+    : 0;
   const hasActiveAlerts = activeAlerts.length > 0;
 
   return (
@@ -172,21 +187,21 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
       )}
 
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-8 py-6">
-        <div className="flex items-start justify-between gap-6">
+      <div className="bg-white border-b border-gray-200 px-6 lg:px-8 py-6">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 lg:gap-6">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1.5 text-xs font-mono text-gray-400">
               <span className="uppercase tracking-widest">{project.clientName}</span>
               <ChevronRight className="w-3 h-3" />
               <span>Project</span>
             </div>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">
+            <h1 className="text-xl lg:text-2xl font-black text-gray-900 tracking-tight">
               {project.projectTitle}
             </h1>
-            <div className="flex items-center gap-3 mt-3">
+            <div className="flex flex-wrap items-center gap-2 mt-3">
               <ProjectStatusBadge status={project.status} />
               <PriorityBadge priority={project.priority} />
-              <div className="flex items-center gap-1.5 ml-2 text-xs text-gray-500">
+              <div className="flex items-center gap-1.5 text-xs text-gray-500">
                 <Calendar className="w-3.5 h-3.5" />
                 <span className="font-mono">Due {formatDate(project.deadline)}</span>
               </div>
@@ -198,19 +213,21 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
           </div>
 
           {/* Right side stats + actions */}
-          <div className="flex-shrink-0 flex flex-col items-end gap-3">
-            <div className="text-right">
-              <div className="text-4xl font-black font-mono text-gray-900">
-                {project.completionPercentage}%
+          <div className="flex-shrink-0 flex flex-row lg:flex-col items-start lg:items-end gap-3">
+            <div className="text-left lg:text-right">
+              <div className="text-3xl lg:text-4xl font-black font-mono text-gray-900">
+                {isAdmin ? project.completionPercentage : visibleCompletionPercentage}%
               </div>
-              <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wide">Complete</div>
+              <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wide">
+                {isAdmin ? 'Complete' : `${DEPARTMENT_LABELS[currentUserDepartment as Department] ?? 'Department'} Complete`}
+              </div>
               <div className="text-xs text-gray-500 mt-0.5 font-mono">
                 {completedTasks}/{tasks.length} tasks done
               </div>
             </div>
 
             {isAdmin && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <ProjectStatusControl
                   project={project}
                   hasActiveAlerts={hasActiveAlerts}
@@ -248,7 +265,7 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
         <div className="mt-5 h-2 bg-gray-100 w-full rounded-full overflow-hidden">
           <div
             className={cn('h-full transition-all duration-700 rounded-full', hasActiveAlerts ? 'bg-red-500' : 'bg-black')}
-            style={{ width: `${project.completionPercentage}%` }}
+            style={{ width: `${isAdmin ? project.completionPercentage : visibleCompletionPercentage}%` }}
           />
         </div>
       </div>
@@ -385,7 +402,7 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
               <span className="text-xs font-mono text-gray-400">{tasks.length} total tasks</span>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-              {DEPARTMENT_SEQUENCE.map((dept) => {
+              {visibleDepartments.map((dept) => {
                 const deptTasks = tasks.filter((t) => t.department === dept);
                 const done = deptTasks.filter((t) => t.status === TaskStatus.DONE).length;
                 const blocked = deptTasks.filter((t) => t.status === TaskStatus.BLOCKED).length;
@@ -459,7 +476,9 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className="text-sm font-black uppercase tracking-widest text-gray-700">Workflow Timeline</h2>
-              <p className="text-xs text-gray-400 font-mono mt-0.5">Task status across all departments</p>
+              <p className="text-xs text-gray-400 font-mono mt-0.5">
+                {isAdmin ? 'Task status across all departments' : 'Task status for your department'}
+              </p>
             </div>
             <a
               href={`/tasks/project/${project._id}`}
@@ -472,7 +491,7 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {DEPARTMENT_SEQUENCE.map((dept, deptIdx) => {
+            {visibleDepartments.map((dept, deptIdx) => {
               const deptTasks = tasks.filter((t) => t.department === dept).sort((a, b) => a.sequence - b.sequence);
               if (deptTasks.length === 0) return null;
 
@@ -584,7 +603,21 @@ export function ProjectDetail({ project: initialProject, tasks: initialTasks, al
           projectId={project._id}
           projectTitle={project.projectTitle}
           title="Raise Global Alert"
-          onSuccess={() => setAlertModalOpen(false)}
+          onSuccess={(alert) => {
+            setAlerts((prev) => (prev.some((a) => a._id === alert._id) ? prev : [alert, ...prev]));
+            if (alert.type !== AlertType.DISCUSSION) {
+              setProject((prev) => ({ ...prev, status: ProjectStatus.ON_HOLD }));
+              setTasks((prev) =>
+                prev.map((task) =>
+                  alert.affectedDepartments.includes(task.department) &&
+                  [TaskStatus.TODO, TaskStatus.IN_PROGRESS].includes(task.status)
+                    ? { ...task, status: TaskStatus.BLOCKED }
+                    : task
+                )
+              );
+            }
+            setAlertModalOpen(false);
+          }}
           onCancel={() => setAlertModalOpen(false)}
         />
       </Modal>

@@ -28,7 +28,7 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
 
   // Listen for new alerts globally
   useGlobalAlerts(useCallback((alert: IAlert) => {
-    setAlerts((prev) => [alert, ...prev]);
+    setAlerts((prev) => (prev.some((a) => a._id === alert._id) ? prev : [alert, ...prev]));
   }, []));
 
   const filtered = alerts.filter((a) => {
@@ -48,9 +48,13 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
     setActionLoading(null);
 
     if (result.success && result.data) {
+      const updatedAlert = result.data as IAlert;
       setAlerts((prev) =>
-        prev.map((a) => (a._id === alertId ? (result.data as IAlert) : a))
+        prev.map((a) => (a._id === alertId ? updatedAlert : a))
       );
+      if (updatedAlert.status === AlertStatus.RESOLVED) {
+        window.dispatchEvent(new CustomEvent('erp-alert-resolved', { detail: updatedAlert }));
+      }
     }
   };
 
@@ -64,7 +68,11 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
     setActionLoading(null);
 
     if (result.success) {
+      const deletedAlert = alerts.find((a) => a._id === alertId);
       setAlerts((prev) => prev.filter((a) => a._id !== alertId));
+      if (deletedAlert?.status !== AlertStatus.RESOLVED) {
+        window.dispatchEvent(new CustomEvent('erp-alert-deleted', { detail: deletedAlert }));
+      }
     }
   };
 

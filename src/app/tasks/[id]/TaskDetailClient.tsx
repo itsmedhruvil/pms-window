@@ -14,6 +14,8 @@ import {
   Image as ImageIcon,
   Loader2,
   Lock,
+  MessageCircle,
+  MessageSquare,
   PlayCircle,
   RotateCcw,
   Upload,
@@ -22,10 +24,11 @@ import {
 } from 'lucide-react';
 import { CommentThread } from '@/components/comment/CommentThread';
 import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
+import { TaskDiscussion } from '@/components/task/TaskDiscussion';
 import { Modal } from '@/components/ui/Modal';
 import { TaskStatusBadge } from '@/components/ui/badges';
 import { apiFetch, cn, DEPARTMENT_LABELS, formatDate, formatDateTime } from '@/lib/utils';
-import { IProject, ITask, IUser, TaskImageAttachment, TaskStatus } from '@/types';
+import { AlertType, IAlert, IProject, ITask, IUser, TaskImageAttachment, TaskStatus } from '@/types';
 
 interface TaskDetailClientProps {
   initialTask: ITask;
@@ -35,6 +38,8 @@ interface TaskDetailClientProps {
 
 const MAX_IMAGE_SIZE = 2_500_000;
 const MAX_IMAGES = 6;
+
+type TabId = 'images' | 'comments' | 'discussion';
 
 function getProject(task: ITask) {
   return typeof task.projectId === 'object' && task.projectId !== null
@@ -59,6 +64,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
   const [statusError, setStatusError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [alertModalOpen, setAlertModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>('comments');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -132,10 +138,16 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
     });
   };
 
+  const tabs: { id: TabId; label: string; icon: typeof ImageIcon }[] = [
+    { id: 'comments', label: 'Comments', icon: MessageSquare },
+    { id: 'discussion', label: 'Discussion', icon: MessageCircle },
+    { id: 'images', label: 'Images', icon: ImageIcon },
+  ];
+
   return (
     <div className="min-h-screen bg-white">
       <div className="border-b border-gray-200 px-6 py-5">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div className="min-w-0">
             <Link
               href={`/tasks/departments/${task.department}`}
@@ -150,7 +162,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                 {DEPARTMENT_LABELS[task.department]}
               </span>
             </div>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">{task.title}</h1>
+            <h1 className="text-xl lg:text-2xl font-black text-gray-900 tracking-tight">{task.title}</h1>
             <p className="text-sm text-gray-600 leading-relaxed mt-3 max-w-3xl">{task.description}</p>
           </div>
 
@@ -171,79 +183,120 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6 p-6">
         <main className="space-y-6 min-w-0">
-          <section className="border border-gray-200">
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
-              <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500">
-                Images
-              </h2>
-              {canModify && (
+          {/* Tab bar */}
+          <div className="flex border-b border-gray-200">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
                 <button
+                  key={tab.id}
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={saving || images.length >= MAX_IMAGES}
-                  className="inline-flex items-center gap-2 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-2.5 text-[10px] font-mono font-bold uppercase tracking-widest border-b-2 transition-colors',
+                    activeTab === tab.id
+                      ? 'border-black text-black'
+                      : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
+                  )}
                 >
-                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                  Upload
+                  <Icon className="w-3.5 h-3.5" />
+                  {tab.label}
                 </button>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(event) => handleImagesSelected(event.target.files)}
-              />
-            </div>
-            {uploadError && (
-              <p className="px-4 pt-3 text-xs font-mono text-red-600">{uploadError}</p>
-            )}
-            {images.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-                {images.map((image) => (
-                  <figure key={image.id} className="border border-gray-200 bg-white">
-                    <div className="relative aspect-[4/3] bg-gray-50 overflow-hidden">
-                      <Image
-                        src={image.url}
-                        alt={image.name}
-                        fill
-                        unoptimized
-                        className="object-cover"
-                      />
-                    </div>
-                    <figcaption className="p-3 flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-gray-900 truncate">{image.name}</p>
-                        <p className="text-[10px] font-mono text-gray-400 mt-0.5">
-                          {Math.round(image.size / 1024)} KB · {formatDateTime(image.uploadedAt)}
-                        </p>
-                      </div>
-                      {canModify && (
-                        <button
-                          type="button"
-                          onClick={() => removeImage(image.id)}
-                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                          title="Remove image"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </figcaption>
-                  </figure>
-                ))}
-              </div>
-            ) : (
-              <div className="p-12 text-center">
-                <ImageIcon className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-                <p className="text-xs font-mono text-gray-400">No images uploaded for this task.</p>
-              </div>
-            )}
-          </section>
+              );
+            })}
+          </div>
 
-          <section className="border border-gray-200 h-[520px]">
-            <CommentThread taskId={task._id} currentUser={currentUser} />
-          </section>
+          {/* Images tab */}
+          {activeTab === 'images' && (
+            <section className="border border-gray-200">
+              <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
+                <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500">
+                  Images
+                </h2>
+                {canModify && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={saving || images.length >= MAX_IMAGES}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    Upload
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => handleImagesSelected(event.target.files)}
+                />
+              </div>
+              {uploadError && (
+                <p className="px-4 pt-3 text-xs font-mono text-red-600">{uploadError}</p>
+              )}
+              {images.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                  {images.map((image) => (
+                    <figure key={image.id} className="border border-gray-200 bg-white">
+                      <div className="relative aspect-[4/3] bg-gray-50 overflow-hidden">
+                        <Image
+                          src={image.url}
+                          alt={image.name}
+                          fill
+                          unoptimized
+                          className="object-cover"
+                        />
+                      </div>
+                      <figcaption className="p-3 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-gray-900 truncate">{image.name}</p>
+                          <p className="text-[10px] font-mono text-gray-400 mt-0.5">
+                            {Math.round(image.size / 1024)} KB · {formatDateTime(image.uploadedAt)}
+                          </p>
+                        </div>
+                        {canModify && (
+                          <button
+                            type="button"
+                            onClick={() => removeImage(image.id)}
+                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                            title="Remove image"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-12 text-center">
+                  <ImageIcon className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+                  <p className="text-xs font-mono text-gray-400">No images uploaded for this task.</p>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Comments tab */}
+          {activeTab === 'comments' && (
+            <section className="border border-gray-200 h-[520px] flex flex-col">
+              <CommentThread taskId={task._id} currentUser={currentUser} />
+            </section>
+          )}
+
+          {/* Discussion tab */}
+          {activeTab === 'discussion' && (
+            <section className="border border-gray-200 h-[520px] flex flex-col">
+              <TaskDiscussion
+                taskId={task._id}
+                projectId={projectId}
+                currentUser={currentUser}
+                projectTitle={project?.projectTitle}
+              />
+            </section>
+          )}
         </main>
 
         <aside className="space-y-4">
@@ -330,9 +383,11 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
           taskId={task._id}
           defaultAffectedDepartments={[task.department]}
           title="Raise Task Alert"
-          onSuccess={() => {
+          onSuccess={(alert: IAlert) => {
+            if (alert.type !== AlertType.DISCUSSION) {
+              setTask((prev) => ({ ...prev, status: TaskStatus.BLOCKED }));
+            }
             setAlertModalOpen(false);
-            router.refresh();
           }}
           onCancel={() => setAlertModalOpen(false)}
         />

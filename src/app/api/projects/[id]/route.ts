@@ -8,7 +8,7 @@ import { UpdateProjectSchema } from '@/lib/validations';
 import { UserRole, ProjectStatus } from '@/types';
 
 // GET /api/projects/[id]
-export const GET = withAuth(async (_req: NextRequest, ctx) => {
+export const GET = withAuth(async (_req: NextRequest, ctx, { user }) => {
   await connectDB();
 
   const params = await ctx.params;
@@ -23,13 +23,22 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
     return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 });
   }
 
+  const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
+  const taskQuery: Record<string, unknown> = { projectId: id };
+  const alertQuery: Record<string, unknown> = { projectId: id };
+
+  if (!isAdmin) {
+    taskQuery.department = user.department;
+    alertQuery.affectedDepartments = user.department;
+  }
+
   // Fetch related tasks and alerts
   const [tasks, alerts] = await Promise.all([
-    TaskModel.find({ projectId: id })
+    TaskModel.find(taskQuery)
       .populate('assignedUser', 'name email department')
       .sort({ sequence: 1 })
       .lean(),
-    AlertModel.find({ projectId: id })
+    AlertModel.find(alertQuery)
       .populate('raisedBy', 'name email')
       .sort({ createdAt: -1 })
       .lean(),

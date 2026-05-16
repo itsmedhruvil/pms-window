@@ -3,7 +3,7 @@ import connectDB from '@/lib/db';
 import AlertModel from '@/models/Alert';
 import { withAuth } from '@/lib/auth';
 import { CreateAlertSchema } from '@/lib/validations';
-import { AlertStatus, UserRole } from '@/types';
+import { AlertStatus, UserRole, AlertType } from '@/types';
 import { applyAlertEffects, createSystemLog } from '@/lib/workflow';
 
 // GET /api/alerts
@@ -12,10 +12,14 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
 
   const projectId = req.nextUrl.searchParams.get('projectId');
   const status = req.nextUrl.searchParams.get('status');
+  const taskId = req.nextUrl.searchParams.get('taskId');
+  const type = req.nextUrl.searchParams.get('type');
 
   const query: Record<string, unknown> = {};
   if (projectId) query.projectId = projectId;
   if (status) query.status = status;
+  if (taskId) query.taskId = taskId;
+  if (type) query.type = type;
 
   // Department users only see alerts affecting their department
   if (user.role === UserRole.DEPARTMENT_USER) {
@@ -23,7 +27,7 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
   }
 
   const alerts = await AlertModel.find(query)
-    .populate('raisedBy', 'name email')
+    .populate('raisedBy', 'name email department')
     .populate('projectId', 'projectTitle clientName')
     .sort({ createdAt: -1 })
     .lean();
@@ -31,7 +35,7 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
   return NextResponse.json({ success: true, data: alerts });
 });
 
-// POST /api/alerts - Admin only
+// POST /api/alerts - Admin only (or any user for DISCUSSIONS)
 export const POST = withAuth(
   async (req: NextRequest, _ctx, { user }) => {
     await connectDB();
@@ -43,6 +47,14 @@ export const POST = withAuth(
       return NextResponse.json(
         { success: false, error: parsed.error.flatten() },
         { status: 400 }
+      );
+    }
+
+    // Department users can only create DISCUSSION type alerts
+    if (user.role === UserRole.DEPARTMENT_USER && parsed.data.type !== AlertType.DISCUSSION) {
+      return NextResponse.json(
+        { success: false, error: 'Department users can only create discussion threads' },
+        { status: 403 }
       );
     }
 
@@ -64,11 +76,11 @@ export const POST = withAuth(
     });
 
     const populated = await AlertModel.findById(alert._id)
-      .populate('raisedBy', 'name email')
+      .populate('raisedBy', 'name email department')
       .populate('projectId', 'projectTitle clientName')
       .lean();
 
     return NextResponse.json({ success: true, data: populated }, { status: 201 });
   },
-  [UserRole.SUPER_ADMIN, UserRole.ADMIN]
+  [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.DEPARTMENT_USER]
 );

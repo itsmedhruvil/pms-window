@@ -53,6 +53,7 @@ export enum AlertType {
   CLIENT_ESCALATION = 'client_escalation',
   PRODUCTION_ISSUE = 'production_issue',
   MATERIAL_ISSUE = 'material_issue',
+  DISCUSSION = 'discussion',
 }
 
 export enum AlertStatus {
@@ -62,6 +63,7 @@ export enum AlertStatus {
 }
 
 export enum AlertSeverity {
+  LOW = 'low',
   HIGH = 'high',
   CRITICAL = 'critical',
 }

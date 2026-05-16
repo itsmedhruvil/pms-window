@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Save, X, Edit3, ChevronDown, ChevronRight, GripVertical, Layers } from 'lucide-react';
+import { Plus, Trash2, Save, X, Edit3, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { apiFetch, cn, DEPARTMENT_LABELS } from '@/lib/utils';
 import { Department, DEPARTMENT_SEQUENCE, TaskFrequency } from '@/types';
 import type { ITemplateGroup } from '@/types';
@@ -50,6 +50,256 @@ const emptyGroupDraft: GroupDraft = {
   tasks: [{ ...emptyTaskDraft }],
 };
 
+// ── Module-level components (prevents re-mount on parent re-render) ────────
+
+function DepartmentTabs({
+  tasks,
+  activeTab,
+  onTabChange,
+}: {
+  tasks: TaskDraft[];
+  activeTab: Department;
+  onTabChange: (d: Department) => void;
+}) {
+  const counts = tasks.reduce((acc, t) => {
+    acc[t.department] = (acc[t.department] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  return (
+    <div className="flex border-b border-gray-200 overflow-x-auto">
+      {DEPARTMENT_SEQUENCE.map((dept) => {
+        const count = counts[dept] || 0;
+        const isActive = activeTab === dept;
+        return (
+          <button
+            key={dept}
+            type="button"
+            onClick={() => onTabChange(dept)}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2.5 text-[11px] font-mono whitespace-nowrap border-b-2 transition-colors',
+              isActive
+                ? 'border-black text-black font-bold'
+                : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
+            )}
+          >
+            {DEPARTMENT_LABELS[dept]}
+            {count > 0 && (
+              <span className={cn(
+                'px-1.5 py-0.5 text-[9px] rounded-sm font-bold',
+                isActive ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'
+              )}>
+                {count}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TaskTable({
+  tasks,
+  onUpdate,
+  onRemove,
+  onAdd,
+  onMove,
+  readOnly = false,
+  addLabel = 'Add task',
+}: {
+  tasks: TaskDraft[];
+  onUpdate: (idx: number, key: keyof TaskDraft, value: string) => void;
+  onRemove: (idx: number) => void;
+  onAdd: () => void;
+  onMove?: (idx: number, direction: 'up' | 'down') => void;
+  readOnly?: boolean;
+  addLabel?: string;
+}) {
+  return (
+    <div className="border border-gray-200 overflow-x-auto">
+      {/* Table header */}
+      <div className="grid grid-cols-[36px_44px_1fr_1fr_130px_110px_36px] min-w-[700px] bg-gray-50 border-b border-gray-200 text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
+        <div className="px-2 py-2 text-center">#</div>
+        <div className="px-1 py-2 text-center">Move</div>
+        <div className="px-3 py-2">Task Title</div>
+        <div className="px-3 py-2">Description</div>
+        <div className="px-3 py-2">Department</div>
+        <div className="px-3 py-2">Frequency</div>
+        <div className="px-2 py-2"></div>
+      </div>
+
+      {/* Table rows */}
+      <div className="divide-y divide-gray-100 min-w-[700px]">
+        {tasks.length === 0 && (
+          <div className="px-4 py-8 text-center text-xs font-mono text-gray-400">
+            No tasks in this view.
+          </div>
+        )}
+        {tasks.map((task, idx) => (
+          <div key={idx} className="grid grid-cols-[36px_44px_1fr_1fr_130px_110px_36px] gap-0 items-start group">
+            <div className="px-2 py-2.5 text-[10px] font-mono text-gray-400 text-center pt-3.5">
+              {idx + 1}
+            </div>
+            {/* Reorder buttons */}
+            <div className="px-1 py-1.5 flex items-center gap-0.5">
+              {!readOnly && onMove && tasks.length > 1 && (
+                <div className="flex flex-col items-center opacity-30 group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={() => onMove(idx, 'up')}
+                    disabled={idx === 0}
+                    className="p-0.5 text-gray-400 hover:text-gray-900 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                    title="Move up"
+                  >
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onMove(idx, 'down')}
+                    disabled={idx === tasks.length - 1}
+                    className="p-0.5 text-gray-400 hover:text-gray-900 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                    title="Move down"
+                  >
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="px-2 py-1.5">
+              <input
+                value={task.title}
+                onChange={(e) => onUpdate(idx, 'title', e.target.value)}
+                disabled={readOnly}
+                className={cn(
+                  'w-full px-2 py-1.5 text-[10px] font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white',
+                  readOnly && 'bg-gray-50 cursor-default'
+                )}
+                placeholder="Task title"
+              />
+            </div>
+            <div className="px-2 py-1.5">
+              <input
+                value={task.description}
+                onChange={(e) => onUpdate(idx, 'description', e.target.value)}
+                disabled={readOnly}
+                className={cn(
+                  'w-full px-2 py-1.5 text-[10px] font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white',
+                  readOnly && 'bg-gray-50 cursor-default'
+                )}
+                placeholder="Description"
+              />
+            </div>
+            <div className="px-2 py-1.5">
+              <select
+                value={task.department}
+                onChange={(e) => onUpdate(idx, 'department', e.target.value)}
+                disabled={readOnly}
+                className={cn(
+                  'w-full px-2 py-1.5 text-[10px] font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white',
+                  readOnly && 'bg-gray-50 cursor-default'
+                )}
+              >
+                {DEPARTMENT_SEQUENCE.map((d) => (
+                  <option key={d} value={d}>{DEPARTMENT_LABELS[d]}</option>
+                ))}
+              </select>
+            </div>
+            <div className="px-2 py-1.5">
+              <select
+                value={task.frequency}
+                onChange={(e) => onUpdate(idx, 'frequency', e.target.value)}
+                disabled={readOnly}
+                className={cn(
+                  'w-full px-2 py-1.5 text-[10px] font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white',
+                  readOnly && 'bg-gray-50 cursor-default'
+                )}
+              >
+                {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="px-1 py-1.5 pt-3">
+              {!readOnly && tasks.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => onRemove(idx)}
+                  className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
+                  title="Remove task"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Add row button */}
+      {!readOnly && (
+        <div className="px-3 py-2 border-t border-gray-100 bg-gray-50/50">
+          <button
+            type="button"
+            onClick={onAdd}
+            className="text-[10px] font-mono text-gray-500 hover:text-black flex items-center gap-1 transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            {addLabel}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ViewTaskTable({ tasks }: { tasks: ITemplateGroup['tasks'] }) {
+  return (
+    <div className="border border-gray-200 overflow-hidden">
+      <div className="grid grid-cols-[32px_1fr_1fr_90px] bg-gray-50 border-b border-gray-200 text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
+        <div className="px-2 py-2 text-center">#</div>
+        <div className="px-3 py-2">Task</div>
+        <div className="px-3 py-2">Description</div>
+        <div className="px-3 py-2">Frequency</div>
+      </div>
+      <div className="divide-y divide-gray-100">
+        {tasks.map((task, idx) => (
+          <div key={idx} className="grid grid-cols-[32px_1fr_1fr_90px] gap-0 items-center px-2 py-2 hover:bg-gray-50/50">
+            <div className="text-[10px] font-mono text-gray-400 text-center">{idx + 1}</div>
+            <div className="min-w-0 px-1">
+              <p className="text-[11px] font-medium text-gray-900 truncate">{task.title}</p>
+            </div>
+            <div className="min-w-0 px-1">
+              <p className="text-[10px] text-gray-500 truncate">{task.description}</p>
+            </div>
+            <div className="px-1">
+              <span className={cn(
+                'inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider rounded-sm',
+                FREQUENCY_BADGES[task.frequency || 'project'] || 'bg-gray-100 text-gray-800'
+              )}>
+                {FREQUENCY_LABELS[task.frequency || 'project'] || task.frequency}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FrequencyBadge({ freq }: { freq: string }) {
+  return (
+    <span className={cn(
+      'inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider rounded-sm',
+      FREQUENCY_BADGES[freq] || 'bg-gray-100 text-gray-800'
+    )}>
+      {FREQUENCY_LABELS[freq] || freq}
+    </span>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────
+
 export function TemplateGroupsClient() {
   const [groups, setGroups] = useState<ITemplateGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +309,8 @@ export function TemplateGroupsClient() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<GroupDraft>(emptyGroupDraft);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [editDepartmentTab, setEditDepartmentTab] = useState<Department>(DEPARTMENT_SEQUENCE[0]);
+  const [viewDepartmentTab, setViewDepartmentTab] = useState<Department | null>(null);
 
   const fetchGroups = useCallback(async () => {
     setLoading(true);
@@ -75,6 +327,7 @@ export function TemplateGroupsClient() {
 
   const toggleExpand = (groupId: string) => {
     setExpandedGroup((prev) => (prev === groupId ? null : groupId));
+    setViewDepartmentTab(null);
   };
 
   // ── Draft helpers ──────────────────────────────────────────────────────────
@@ -96,6 +349,16 @@ export function TemplateGroupsClient() {
     setDraft((prev) => {
       const tasks = [...prev.tasks];
       tasks[idx] = { ...tasks[idx], [key]: value };
+      return { ...prev, tasks };
+    });
+  };
+
+  const moveTaskInDraft = (idx: number, direction: 'up' | 'down') => {
+    setDraft((prev) => {
+      const tasks = [...prev.tasks];
+      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (targetIdx < 0 || targetIdx >= tasks.length) return prev;
+      [tasks[idx], tasks[targetIdx]] = [tasks[targetIdx], tasks[idx]];
       return { ...prev, tasks };
     });
   };
@@ -143,6 +406,7 @@ export function TemplateGroupsClient() {
   // ── Edit helpers ───────────────────────────────────────────────────────────
   const startEditing = (group: ITemplateGroup) => {
     setEditingId(group._id);
+    setEditDepartmentTab(DEPARTMENT_SEQUENCE[0]);
     setEditDraft({
       name: group.name,
       description: group.description,
@@ -155,10 +419,10 @@ export function TemplateGroupsClient() {
     });
   };
 
-  const addEditTask = () => {
+  const addEditTask = (department: Department) => {
     setEditDraft((prev) => ({
       ...prev,
-      tasks: [...prev.tasks, { ...emptyTaskDraft }],
+      tasks: [...prev.tasks, { ...emptyTaskDraft, department }],
     }));
   };
 
@@ -173,6 +437,16 @@ export function TemplateGroupsClient() {
     setEditDraft((prev) => {
       const tasks = [...prev.tasks];
       tasks[idx] = { ...tasks[idx], [key]: value };
+      return { ...prev, tasks };
+    });
+  };
+
+  const moveEditTask = (idx: number, direction: 'up' | 'down') => {
+    setEditDraft((prev) => {
+      const tasks = [...prev.tasks];
+      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (targetIdx < 0 || targetIdx >= tasks.length) return prev;
+      [tasks[idx], tasks[targetIdx]] = [tasks[targetIdx], tasks[idx]];
       return { ...prev, tasks };
     });
   };
@@ -228,130 +502,6 @@ export function TemplateGroupsClient() {
     }
   };
 
-  // ── Task table component (shared for create & edit) ────────────────────────
-  const TaskTable = ({
-    tasks,
-    onUpdate,
-    onRemove,
-    onAdd,
-    readOnly = false,
-  }: {
-    tasks: TaskDraft[];
-    onUpdate: (idx: number, key: keyof TaskDraft, value: string) => void;
-    onRemove: (idx: number) => void;
-    onAdd: () => void;
-    readOnly?: boolean;
-  }) => (
-    <div className="border border-gray-200 overflow-hidden">
-      {/* Table header */}
-      <div className="grid grid-cols-[40px_140px_110px_1fr_40px] bg-gray-50 border-b border-gray-200 text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
-        <div className="px-3 py-2 text-center">#</div>
-        <div className="px-3 py-2">Department</div>
-        <div className="px-3 py-2">Frequency</div>
-        <div className="px-3 py-2">Task</div>
-        <div className="px-3 py-2"></div>
-      </div>
-
-      {/* Table rows */}
-      <div className="divide-y divide-gray-100">
-        {tasks.map((task, idx) => (
-          <div key={idx} className="grid grid-cols-[40px_140px_110px_1fr_40px] gap-0 items-start">
-            <div className="px-3 py-2.5 text-[10px] font-mono text-gray-400 text-center pt-3.5">
-              {idx + 1}
-            </div>
-            <div className="px-2 py-1.5">
-              <select
-                value={task.department}
-                onChange={(e) => onUpdate(idx, 'department', e.target.value)}
-                disabled={readOnly}
-                className={cn(
-                  'w-full px-2 py-1.5 text-[10px] font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white',
-                  readOnly && 'bg-gray-50 cursor-default'
-                )}
-              >
-                {DEPARTMENT_SEQUENCE.map((d) => (
-                  <option key={d} value={d}>{DEPARTMENT_LABELS[d]}</option>
-                ))}
-              </select>
-            </div>
-            <div className="px-2 py-1.5">
-              <select
-                value={task.frequency}
-                onChange={(e) => onUpdate(idx, 'frequency', e.target.value)}
-                disabled={readOnly}
-                className={cn(
-                  'w-full px-2 py-1.5 text-[10px] font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white',
-                  readOnly && 'bg-gray-50 cursor-default'
-                )}
-              >
-                {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="px-2 py-1.5">
-              <input
-                value={task.title}
-                onChange={(e) => onUpdate(idx, 'title', e.target.value)}
-                disabled={readOnly}
-                className={cn(
-                  'w-full px-2 py-1.5 text-[10px] font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white mb-1',
-                  readOnly && 'bg-gray-50 cursor-default'
-                )}
-                placeholder="Task title"
-              />
-              <input
-                value={task.description}
-                onChange={(e) => onUpdate(idx, 'description', e.target.value)}
-                disabled={readOnly}
-                className={cn(
-                  'w-full px-2 py-1.5 text-[10px] font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white',
-                  readOnly && 'bg-gray-50 cursor-default'
-                )}
-                placeholder="Description"
-              />
-            </div>
-            <div className="px-1 py-1.5 pt-3">
-              {!readOnly && tasks.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => onRemove(idx)}
-                  className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
-                  title="Remove task"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Add row button */}
-      {!readOnly && (
-        <div className="px-3 py-2 border-t border-gray-100 bg-gray-50/50">
-          <button
-            type="button"
-            onClick={onAdd}
-            className="text-[10px] font-mono text-gray-500 hover:text-black flex items-center gap-1 transition-colors"
-          >
-            <Plus className="w-3 h-3" />
-            Add task
-          </button>
-        </div>
-      )}
-    </div>
-  );
-
-  const FrequencyBadge = ({ freq }: { freq: string }) => (
-    <span className={cn(
-      'inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider rounded-sm',
-      FREQUENCY_BADGES[freq] || 'bg-gray-100 text-gray-800'
-    )}>
-      {FREQUENCY_LABELS[freq] || freq}
-    </span>
-  );
-
   return (
     <div className="min-h-screen bg-white">
       <div className="border-b border-gray-200 px-6 py-5">
@@ -369,7 +519,7 @@ export function TemplateGroupsClient() {
         </div>
       </div>
 
-      <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <div className="p-6 max-w-screen-xl mx-auto space-y-6">
         {error && (
           <div className="border border-red-300 bg-red-50 px-4 py-3 text-xs font-mono text-red-700">
             {error}
@@ -384,11 +534,18 @@ export function TemplateGroupsClient() {
             <p className="text-sm font-mono text-gray-400">No template groups yet. Create one below.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {groups.map((group) => {
               const isEditing = editingId === group._id;
               const isExpanded = expandedGroup === group._id;
               const depCount = new Set(group.tasks.map((t) => t.department)).size;
+              const deptGroups = DEPARTMENT_SEQUENCE
+                .map((d) => ({
+                  department: d,
+                  label: DEPARTMENT_LABELS[d],
+                  tasks: group.tasks.filter((t) => t.department === d),
+                }))
+                .filter((g) => g.tasks.length > 0);
               const freqCounts = group.tasks.reduce((acc, t) => {
                 const f = t.frequency || 'project';
                 acc[f] = (acc[f] || 0) + 1;
@@ -398,7 +555,7 @@ export function TemplateGroupsClient() {
               return (
                 <div key={group._id} className="border border-gray-200">
                   {/* Group header — always visible */}
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <button
                         type="button"
@@ -443,7 +600,7 @@ export function TemplateGroupsClient() {
 
                   {/* Frequency summary chips */}
                   {!isEditing && isExpanded && (
-                    <div className="px-4 py-2 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2 flex-wrap">
+                    <div className="px-5 py-2 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2 flex-wrap">
                       <span className="text-[9px] font-mono uppercase tracking-wider text-gray-500 font-bold">Frequency:</span>
                       {Object.entries(freqCounts).map(([freq, count]) => (
                         <FrequencyBadge key={freq} freq={freq} />
@@ -452,41 +609,57 @@ export function TemplateGroupsClient() {
                     </div>
                   )}
 
-                  {/* Collapsible task details */}
+                  {/* View mode - collapsible with department tabs */}
                   {isExpanded && !isEditing && (
-                    <div className="divide-y divide-gray-50">
-                      {/* Task table view */}
-                      <div className="">
-                        {/* Table header */}
-                        <div className="grid grid-cols-[40px_130px_100px_1fr] bg-gray-50/30 border-b border-gray-100 text-[9px] font-mono font-bold uppercase tracking-widest text-gray-400 px-3 py-1.5">
-                          <div className="text-center">#</div>
-                          <div>Dept</div>
-                          <div>Freq</div>
-                          <div>Task</div>
+                    <div>
+                      {/* Department tabs for view mode */}
+                      {deptGroups.length > 1 && (
+                        <div className="flex border-b border-gray-100 bg-gray-50/30 overflow-x-auto">
+                          <button
+                            type="button"
+                            onClick={() => setViewDepartmentTab(null)}
+                            className={cn(
+                              'px-4 py-2 text-[10px] font-mono whitespace-nowrap border-b-2 transition-colors',
+                              viewDepartmentTab === null
+                                ? 'border-black text-black font-bold'
+                                : 'border-transparent text-gray-500 hover:text-gray-800'
+                            )}
+                          >
+                            All ({group.tasks.length})
+                          </button>
+                          {deptGroups.map((g) => (
+                            <button
+                              key={g.department}
+                              type="button"
+                              onClick={() => setViewDepartmentTab(g.department)}
+                              className={cn(
+                                'px-4 py-2 text-[10px] font-mono whitespace-nowrap border-b-2 transition-colors',
+                                viewDepartmentTab === g.department
+                                  ? 'border-black text-black font-bold'
+                                  : 'border-transparent text-gray-500 hover:text-gray-800'
+                              )}
+                            >
+                              {g.label} ({g.tasks.length})
+                            </button>
+                          ))}
                         </div>
-                        {group.tasks.map((task, idx) => (
-                          <div key={idx} className="grid grid-cols-[40px_130px_100px_1fr] gap-0 items-center px-3 py-2 hover:bg-gray-50/50">
-                            <div className="text-[10px] font-mono text-gray-400 text-center">{idx + 1}</div>
-                            <div className="text-[10px] font-mono text-gray-700 uppercase tracking-wide">
-                              {DEPARTMENT_LABELS[task.department]}
-                            </div>
-                            <div>
-                              <FrequencyBadge freq={task.frequency || 'project'} />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-[11px] font-medium text-gray-900 truncate">{task.title}</p>
-                              <p className="text-[10px] text-gray-500 truncate">{task.description}</p>
-                            </div>
-                          </div>
-                        ))}
+                      )}
+                      <div className="p-4">
+                        <ViewTaskTable
+                          tasks={
+                            viewDepartmentTab === null
+                              ? group.tasks
+                              : group.tasks.filter((t) => t.department === viewDepartmentTab)
+                          }
+                        />
                       </div>
                     </div>
                   )}
 
-                  {/* Editing mode */}
+                  {/* Editing mode with department tabs */}
                   {isEditing && (
-                    <div className="p-4 space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
+                    <div className="p-5 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
                         <input
                           value={editDraft.name}
                           onChange={(e) => setEditDraft((prev) => ({ ...prev, name: e.target.value }))}
@@ -501,15 +674,40 @@ export function TemplateGroupsClient() {
                         />
                       </div>
 
-                      <TaskTable
+                      {/* Department tabs for editing */}
+                      <DepartmentTabs
                         tasks={editDraft.tasks}
-                        onUpdate={updateEditTask}
-                        onRemove={removeEditTask}
-                        onAdd={addEditTask}
+                        activeTab={editDepartmentTab}
+                        onTabChange={setEditDepartmentTab}
+                      />
+
+                      {/* Task table filtered by selected department */}
+                      <TaskTable
+                        tasks={editDraft.tasks.filter((t) => t.department === editDepartmentTab)}
+                        onUpdate={(localIdx, key, value) => {
+                          const globalTasks = editDraft.tasks.filter((t) => t.department === editDepartmentTab);
+                          const globalIdx = editDraft.tasks.indexOf(globalTasks[localIdx]);
+                          updateEditTask(globalIdx, key, value);
+                        }}
+                        onRemove={(localIdx) => {
+                          const globalTasks = editDraft.tasks.filter((t) => t.department === editDepartmentTab);
+                          const globalIdx = editDraft.tasks.indexOf(globalTasks[localIdx]);
+                          removeEditTask(globalIdx);
+                        }}
+                        onAdd={() => addEditTask(editDepartmentTab)}
+                        onMove={(localIdx, direction) => {
+                          const deptTasks = editDraft.tasks.filter((t) => t.department === editDepartmentTab);
+                          const globalIdx = editDraft.tasks.indexOf(deptTasks[localIdx]);
+                          moveEditTask(globalIdx, direction);
+                        }}
+                        addLabel={`Add ${DEPARTMENT_LABELS[editDepartmentTab]} task`}
                       />
 
                       <div className="flex items-center justify-between">
-                        <div />
+                        <div className="text-[10px] font-mono text-gray-400">
+                          {editDraft.tasks.filter((t) => t.title.trim()).length} tasks defined across{' '}
+                          {new Set(editDraft.tasks.map((t) => t.department)).size} departments
+                        </div>
                         <div className="flex gap-2">
                           <button
                             type="button"
@@ -538,7 +736,7 @@ export function TemplateGroupsClient() {
         )}
 
         {/* Create new group */}
-        <div className="border-2 border-dashed border-gray-300 p-4">
+        <div className="border-2 border-dashed border-gray-300 p-5">
           <div className="flex items-center gap-2 mb-4">
             <Plus className="w-4 h-4 text-gray-500" />
             <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500">
@@ -547,7 +745,7 @@ export function TemplateGroupsClient() {
           </div>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <input
                 value={draft.name}
                 onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))}
@@ -567,6 +765,7 @@ export function TemplateGroupsClient() {
               onUpdate={updateTaskInDraft}
               onRemove={removeTaskFromDraft}
               onAdd={addTaskToDraft}
+              onMove={moveTaskInDraft}
             />
 
             <div className="flex items-center justify-between">

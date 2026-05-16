@@ -11,6 +11,7 @@ import { createSystemLog } from '@/lib/workflow';
 // GET /api/projects - List projects with filters
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
   await connectDB();
+  void user;
 
   const searchParams = Object.fromEntries(req.nextUrl.searchParams);
   const filters = ProjectFiltersSchema.safeParse(searchParams);
@@ -35,11 +36,6 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
       { clientName: { $regex: search, $options: 'i' } },
       { projectTitle: { $regex: search, $options: 'i' } },
     ];
-  }
-
-  // Department users only see assigned projects
-  if (user.role === UserRole.DEPARTMENT_USER) {
-    query.assignedUsers = user._id;
   }
 
   const [items, total] = await Promise.all([

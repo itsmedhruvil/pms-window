@@ -34,14 +34,15 @@ export interface ProjectListFilters {
   search?: string;
   page?: number;
   limit?: number;
-  userId?: string;        // restrict to assigned (dept users)
+  userId?: string;
   isAdmin?: boolean;
+  department?: Department;
 }
 
 export async function getProjects(filters: ProjectListFilters = {}) {
   await connectDB();
 
-  const { status, priority, search, page = 1, limit = 50, userId, isAdmin = true } = filters;
+  const { status, priority, search, page = 1, limit = 50 } = filters;
   const skip = (page - 1) * limit;
 
   const query: Record<string, unknown> = {};
@@ -52,9 +53,6 @@ export async function getProjects(filters: ProjectListFilters = {}) {
       { clientName: { $regex: search, $options: 'i' } },
       { projectTitle: { $regex: search, $options: 'i' } },
     ];
-  }
-  if (!isAdmin && userId) {
-    query.assignedUsers = userId;
   }
 
   const [items, total] = await Promise.all([

@@ -31,13 +31,19 @@ export default async function WindowDetailPage(props: {
   }
 
   const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
-  const activeAlertCount = data.alerts.filter((a) => a.status === AlertStatus.ACTIVE).length;
+  const visibleTasks = isAdmin
+    ? data.tasks
+    : data.tasks.filter((task) => task.department === user.department);
+  const visibleAlerts = isAdmin
+    ? data.alerts
+    : data.alerts.filter((alert) => alert.affectedDepartments.includes(user.department));
+  const activeAlertCount = visibleAlerts.filter((a) => a.status === AlertStatus.ACTIVE).length;
 
   return (
     <AppLayout activeAlertCount={activeAlertCount}>
       <WindowDetail
         project={data.project as IProject}
-        tasks={data.tasks as ITask[]}
+        tasks={visibleTasks as ITask[]}
         windowIndex={windowIndex}
         isAdmin={isAdmin}
       />

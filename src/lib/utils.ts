@@ -103,9 +103,11 @@ export const ALERT_TYPE_LABEL: Record<AlertType, string> = {
   [AlertType.CLIENT_ESCALATION]: 'Client Escalation',
   [AlertType.PRODUCTION_ISSUE]: 'Production Issue',
   [AlertType.MATERIAL_ISSUE]: 'Material Issue',
+  [AlertType.DISCUSSION]: 'Discussion',
 };
 
 export const ALERT_SEVERITY_STYLE: Record<AlertSeverity, string> = {
+  [AlertSeverity.LOW]: 'bg-blue-50 text-blue-700 border-blue-300',
   [AlertSeverity.HIGH]: 'bg-red-50 text-red-700 border-red-300',
   [AlertSeverity.CRITICAL]: 'bg-red-600 text-white border-red-700',
 };
