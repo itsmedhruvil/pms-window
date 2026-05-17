@@ -123,7 +123,7 @@ export function InternalTasksPageClient({
                   </p>
                 </div>
 
-                <div className="overflow-hidden">
+                <div className="erp-table-wrap">
                   <table className="erp-table">
                     <thead>
                       <tr>

@@ -184,7 +184,7 @@ export function TasksClient({
   return (
     <div className="flex min-h-[640px] overflow-hidden">
       {/* Main panel */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-3 gap-3">
             <div>
@@ -399,7 +399,7 @@ function TaskListView({
   }
 
   return (
-    <div className="border border-gray-200 overflow-hidden">
+    <div className="erp-table-wrap border border-gray-200">
       <table className="erp-table">
         <thead>
           <tr>

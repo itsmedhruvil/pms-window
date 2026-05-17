@@ -204,7 +204,7 @@ export function AccessSummaryClient({
       </div>
 
       {/* Permissions table */}
-      <div className="border border-gray-200">
+      <div className="erp-table-wrap border border-gray-200">
         <table className="erp-table">
           <thead>
             <tr>

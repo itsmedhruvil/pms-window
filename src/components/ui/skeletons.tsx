@@ -32,7 +32,8 @@ export function ProjectCardSkeleton() {
 
 export function TableSkeleton({ rows = 5, cols = 5 }: { rows?: number; cols?: number }) {
   return (
-    <div className="border border-gray-200 overflow-hidden">
+    <div className="erp-table-wrap border border-gray-200">
+      <div className="min-w-[720px] md:min-w-full">
       {/* Header */}
       <div className="flex gap-4 px-3 py-2 bg-gray-50 border-b border-gray-200">
         {Array.from({ length: cols }).map((_, i) => (
@@ -53,6 +54,7 @@ export function TableSkeleton({ rows = 5, cols = 5 }: { rows?: number; cols?: nu
           ))}
         </div>
       ))}
+      </div>
     </div>
   );
 }

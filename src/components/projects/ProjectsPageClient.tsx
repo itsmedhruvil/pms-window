@@ -33,7 +33,7 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: Proj
             <p className="text-sm font-mono text-gray-400">No projects yet</p>
           </div>
         ) : (
-          <div className="border border-gray-200 overflow-hidden">
+          <div className="erp-table-wrap border border-gray-200">
             <table className="erp-table">
               <thead>
                 <tr>

@@ -297,7 +297,7 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
       </div>
 
       {/* Main content — isolated from Sidebar Clerk re-renders */}
-      <main className="flex-1 overflow-auto pt-14 lg:pt-0">
+      <main className="min-w-0 flex-1 overflow-auto pt-14 lg:pt-0">
         {children}
       </main>
     </div>

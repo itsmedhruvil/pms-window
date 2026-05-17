@@ -405,15 +405,15 @@ export function DiscussionsClient({ currentUser: _currentUser }: DiscussionsClie
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="border-b border-gray-200 px-6 py-5">
-        <div className="flex items-start justify-between gap-4">
+      <div className="border-b border-gray-200 px-4 py-4 sm:px-6 sm:py-5">
+        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
           <div>
             <h1 className="text-xl font-black text-gray-900">Discussions</h1>
             <p className="text-xs font-mono text-gray-500 mt-1">
               Start or browse task-level discussion threads.
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
             <div className="text-right font-mono">
               <p className="text-2xl font-black text-gray-900">{discussions.length}</p>
               <p className="text-[10px] uppercase tracking-widest text-gray-400">Threads</p>
@@ -438,7 +438,7 @@ export function DiscussionsClient({ currentUser: _currentUser }: DiscussionsClie
         </div>
       </div>
 
-      <div className="p-6 max-w-screen-xl mx-auto space-y-6">
+      <div className="mx-auto max-w-screen-xl space-y-6 p-4 sm:p-6">
         {error && (
           <div className="border border-red-300 bg-red-50 px-4 py-3 text-xs font-mono text-red-700">
             {error}
@@ -642,10 +642,10 @@ export function DiscussionsClient({ currentUser: _currentUser }: DiscussionsClie
                   <button
                     type="button"
                     onClick={() => toggleExpand(discussion._id)}
-                    className="w-full flex items-start gap-3 px-5 py-3.5 hover:bg-gray-50/50 transition-colors text-left"
+                    className="flex w-full items-start gap-3 px-3 py-3.5 text-left transition-colors hover:bg-gray-50/50 sm:px-5"
                   >
                     <div className={cn(
-                      'w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5',
+                      'mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full sm:h-9 sm:w-9',
                       discussion.severity === AlertSeverity.CRITICAL
                         ? 'bg-red-100'
                         : discussion.severity === AlertSeverity.HIGH
@@ -682,7 +682,7 @@ export function DiscussionsClient({ currentUser: _currentUser }: DiscussionsClie
                           {discussion.status === AlertStatus.RESOLVED ? 'Resolved' : 'Active'}
                         </span>
                         {discussion.affectedDepartments && discussion.affectedDepartments.length > 0 && (
-                          <div className="flex items-center gap-1">
+                          <div className="flex flex-wrap items-center gap-1">
                             {discussion.affectedDepartments.map((d) => (
                               <span key={d} className="text-[8px] font-mono px-1 py-0.5 bg-gray-100 text-gray-600 uppercase tracking-wider rounded-sm">
                                 {DEPARTMENT_ABBR[d]}
@@ -716,7 +716,7 @@ export function DiscussionsClient({ currentUser: _currentUser }: DiscussionsClie
                           </>
                         )}
                         {project?.projectTitle && (
-                          <span className="text-gray-400 truncate max-w-[200px]">
+                          <span className="max-w-full truncate text-gray-400 sm:max-w-[200px]">
                             · {project.projectTitle}
                           </span>
                         )}
@@ -734,7 +734,7 @@ export function DiscussionsClient({ currentUser: _currentUser }: DiscussionsClie
                   {/* Expanded discussion */}
                   {isExpanded && (
                     <div className="border-t border-gray-100 bg-gray-50/30">
-                      <div className="max-h-[400px] overflow-y-auto p-4 space-y-3">
+                      <div className="max-h-[400px] space-y-3 overflow-y-auto p-3 sm:p-4">
                         {discussionComments.length === 0 ? (
                           <p className="text-[10px] font-mono text-gray-400 text-center py-4">
                             No replies yet.
@@ -750,14 +750,14 @@ export function DiscussionsClient({ currentUser: _currentUser }: DiscussionsClie
                                   </span>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-baseline gap-2 mb-0.5">
+                                  <div className="mb-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                                     <span className="text-[11px] font-bold text-gray-900">
                                       {author?.name || 'Unknown'}
                                     </span>
                                     <span className="text-[9px] font-mono text-gray-400 uppercase">
                                       {author?.department ? DEPARTMENT_LABELS[author.department as Department] : ''}
                                     </span>
-                                    <span className="text-[9px] text-gray-400 ml-auto">
+                                    <span className="ml-0 text-[9px] text-gray-400 sm:ml-auto">
                                       {timeAgo(comment.createdAt)}
                                     </span>
                                   </div>
@@ -776,7 +776,7 @@ export function DiscussionsClient({ currentUser: _currentUser }: DiscussionsClie
                         {showMentionDropdown && !showNewDiscussionForm && (
                           <MentionDropdown users={filteredUsers} onSelect={insertMention} />
                         )}
-                        <div className="flex gap-2 items-end">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                           <div className="flex-1">
                             <textarea
                               value={newMessage}
@@ -789,7 +789,7 @@ export function DiscussionsClient({ currentUser: _currentUser }: DiscussionsClie
                               }}
                             />
                           </div>
-                          <div className="flex flex-col gap-1">
+                          <div className="flex gap-1 sm:flex-col">
                             <button
                               onClick={() => handleSendComment(discussion._id)}
                               disabled={sending || !newMessage.trim()}
