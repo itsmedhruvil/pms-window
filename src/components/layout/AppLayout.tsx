@@ -190,6 +190,18 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
       {isAdmin && (
         <div className="px-3 lg:px-4 py-3 border-t border-gray-200 space-y-0.5">
           <Link
+            href="/users"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',
+              pathname === '/users'
+                ? 'bg-black text-white'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            )}
+          >
+            <Users className="w-4 h-4 flex-shrink-0" />
+            <span>Users</span>
+          </Link>
+          <Link
             href="/access"
             className={cn(
               'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',

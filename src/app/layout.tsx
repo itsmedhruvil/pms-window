@@ -13,6 +13,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="manifest" href="https://progressier.app/Ko1ajWkNu7OtNVumtGzu/progressier.json"/>
         <script defer src="https://progressier.app/Ko1ajWkNu7OtNVumtGzu/script.js"></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/progressier.js');
+              }
+            `,
+          }}
+        />
       </head>
       <body className="antialiased">
         <ClerkAppProvider>{children}</ClerkAppProvider>
