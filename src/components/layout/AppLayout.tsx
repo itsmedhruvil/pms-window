@@ -34,7 +34,6 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
   { href: '/internal-tasks', label: 'Internal Tasks', icon: ClipboardList },
-  { href: '/template-groups', label: 'Template Groups', icon: ClipboardList },
   { href: '/discussions', label: 'Discussions', icon: MessageCircle },
   { href: '/alerts', label: 'Alerts', icon: AlertTriangle },
 ];
@@ -188,6 +187,18 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
 
       {isAdmin && (
         <div className="px-3 lg:px-4 py-3 border-t border-gray-200 space-y-0.5">
+          <Link
+            href="/template-groups"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',
+              pathname.startsWith('/template-groups')
+                ? 'bg-black text-white'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            )}
+          >
+            <ClipboardList className="w-4 h-4 flex-shrink-0" />
+            <span>Template Groups</span>
+          </Link>
           <Link
             href="/users"
             className={cn(

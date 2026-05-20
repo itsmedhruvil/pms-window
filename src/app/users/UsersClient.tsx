@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Trash2, Plus } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { Trash2, Plus, RefreshCw } from 'lucide-react';
 import { cn, getDepartmentLabel, apiFetch } from '@/lib/utils';
 import { Modal } from '@/components/ui/Modal';
 import { FilterDrawer, MobileFilterButton } from '@/components/ui/FilterDrawer';
@@ -39,7 +39,9 @@ export function UsersClient({
   const [loading, setLoading] = useState<string | null>(null);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
-  
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ message: string; error?: string } | null>(null);
+
   const activeFilterCount = useMemo(() => {
     return deptFilter !== 'all' ? 1 : 0;
   }, [deptFilter]);
@@ -88,6 +90,32 @@ export function UsersClient({
     }
   };
 
+  const syncFromClerk = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncResult(null);
+
+    try {
+      const result = await apiFetch<{ message?: string }>('/api/users/sync-clerk', { method: 'POST' });
+      if (result.success) {
+        setSyncResult({ message: result.data?.message || 'Sync completed.' });
+        // Refresh the users list
+        const refresh = await apiFetch<IUser[]>('/api/users');
+        if (refresh.success && Array.isArray(refresh.data)) {
+          setUsers(refresh.data);
+        }
+      } else {
+        setSyncResult({ message: result.error || 'Sync failed.', error: result.error });
+      }
+    } catch (err) {
+      setSyncResult({ message: 'Failed to sync Clerk users.', error: String(err) });
+    } finally {
+      setSyncing(false);
+      // Auto-clear result after 8 seconds
+      setTimeout(() => setSyncResult(null), 8000);
+    }
+  };
+
   return (
     <div className="p-6 max-w-screen-xl mx-auto">
       {/* Header */}
@@ -99,6 +127,17 @@ export function UsersClient({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={syncFromClerk}
+              disabled={syncing}
+              className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide border border-gray-300 text-gray-700 hover:border-gray-500 hover:text-black transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync from Clerk'}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setUserModalOpen(true)}
@@ -123,6 +162,20 @@ export function UsersClient({
           </div>
         </div>
       </div>
+
+      {/* Sync result banner */}
+      {syncResult && (
+        <div
+          className={cn(
+            'mb-4 px-3 py-2 text-[11px] font-mono font-bold uppercase tracking-wide border',
+            syncResult.error
+              ? 'border-red-300 bg-red-50 text-red-700'
+              : 'border-green-300 bg-green-50 text-green-700'
+          )}
+        >
+          {syncResult.message}
+        </div>
+      )}
 
       {/* Filter — desktop */}
       <div className="hidden sm:flex gap-1.5 mb-4 items-center">

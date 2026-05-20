@@ -17,8 +17,6 @@ const UserSchema = new Schema<IUserDocument>(
   {
     clerkId: {
       type: String,
-      unique: true,
-      sparse: true,
       index: true,
     },
     email: {
@@ -63,6 +61,16 @@ const UserSchema = new Schema<IUserDocument>(
 // Indexes
 UserSchema.index({ role: 1 });
 UserSchema.index({ department: 1, isActive: 1 });
+
+// Unique index on clerkId only for documents where clerkId is a non-null string
+// (partialFilterExpression is more reliable than sparse for excluding nulls)
+UserSchema.index(
+  { clerkId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clerkId: { $type: 'string' } },
+  }
+);
 
 // Pre-save middleware to handle department migration from old enum values
 UserSchema.pre('save', function (next) {

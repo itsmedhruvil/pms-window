@@ -34,10 +34,11 @@ export const POST = withAuth(async (req: NextRequest) => {
     return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
   }
 
+  const { clerkId, ...safeData } = parsed.data;
   const userData = {
-    ...parsed.data,
-    email: parsed.data.email.trim().toLowerCase(),
-    name: parsed.data.name.trim(),
+    ...safeData,
+    email: safeData.email.trim().toLowerCase(),
+    name: safeData.name.trim(),
   };
 
   const existingUser = await UserModel.findOne({ email: userData.email });
