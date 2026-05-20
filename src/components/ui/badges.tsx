@@ -1,6 +1,6 @@
 'use client';
 
-import { cn, PROJECT_STATUS_STYLE, PROJECT_STATUS_LABEL, TASK_STATUS_STYLE, TASK_STATUS_LABEL, PRIORITY_STYLE, PRIORITY_LABEL, ALERT_SEVERITY_STYLE, ALERT_STATUS_LABEL } from '@/lib/utils';
+import { cn, PROJECT_STATUS_STYLE, PROJECT_STATUS_LABEL, TASK_STATUS_STYLE, TASK_STATUS_LABEL, PRIORITY_STYLE, PRIORITY_LABEL, ALERT_SEVERITY_STYLE, ALERT_STATUS_LABEL, normalizeProjectPriority } from '@/lib/utils';
 import { ProjectStatus, TaskStatus, ProjectPriority, AlertSeverity, AlertStatus } from '@/types';
 
 interface BadgeProps {
@@ -42,17 +42,19 @@ export function TaskStatusBadge({ status, className, size = 'md' }: { status: Ta
   );
 }
 
-export function PriorityBadge({ priority, className, size = 'md' }: { priority: ProjectPriority } & BadgeProps) {
+export function PriorityBadge({ priority, className, size = 'md' }: { priority: ProjectPriority | string } & BadgeProps) {
+  const normalizedPriority = normalizeProjectPriority(priority);
+
   return (
     <span className={cn(
       'inline-flex items-center border font-mono tracking-widest uppercase',
       size === 'sm' ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-1',
-      PRIORITY_STYLE[priority],
-      priority === ProjectPriority.URGENT && 'animate-pulse',
+      PRIORITY_STYLE[normalizedPriority],
+      normalizedPriority === ProjectPriority.URGENT && 'animate-pulse',
       className
     )}>
-      {priority === ProjectPriority.URGENT && '⚠ '}
-      {PRIORITY_LABEL[priority]}
+      {normalizedPriority === ProjectPriority.URGENT && '⚠ '}
+      {PRIORITY_LABEL[normalizedPriority]}
     </span>
   );
 }

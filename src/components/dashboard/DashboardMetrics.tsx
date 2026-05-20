@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { AlertTriangle, TrendingUp, Clock, Layers, Zap } from 'lucide-react';
-import { cn, DEPARTMENT_LABELS, ALERT_TYPE_LABEL } from '@/lib/utils';
+import { cn, getDepartmentLabel, ALERT_TYPE_LABEL } from '@/lib/utils';
 import { Department, AlertType } from '@/types';
 
 interface DashboardMetricsData {
@@ -87,7 +87,7 @@ export function DashboardMetrics({ data }: { data: DashboardMetricsData }) {
               Bottleneck Detected:
             </span>
             <span className="text-xs text-red-700 ml-2">
-              {DEPARTMENT_LABELS[metrics.bottleneckDepartment]} department has the most blocked tasks
+              {getDepartmentLabel(metrics.bottleneckDepartment)} department has the most blocked tasks
               with the lowest completion rate.
             </span>
           </div>
@@ -105,7 +105,7 @@ export function DashboardMetrics({ data }: { data: DashboardMetricsData }) {
               <XAxis
                 dataKey="department"
                 tick={{ fontSize: 10, fontFamily: 'monospace', fill: '#666' }}
-                tickFormatter={(v) => DEPARTMENT_LABELS[v as Department]?.split(' ')[0] || v}
+                tickFormatter={(v) => getDepartmentLabel(v as string).split(' ')[0] || v}
               />
               <YAxis tick={{ fontSize: 10, fontFamily: 'monospace', fill: '#666' }} />
               <Tooltip
@@ -152,12 +152,12 @@ export function DashboardMetrics({ data }: { data: DashboardMetricsData }) {
 
       {/* Department completion rates */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {Object.values(Department).map((dept) => {
+        {charts.tasksByDepartment.map(({ department: dept }) => {
           const rate = metrics.taskCompletionRate[dept] || 0;
           return (
             <div key={dept} className="border border-gray-200 p-3">
               <p className="text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-2">
-                {DEPARTMENT_LABELS[dept]}
+                {getDepartmentLabel(dept)}
               </p>
               <div className="flex items-end gap-2 mb-2">
                 <span className="text-2xl font-black font-mono text-gray-900">{rate}%</span>

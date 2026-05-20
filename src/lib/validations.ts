@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import {
-  Department,
   ProjectPriority,
   ProjectStatus,
   TaskStatus,
@@ -19,6 +18,15 @@ const OptionalDateSchema = z.preprocess(
   z.date().nullable().optional()
 );
 
+const ProjectPrioritySchema = z.preprocess((value) => {
+  if (value === 'low') return ProjectPriority.STANDARD;
+  if (value === 'medium') return ProjectPriority.NECESSARY;
+  if (value === 'high') return ProjectPriority.PRIORITY;
+  return value;
+}, z.nativeEnum(ProjectPriority));
+
+const DepartmentSchema = z.string().trim().toLowerCase().min(1, 'Department is required');
+
 // ============================================================
 // USER SCHEMAS
 // ============================================================
@@ -28,13 +36,13 @@ export const CreateUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(2).max(100),
   role: z.nativeEnum(UserRole),
-  department: z.nativeEnum(Department),
+  department: DepartmentSchema,
 });
 
 export const UpdateUserSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   role: z.nativeEnum(UserRole).optional(),
-  department: z.nativeEnum(Department).optional(),
+  department: DepartmentSchema.optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -58,7 +66,7 @@ export const CreateProjectSchema = z.object({
   totalWindows: z.number().int().positive('Total windows must be positive'),
   selectedTemplateGroupId: z.string().optional(),
   windowSpecifications: z.array(WindowSpecSchema).min(1).optional(),
-  priority: z.nativeEnum(ProjectPriority),
+  priority: ProjectPrioritySchema,
   address: z.string().min(5, 'Address must be at least 5 characters'),
   contactPhone: z.string().min(7, 'Contact phone must be at least 7 digits'),
   deadline: z.string()
@@ -77,13 +85,15 @@ export const UpdateProjectSchema = z.object({
   clientName: z.string().min(2).optional(),
   projectTitle: z.string().min(3).optional(),
   totalWindows: z.number().int().positive().optional(),
+  address: z.string().min(5).optional(),
+  contactPhone: z.string().min(7).optional(),
   selectedTemplateGroupId: z.string().optional(),
   windowSpecifications: z.array(WindowSpecSchema).min(1).optional(),
   excelSheetName: z.string().optional(),
   excelRows: z
     .array(z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])))
     .optional(),
-  priority: z.nativeEnum(ProjectPriority).optional(),
+  priority: ProjectPrioritySchema.optional(),
   deadline: z
     .string()
     .transform((str) => new Date(str))
@@ -99,13 +109,13 @@ export const CreateTaskSchema = z.object({
   title: z.string().min(3, 'Task title must be at least 3 characters'),
   description: z.string().min(10, 'Task description must be at least 10 characters'),
   projectId: z.string().optional(),
-  department: z.nativeEnum(Department),
+  department: DepartmentSchema,
   frequency: z.nativeEnum(TaskFrequency).optional(),
   dueDate: z.string().optional(),
 });
 
 export const CreateTaskTemplateSchema = z.object({
-  department: z.nativeEnum(Department),
+  department: DepartmentSchema,
   title: z.string().min(3, 'Task title must be at least 3 characters'),
   description: z.string().min(10, 'Task description must be at least 10 characters'),
   sequence: z.number().int().min(0).optional(),
@@ -155,7 +165,7 @@ export const CreateAlertSchema = z.object({
   type: z.nativeEnum(AlertType),
   message: z.string().min(10, 'Alert message must be at least 10 characters'),
   affectedDepartments: z
-    .array(z.nativeEnum(Department))
+    .array(DepartmentSchema)
     .min(1, 'At least one affected department required'),
   severity: z.nativeEnum(AlertSeverity),
 });
@@ -194,7 +204,7 @@ export const PaginationSchema = z.object({
 
 export const ProjectFiltersSchema = z.object({
   status: z.nativeEnum(ProjectStatus).optional(),
-  priority: z.nativeEnum(ProjectPriority).optional(),
+  priority: ProjectPrioritySchema.optional(),
   search: z.string().optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),

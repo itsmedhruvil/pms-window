@@ -27,7 +27,7 @@ import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
 import { TaskDiscussion } from '@/components/task/TaskDiscussion';
 import { Modal } from '@/components/ui/Modal';
 import { TaskStatusBadge } from '@/components/ui/badges';
-import { apiFetch, cn, DEPARTMENT_LABELS, formatDate, formatDateTime } from '@/lib/utils';
+import { apiFetch, cn, getDepartmentLabel, formatDate, formatDateTime } from '@/lib/utils';
 import { AlertType, IAlert, IProject, ITask, IUser, TaskImageAttachment, TaskStatus } from '@/types';
 
 interface TaskDetailClientProps {
@@ -154,12 +154,12 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
               className="inline-flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wide text-gray-500 hover:text-black mb-3"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              {DEPARTMENT_LABELS[task.department]} Tasks
+              {getDepartmentLabel(task.department)} Tasks
             </Link>
             <div className="flex items-center gap-2 mb-2">
               <TaskStatusBadge status={task.status} />
               <span className="text-xs font-mono text-gray-400 uppercase tracking-widest">
-                {DEPARTMENT_LABELS[task.department]}
+                {getDepartmentLabel(task.department)}
               </span>
             </div>
             <h1 className="text-xl lg:text-2xl font-black text-gray-900 tracking-tight">{task.title}</h1>

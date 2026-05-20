@@ -8,9 +8,9 @@ import { ProjectPriority } from '@/types';
 import type { ITemplateGroup } from '@/types';
 
 const PRIORITIES = [
-  { value: ProjectPriority.LOW, label: 'Low', desc: 'Standard timeline' },
-  { value: ProjectPriority.MEDIUM, label: 'Medium', desc: 'Normal priority' },
-  { value: ProjectPriority.HIGH, label: 'High', desc: 'Accelerated schedule' },
+  { value: ProjectPriority.STANDARD, label: 'Standard', desc: 'Standard timeline' },
+  { value: ProjectPriority.NECESSARY, label: 'Necessary', desc: 'Normal priority' },
+  { value: ProjectPriority.PRIORITY, label: 'Priority', desc: 'Accelerated schedule' },
   { value: ProjectPriority.URGENT, label: 'Urgent', desc: 'Immediate attention required' },
 ];
 
@@ -39,7 +39,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
   const [form, setForm] = useState<FormData>({
     clientName: '',
     projectTitle: '',
-    priority: ProjectPriority.MEDIUM,
+    priority: ProjectPriority.NECESSARY,
     deadline: '',
     address: '',
     contactPhone: '',

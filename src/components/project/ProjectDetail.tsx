@@ -10,17 +10,17 @@ import {
   X, Save,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
-import { cn, DEPARTMENT_LABELS, formatDate, timeAgo, ALERT_TYPE_LABEL } from '@/lib/utils';
+import { cn, getDepartmentLabel, formatDate, ALERT_TYPE_LABEL, normalizeProjectPriority } from '@/lib/utils';
 import {
-  ProjectStatusBadge, PriorityBadge, TaskStatusBadge, AlertSeverityBadge, AlertStatusBadge
+  ProjectStatusBadge, PriorityBadge, TaskStatusBadge, AlertSeverityBadge
 } from '@/components/ui/badges';
-import { CommentThread } from '@/components/comment/CommentThread';
 import { useProjectRealtime } from '@/hooks/useRealtime';
 import { ProjectStatusControl } from '@/components/project/ProjectStatusControl';
 import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
 import { Modal } from '@/components/ui/Modal';
 import type { IProject, ITask, IAlert, IUser } from '@/types';
-import { TaskStatus, AlertStatus, AlertType, DEPARTMENT_SEQUENCE, Department, ProjectPriority, ProjectStatus } from '@/types';
+import { TaskStatus, AlertStatus, AlertType, Department, ProjectPriority, ProjectStatus } from '@/types';
+import { useDepartments } from '@/hooks/useDepartments';
 
 interface ProjectDetailProps {
   project: IProject;
@@ -38,6 +38,7 @@ export function ProjectDetail({
   currentUserDepartment,
 }: ProjectDetailProps) {
   const router = useRouter();
+  const departments = useDepartments();
   const [project, setProject] = useState(initialProject);
   const [tasks, setTasks] = useState(initialTasks);
   const [alerts, setAlerts] = useState(initialAlerts);
@@ -54,7 +55,7 @@ export function ProjectDetail({
     contactPhone: initialProject.contactPhone || '',
     totalWindows: initialProject.totalWindows,
     deadline: initialProject.deadline ? new Date(initialProject.deadline).toISOString().split('T')[0] : '',
-    priority: initialProject.priority,
+    priority: normalizeProjectPriority(initialProject.priority),
   });
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -66,8 +67,14 @@ export function ProjectDetail({
       const arrayBuffer = await file.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
+      if (!sheetName) {
+        setExcelError('The selected spreadsheet does not contain any sheets.');
+        return;
+      }
       const sheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+      const rows = XLSX.utils
+        .sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: false })
+        .map(normalizeExcelRow);
 
       const result = await apiFetch(`/api/projects/${project._id}`, {
         method: 'PATCH',
@@ -168,17 +175,21 @@ export function ProjectDetail({
       contactPhone: project.contactPhone || '',
       totalWindows: project.totalWindows,
       deadline: project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : '',
-      priority: project.priority,
+      priority: normalizeProjectPriority(project.priority),
     });
     setEditError(null);
     setEditModalOpen(true);
   };
 
+  const taskDepartments = [...new Set(tasks.map((task) => task.department))] as Department[];
   const visibleDepartments = isAdmin
-    ? DEPARTMENT_SEQUENCE
+    ? [
+        ...departments.map((department) => department.name),
+        ...taskDepartments.filter((department) => !departments.some((item) => item.name === department)),
+      ]
     : currentUserDepartment
       ? [currentUserDepartment]
-      : DEPARTMENT_SEQUENCE;
+      : taskDepartments;
   const activeAlerts = alerts.filter((a) => a.status !== AlertStatus.RESOLVED);
   const completedTasks = tasks.filter((t) => t.status === TaskStatus.DONE).length;
   const visibleCompletionPercentage = tasks.length > 0
@@ -231,7 +242,7 @@ export function ProjectDetail({
                 {isAdmin ? project.completionPercentage : visibleCompletionPercentage}%
               </div>
               <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wide">
-                {isAdmin ? 'Complete' : `${DEPARTMENT_LABELS[currentUserDepartment as Department] ?? 'Department'} Complete`}
+                {isAdmin ? 'Complete' : `${getDepartmentLabel(currentUserDepartment)} Complete`}
               </div>
               <div className="text-xs text-gray-500 mt-0.5 font-mono">
                 {completedTasks}/{tasks.length} tasks done
@@ -369,7 +380,7 @@ export function ProjectDetail({
                   <p className="text-xs text-red-700 font-mono">{excelError}</p>
                 </div>
               )}
-              {!project.excelRows && (
+              {(!project.excelRows || project.excelRows.length === 0) && (
                 <ExcelUpload onUpload={handleExcelUpload} loading={excelLoading} />
               )}
 
@@ -435,7 +446,7 @@ export function ProjectDetail({
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-mono uppercase tracking-wider font-bold text-gray-600">
-                        {DEPARTMENT_LABELS[dept]}
+                        {departments.find((department) => department.name === dept)?.label || getDepartmentLabel(dept)}
                       </span>
                       <span className="text-sm font-black font-mono text-gray-900">{pct}%</span>
                     </div>
@@ -525,7 +536,7 @@ export function ProjectDetail({
                   <div className="px-4 py-3 border-b border-gray-100">
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700">
-                        {deptIdx + 1}. {DEPARTMENT_LABELS[dept]}
+                        {deptIdx + 1}. {departments.find((department) => department.name === dept)?.label || getDepartmentLabel(dept)}
                       </span>
                       <span className="text-[11px] font-black font-mono">{deptPct}%</span>
                     </div>
@@ -722,7 +733,7 @@ export function ProjectDetail({
             <div className="space-y-1.5">
               <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Priority</label>
               <div className="grid grid-cols-2 gap-2">
-                {([ProjectPriority.LOW, ProjectPriority.MEDIUM, ProjectPriority.HIGH, ProjectPriority.URGENT] as const).map((p) => (
+                {([ProjectPriority.STANDARD, ProjectPriority.NECESSARY, ProjectPriority.PRIORITY, ProjectPriority.URGENT] as const).map((p) => (
                   <button
                     key={p}
                     type="button"
@@ -773,6 +784,17 @@ export function ProjectDetail({
         </div>
       </Modal>
     </div>
+  );
+}
+
+function normalizeExcelRow(row: Record<string, unknown>): Record<string, string | number | boolean | null> {
+  return Object.fromEntries(
+    Object.entries(row).map(([key, value]) => {
+      if (value === null || value === undefined) return [key, null];
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return [key, value];
+      if (value instanceof Date) return [key, value.toISOString()];
+      return [key, String(value)];
+    })
   );
 }
 

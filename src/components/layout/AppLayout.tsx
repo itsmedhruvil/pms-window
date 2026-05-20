@@ -15,11 +15,12 @@ import {
   Menu,
   Building2,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { AlertStatus, DEPARTMENT_LABELS, DEPARTMENT_SEQUENCE, UserRole } from '@/types';
+import { cn, getDepartmentLabel } from '@/lib/utils';
+import { AlertStatus, UserRole } from '@/types';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { IAlert } from '@/types';
+import { useDepartments } from '@/hooks/useDepartments';
 
 interface NavItem {
   href: string;
@@ -60,6 +61,7 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
   const [dbRole, setDbRole] = useState<string | null>(null);
   const [dbDepartment, setDbDepartment] = useState<string | null>(null);
   const fetchedRef = useRef(false);
+  const departments = useDepartments();
 
   // Fetch role directly from DB to override potentially stale Clerk metadata
   useEffect(() => {
@@ -91,12 +93,10 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
     : pathname.startsWith(href);
 
   const visibleDepartments = useMemo(() => {
-    if (isAdmin) return DEPARTMENT_SEQUENCE;
-    if (userDepartment && DEPARTMENT_SEQUENCE.includes(userDepartment as any)) {
-      return [userDepartment] as typeof DEPARTMENT_SEQUENCE;
-    }
+    if (isAdmin) return departments.map((department) => department.name);
+    if (userDepartment) return [userDepartment];
     return [];
-  }, [isAdmin, userDepartment]);
+  }, [departments, isAdmin, userDepartment]);
 
   return (
     <>
@@ -178,7 +178,7 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
                     )}
                   >
                     <ClipboardList className="w-4 h-4 flex-shrink-0" />
-                    <span>{DEPARTMENT_LABELS[department]}</span>
+                    <span>{departments.find((item) => item.name === department)?.label || getDepartmentLabel(department)}</span>
                   </Link>
                 );
               })}

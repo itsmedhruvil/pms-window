@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { User, X, Check, Search } from 'lucide-react';
-import { cn, DEPARTMENT_LABELS, apiFetch } from '@/lib/utils';
+import { cn, getDepartmentLabel, apiFetch } from '@/lib/utils';
 import type { ITask, IUser } from '@/types';
 
 interface TaskAssignPanelProps {
@@ -83,7 +83,7 @@ export function TaskAssignPanel({ task, onAssigned, onClose }: TaskAssignPanelPr
       <div className="px-3 py-2 border-b border-gray-100">
         <p className="text-[10px] text-gray-500 font-mono">
           Showing <span className="font-bold text-gray-900">
-            {DEPARTMENT_LABELS[task.department]}
+            {getDepartmentLabel(task.department)}
           </span> department members
         </p>
       </div>

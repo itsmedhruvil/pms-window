@@ -2,14 +2,16 @@
 // ENUMS
 // ============================================================
 
-export enum Department {
-  PRODUCTION = 'production',
-  PURCHASE = 'purchase',
-  OPERATIONS = 'operations',
-  ACCOUNTS = 'accounts',
-  STORE = 'store',
-  SITE = 'site',
-}
+export const Department = {
+  PRODUCTION: 'production',
+  PURCHASE: 'purchase',
+  OPERATIONS: 'operations',
+  ACCOUNTS: 'accounts',
+  STORE: 'store',
+  SITE: 'site',
+} as const;
+
+export type Department = (typeof Department)[keyof typeof Department] | (string & {});
 
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
@@ -26,9 +28,9 @@ export enum ProjectStatus {
 }
 
 export enum ProjectPriority {
-  LOW = 'low',
-  MEDIUM = 'medium',
-  HIGH = 'high',
+  STANDARD = 'standard',
+  NECESSARY = 'necessary',
+  PRIORITY = 'priority',
   URGENT = 'urgent',
 }
 
@@ -104,7 +106,7 @@ export interface IProject {
   windowSpecifications: WindowSpec[];
   selectedTemplateGroupId?: string;
   excelSheetName?: string;
-  excelRows?: Array<Record<string, string | number | null>>;
+  excelRows?: Array<Record<string, string | number | boolean | null>>;
   priority: ProjectPriority;
   deadline: Date;
   status: ProjectStatus;
@@ -250,7 +252,7 @@ export const DEPARTMENT_SEQUENCE: Department[] = [
   Department.SITE,
 ];
 
-export const DEPARTMENT_LABELS: Record<Department, string> = {
+export const DEPARTMENT_LABELS: Record<string, string> = {
   [Department.PRODUCTION]: 'Production',
   [Department.PURCHASE]: 'Purchase',
   [Department.OPERATIONS]: 'Operations',
@@ -276,7 +278,7 @@ export interface ITemplateGroup {
   updatedAt: Date;
 }
 
-export const DEFAULT_TASKS_PER_DEPARTMENT: Record<Department, Array<{ title: string; description: string }>> = {
+export const DEFAULT_TASKS_PER_DEPARTMENT: Record<string, Array<{ title: string; description: string }>> = {
   [Department.PRODUCTION]: [
     { title: 'Production Planning', description: 'Plan production schedule based on specifications.' },
     { title: 'Frame Assembly', description: 'Assemble window frames according to design.' },

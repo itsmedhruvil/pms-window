@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { apiFetch, cn, DEPARTMENT_LABELS } from '@/lib/utils';
+import { apiFetch, cn } from '@/lib/utils';
 import { Department, UserRole } from '@/types';
 import type { IUser } from '@/types';
+import { useDepartments } from '@/hooks/useDepartments';
 
 interface CreateUserFormProps {
   onSuccess?: (user: IUser) => void;
@@ -19,11 +20,12 @@ interface FormData {
 }
 
 export function CreateUserForm({ onSuccess, onCancel }: CreateUserFormProps) {
+  const departments = useDepartments();
   const [form, setForm] = useState<FormData>({
     email: '',
     name: '',
     role: UserRole.DEPARTMENT_USER,
-    department: Department.PRODUCTION,
+    department: departments[0]?.name || Department.PRODUCTION,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,9 +113,9 @@ export function CreateUserForm({ onSuccess, onCancel }: CreateUserFormProps) {
               onChange={(e) => setForm({ ...form, department: e.target.value as Department })}
               className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
             >
-              {Object.entries(DEPARTMENT_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
+              {departments.map((department) => (
+                <option key={department.name} value={department.name}>
+                  {department.label}
                 </option>
               ))}
             </select>

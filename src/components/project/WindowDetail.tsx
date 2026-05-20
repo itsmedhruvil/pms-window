@@ -3,16 +3,16 @@
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
-  ArrowLeft, CheckCircle2, AlertTriangle, ChevronRight,
+  ArrowLeft, AlertTriangle, ChevronRight,
   CheckSquare, Square, Users
 } from 'lucide-react';
-import { cn, DEPARTMENT_LABELS, formatDate } from '@/lib/utils';
+import { getDepartmentLabel, formatDate } from '@/lib/utils';
 import {
-  TaskStatusBadge, AlertSeverityBadge, AlertStatusBadge
+  TaskStatusBadge
 } from '@/components/ui/badges';
 import { useProjectRealtime } from '@/hooks/useRealtime';
 import type { IProject, ITask } from '@/types';
-import { TaskStatus, Department, DEPARTMENT_SEQUENCE } from '@/types';
+import { TaskStatus, Department } from '@/types';
 
 interface WindowDetailProps {
   project: IProject;
@@ -32,9 +32,10 @@ export function WindowDetail({ project, tasks: initialTasks, windowIndex, isAdmi
     task.title.includes(`${windowSpec.design}`) &&
     task.title.includes(`#${windowIndex + 1}`)
   );
+  const departments = [...new Set(windowTasks.map((task) => task.department))] as Department[];
 
   // Group tasks by department
-  const tasksByDepartment = DEPARTMENT_SEQUENCE.reduce((acc, dept) => {
+  const tasksByDepartment = departments.reduce((acc, dept) => {
     acc[dept] = windowTasks.filter(task => task.department === dept);
     return acc;
   }, {} as Record<Department, ITask[]>);
@@ -177,7 +178,7 @@ export function WindowDetail({ project, tasks: initialTasks, windowIndex, isAdmi
 
       {/* Department-wise task list */}
       <div className="p-6 space-y-6">
-        {DEPARTMENT_SEQUENCE.map(department => {
+        {departments.map(department => {
           const deptTasks = tasksByDepartment[department];
           if (deptTasks.length === 0) return null;
 
@@ -190,7 +191,7 @@ export function WindowDetail({ project, tasks: initialTasks, windowIndex, isAdmi
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Users className="w-4 h-4 text-gray-500" />
-                    <h3 className="font-bold text-gray-900">{DEPARTMENT_LABELS[department]}</h3>
+                    <h3 className="font-bold text-gray-900">{getDepartmentLabel(department)}</h3>
                     <span className="text-sm text-gray-500 font-mono">
                       {deptCompleted}/{deptTasks.length} tasks
                     </span>

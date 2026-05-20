@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { apiFetch, cn, DEPARTMENT_LABELS } from '@/lib/utils';
+import { apiFetch, cn } from '@/lib/utils';
 import { Department } from '@/types';
 import type { IProject, ITask } from '@/types';
+import { useDepartments } from '@/hooks/useDepartments';
 
 interface CreateTaskFormProps {
   onSuccess?: (task: ITask) => void;
@@ -22,6 +23,7 @@ interface FormData {
 }
 
 export function CreateTaskForm({ onSuccess, onCancel, department, task }: CreateTaskFormProps) {
+  const departments = useDepartments();
   const [projects, setProjects] = useState<IProject[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export function CreateTaskForm({ onSuccess, onCancel, department, task }: Create
     title: task?.title || '',
     description: task?.description || '',
     projectId: typeof task?.projectId === 'string' ? task.projectId : task?.projectId?._id || '',
-    department: department || task?.department || Department.PRODUCTION,
+    department: department || task?.department || departments[0]?.name || Department.PRODUCTION,
     dueDate: task?.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
   });
 
@@ -148,9 +150,9 @@ export function CreateTaskForm({ onSuccess, onCancel, department, task }: Create
               onChange={(e) => setForm({ ...form, department: e.target.value as Department })}
               className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
             >
-              {Object.entries(DEPARTMENT_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
+              {departments.map((department) => (
+                <option key={department.name} value={department.name}>
+                  {department.label}
                 </option>
               ))}
             </select>

@@ -48,7 +48,6 @@ const AlertSchema = new Schema<IAlertDocument>(
     },
     affectedDepartments: {
       type: [String],
-      enum: Object.values(Department),
       required: true,
       validate: {
         validator: (v: unknown[]) => v.length > 0,

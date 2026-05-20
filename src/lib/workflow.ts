@@ -14,13 +14,20 @@ import {
   DEFAULT_TASKS_PER_DEPARTMENT,
 } from '@/types';
 import type { Department } from '@/types';
+import { getActiveDepartmentNames } from '@/lib/departments';
+
+async function getWorkflowDepartments() {
+  const departments = await getActiveDepartmentNames();
+  return departments.length > 0 ? departments : DEPARTMENT_SEQUENCE;
+}
 
 export async function ensureDefaultTaskTemplates() {
   const existingCount = await TaskTemplateModel.estimatedDocumentCount();
   if (existingCount > 0) return;
 
-  const templates = DEPARTMENT_SEQUENCE.flatMap((department) =>
-    DEFAULT_TASKS_PER_DEPARTMENT[department].map((task, index) => ({
+  const departments = await getWorkflowDepartments();
+  const templates = departments.flatMap((department) =>
+    (DEFAULT_TASKS_PER_DEPARTMENT[department] || []).map((task, index) => ({
       department,
       title: task.title,
       description: task.description,
@@ -92,7 +99,9 @@ export async function generateFromSelectedTemplateGroup(
   }
 
   // Create project tasks (linked to this project)
-  for (const dept of DEPARTMENT_SEQUENCE) {
+  const departments = await getWorkflowDepartments();
+
+  for (const dept of departments) {
     const deptTasks = (projectDeptMap.get(dept) || []).sort((a, b) => a.sequence - b.sequence);
     if (deptTasks.length === 0) continue;
 
@@ -113,7 +122,7 @@ export async function generateFromSelectedTemplateGroup(
   }
 
   // Create internal tasks (standalone, no projectId)
-  for (const dept of DEPARTMENT_SEQUENCE) {
+  for (const dept of departments) {
     const deptTasks = (internalDeptMap.get(dept) || []).sort((a, b) => a.sequence - b.sequence);
     if (deptTasks.length === 0) continue;
 
@@ -170,8 +179,9 @@ async function generateFromTaskTemplates(
   const tasks = [];
   let globalSequence = 0;
   let previousDeptLastTaskId: Types.ObjectId | null = null;
+  const departments = await getWorkflowDepartments();
 
-  for (const dept of DEPARTMENT_SEQUENCE) {
+  for (const dept of departments) {
     const deptTasks = await TaskTemplateModel.find({ department: dept, isActive: true })
       .sort({ sequence: 1, createdAt: 1 })
       .lean();
@@ -205,7 +215,7 @@ async function generateFromTaskTemplates(
 
   await CommentModel.create({
     taskId: tasks[0]._id,
-    content: `Project workflow initialized. ${tasks.length} tasks created across ${DEPARTMENT_SEQUENCE.length} departments.`,
+    content: `Project workflow initialized. ${tasks.length} tasks created across ${departments.length} departments.`,
     author: createdByUserId,
     isSystemLog: true,
   });
@@ -225,6 +235,7 @@ async function generateFromTemplateGroups(
   const tasks = [];
   let globalSequence = 0;
   let previousDeptLastTaskId: Types.ObjectId | null = null;
+  const departments = await getWorkflowDepartments();
 
   // Process each window spec
   for (const spec of windowSpecifications) {
@@ -242,7 +253,7 @@ async function generateFromTemplateGroups(
       deptMap.get(task.department)!.push(task);
     }
 
-    for (const dept of DEPARTMENT_SEQUENCE) {
+    for (const dept of departments) {
       const deptTasks = (deptMap.get(dept) || []).sort((a, b) => a.sequence - b.sequence);
       if (deptTasks.length === 0) continue;
 

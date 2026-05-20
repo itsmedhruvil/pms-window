@@ -21,17 +21,22 @@ export const POST = withAuth(
   async (req: NextRequest) => {
     await connectDB();
 
-    const body = await req.json();
-    const { name, label, abbreviation, description, sequence } = body;
+  const body = await req.json();
+  const { name, label, abbreviation, description, sequence } = body;
+  const slug = String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
 
-    if (!name || !label || !abbreviation) {
+  if (!slug || !label || !abbreviation) {
       return NextResponse.json(
         { success: false, error: 'name, label, and abbreviation are required' },
         { status: 400 }
       );
     }
 
-    const existing = await DepartmentModel.findOne({ name: name.toLowerCase().trim() });
+  const existing = await DepartmentModel.findOne({ name: slug });
     if (existing) {
       return NextResponse.json(
         { success: false, error: 'A department with this name already exists' },
@@ -50,7 +55,7 @@ export const POST = withAuth(
     }
 
     const created = await DepartmentModel.create({
-      name: name.toLowerCase().trim(),
+      name: slug,
       label: label.trim(),
       abbreviation: abbreviation.trim().toUpperCase(),
       description: description || '',

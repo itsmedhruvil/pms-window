@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { AlertTriangle, X, Check } from 'lucide-react';
-import { cn, apiFetch, ALERT_TYPE_LABEL, DEPARTMENT_LABELS } from '@/lib/utils';
+import { cn, apiFetch, ALERT_TYPE_LABEL } from '@/lib/utils';
 import { AlertType, AlertSeverity, Department } from '@/types';
 import type { IAlert } from '@/types';
+import { useDepartments } from '@/hooks/useDepartments';
 
 interface CreateAlertFormProps {
   projectId: string;
@@ -25,6 +26,7 @@ export function CreateAlertForm({
   onSuccess,
   onCancel,
 }: CreateAlertFormProps) {
+  const departments = useDepartments();
   const [form, setForm] = useState({
     type: '' as AlertType | '',
     severity: '' as AlertSeverity | '',
@@ -169,7 +171,7 @@ export function CreateAlertForm({
             Affected Departments <span className="text-red-500">*</span>
           </label>
           <div className="grid grid-cols-2 gap-2">
-            {Object.values(Department).map((dept) => (
+            {departments.map(({ name: dept, label }) => (
               <button
                 key={dept}
                 type="button"
@@ -191,7 +193,7 @@ export function CreateAlertForm({
                     <Check className="w-2.5 h-2.5 text-black" />
                   )}
                 </div>
-                {DEPARTMENT_LABELS[dept]}
+                {label}
               </button>
             ))}
           </div>
@@ -201,14 +203,14 @@ export function CreateAlertForm({
               setForm({
                 ...form,
                 affectedDepartments:
-                  form.affectedDepartments.length === Object.values(Department).length
+                  form.affectedDepartments.length === departments.length
                     ? []
-                    : Object.values(Department),
+                    : departments.map((department) => department.name),
               })
             }
             className="text-[10px] font-mono text-gray-500 hover:text-black underline"
           >
-            {form.affectedDepartments.length === Object.values(Department).length
+            {form.affectedDepartments.length === departments.length
               ? 'Deselect all'
               : 'Select all departments'}
           </button>

@@ -23,8 +23,9 @@ const TemplateGroupTaskSchema = new Schema<ITemplateGroupTask>(
   {
     department: {
       type: String,
-      enum: Object.values(Department),
       required: true,
+      lowercase: true,
+      trim: true,
     },
     title: {
       type: String,

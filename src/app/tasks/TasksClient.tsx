@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock, AlertTriangle, Plus, CheckSquare, Square, Search, Trash2, ChevronDown, X } from 'lucide-react';
-import { cn, DEPARTMENT_LABELS, formatDate } from '@/lib/utils';
+import { cn, getDepartmentLabel, formatDate } from '@/lib/utils';
 import { TaskStatusBadge } from '@/components/ui/badges';
 import { Modal } from '@/components/ui/Modal';
 import { FilterDrawer, MobileFilterButton } from '@/components/ui/FilterDrawer';
@@ -191,7 +191,7 @@ export function TasksClient({
 
   const title = pageTitle || (
     selectedDepartment
-      ? `${DEPARTMENT_LABELS[selectedDepartment]} Tasks`
+      ? `${getDepartmentLabel(selectedDepartment)} Tasks`
       : 'All Tasks'
   );
 
@@ -563,7 +563,7 @@ function TaskListView({
                 {showDepartmentColumn && (
                   <td>
                     <span className="font-mono text-gray-500 uppercase text-[10px] tracking-wide">
-                      {DEPARTMENT_LABELS[task.department]}
+                      {getDepartmentLabel(task.department)}
                     </span>
                   </td>
                 )}

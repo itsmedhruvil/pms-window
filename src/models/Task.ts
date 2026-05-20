@@ -45,8 +45,9 @@ const TaskSchema = new Schema<ITaskDocument>(
     },
     department: {
       type: String,
-      enum: Object.values(Department),
       required: true,
+      lowercase: true,
+      trim: true,
       index: true,
     },
     title: {

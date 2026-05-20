@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Save, X, Edit3, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Trash2, Save, X, Edit3, ChevronDown, ChevronRight, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
 import { apiFetch, cn, DEPARTMENT_LABELS } from '@/lib/utils';
 import { Department, DEPARTMENT_SEQUENCE, TaskFrequency } from '@/types';
 import type { ITemplateGroup } from '@/types';
+import { useDepartments } from '@/hooks/useDepartments';
 
 type TaskDraft = {
   department: Department;
@@ -52,14 +53,26 @@ const emptyGroupDraft: GroupDraft = {
   tasks: [{ ...emptyTaskDraft }],
 };
 
+function reorderItems<T>(items: T[], fromIdx: number, toIdx: number) {
+  if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || fromIdx >= items.length || toIdx >= items.length) {
+    return items;
+  }
+  const next = [...items];
+  const [moved] = next.splice(fromIdx, 1);
+  next.splice(toIdx, 0, moved);
+  return next;
+}
+
 // ── Module-level components (prevents re-mount on parent re-render) ────────
 
 function DepartmentTabs({
   tasks,
+  departments,
   activeTab,
   onTabChange,
 }: {
   tasks: TaskDraft[];
+  departments: Array<{ name: Department; label: string }>;
   activeTab: Department;
   onTabChange: (d: Department) => void;
 }) {
@@ -70,7 +83,7 @@ function DepartmentTabs({
 
   return (
     <div className="flex border-b border-gray-200 overflow-x-auto">
-      {DEPARTMENT_SEQUENCE.map((dept) => {
+      {departments.map(({ name: dept, label }) => {
         const count = counts[dept] || 0;
         const isActive = activeTab === dept;
         return (
@@ -85,7 +98,7 @@ function DepartmentTabs({
                 : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
             )}
           >
-            {DEPARTMENT_LABELS[dept]}
+            {label}
             {count > 0 && (
               <span className={cn(
                 'px-1.5 py-0.5 text-[9px] rounded-sm font-bold',
@@ -103,25 +116,31 @@ function DepartmentTabs({
 
 function TaskTable({
   tasks,
+  departments,
   onUpdate,
   onRemove,
   onAdd,
   onMove,
+  onReorder,
   readOnly = false,
   addLabel = 'Add task',
 }: {
   tasks: TaskDraft[];
+  departments: Array<{ name: Department; label: string }>;
   onUpdate: (idx: number, key: keyof TaskDraft, value: string) => void;
   onRemove: (idx: number) => void;
   onAdd: () => void;
   onMove?: (idx: number, direction: 'up' | 'down') => void;
+  onReorder?: (fromIdx: number, toIdx: number) => void;
   readOnly?: boolean;
   addLabel?: string;
 }) {
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+
   return (
     <div className="border border-gray-200 overflow-x-auto">
       {/* Table header */}
-      <div className="grid grid-cols-[36px_44px_1fr_1fr_130px_90px_90px_36px] min-w-[760px] bg-gray-50 border-b border-gray-200 text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
+      <div className="grid grid-cols-[36px_64px_1fr_1fr_130px_90px_90px_36px] min-w-[800px] bg-gray-50 border-b border-gray-200 text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
         <div className="px-2 py-2 text-center">#</div>
         <div className="px-1 py-2 text-center">Move</div>
         <div className="px-3 py-2">Task Title</div>
@@ -140,12 +159,44 @@ function TaskTable({
           </div>
         )}
         {tasks.map((task, idx) => (
-          <div key={idx} className="grid grid-cols-[36px_44px_1fr_1fr_130px_90px_90px_36px] gap-0 items-start group">
+          <div
+            key={idx}
+            onDragOver={(event) => {
+              if (readOnly || !onReorder || draggedIdx === null || draggedIdx === idx) return;
+              event.preventDefault();
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              if (readOnly || !onReorder || draggedIdx === null || draggedIdx === idx) return;
+              onReorder(draggedIdx, idx);
+              setDraggedIdx(null);
+            }}
+            className={cn(
+              'grid grid-cols-[36px_64px_1fr_1fr_130px_90px_90px_36px] gap-0 items-start group transition-colors',
+              draggedIdx === idx && 'bg-gray-50 opacity-60'
+            )}
+          >
             <div className="px-2 py-2.5 text-[10px] font-mono text-gray-400 text-center pt-3.5">
               {idx + 1}
             </div>
             {/* Reorder buttons */}
-            <div className="px-1 py-1.5 flex items-center gap-0.5">
+            <div className="px-1 py-1.5 flex items-center justify-center gap-1">
+              {!readOnly && onReorder && tasks.length > 1 && (
+                <button
+                  type="button"
+                  draggable
+                  onDragStart={(event) => {
+                    setDraggedIdx(idx);
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', String(idx));
+                  }}
+                  onDragEnd={() => setDraggedIdx(null)}
+                  className="p-1 text-gray-300 hover:text-gray-900 cursor-grab active:cursor-grabbing transition-colors"
+                  title="Drag to reorder"
+                >
+                  <GripVertical className="w-3.5 h-3.5" />
+                </button>
+              )}
               {!readOnly && onMove && tasks.length > 1 && (
                 <div className="flex flex-col items-center opacity-30 group-hover:opacity-100 transition-opacity">
                   <button
@@ -203,8 +254,8 @@ function TaskTable({
                   readOnly && 'bg-gray-50 cursor-default'
                 )}
               >
-                {DEPARTMENT_SEQUENCE.map((d) => (
-                  <option key={d} value={d}>{DEPARTMENT_LABELS[d]}</option>
+                {departments.map((d) => (
+                  <option key={d.name} value={d.name}>{d.label}</option>
                 ))}
               </select>
             </div>
@@ -321,6 +372,7 @@ function FrequencyBadge({ freq }: { freq: string }) {
 // ── Main component ────────────────────────────────────────────────────────
 
 export function TemplateGroupsClient() {
+  const departments = useDepartments();
   const [groups, setGroups] = useState<ITemplateGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -383,6 +435,13 @@ export function TemplateGroupsClient() {
     });
   };
 
+  const reorderTasksInDraft = (fromIdx: number, toIdx: number) => {
+    setDraft((prev) => ({
+      ...prev,
+      tasks: reorderItems(prev.tasks, fromIdx, toIdx),
+    }));
+  };
+
   const createGroup = async () => {
     if (draft.name.trim().length < 3) {
       setError('Group name must be at least 3 characters');
@@ -408,6 +467,7 @@ export function TemplateGroupsClient() {
           title: t.title.trim(),
           description: t.description.trim(),
           frequency: t.frequency,
+          type: t.type,
         })),
       }),
     });
@@ -426,7 +486,7 @@ export function TemplateGroupsClient() {
   // ── Edit helpers ───────────────────────────────────────────────────────────
   const startEditing = (group: ITemplateGroup) => {
     setEditingId(group._id);
-    setEditDepartmentTab(DEPARTMENT_SEQUENCE[0]);
+    setEditDepartmentTab(departments[0]?.name || DEPARTMENT_SEQUENCE[0]);
     setEditDraft({
       name: group.name,
       description: group.description,
@@ -435,7 +495,7 @@ export function TemplateGroupsClient() {
         title: t.title,
         description: t.description,
         frequency: t.frequency || 'project',
-        type: (t as any).type || 'project',
+        type: t.type || 'project',
       })),
     });
   };
@@ -462,12 +522,17 @@ export function TemplateGroupsClient() {
     });
   };
 
-  const moveEditTask = (idx: number, direction: 'up' | 'down') => {
+  const reorderEditTasksInDepartment = (department: Department, fromLocalIdx: number, toLocalIdx: number) => {
     setEditDraft((prev) => {
-      const tasks = [...prev.tasks];
-      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-      if (targetIdx < 0 || targetIdx >= tasks.length) return prev;
-      [tasks[idx], tasks[targetIdx]] = [tasks[targetIdx], tasks[idx]];
+      const departmentTasks = prev.tasks.filter((task) => task.department === department);
+      const reorderedDepartmentTasks = reorderItems(departmentTasks, fromLocalIdx, toLocalIdx);
+      let departmentIdx = 0;
+      const tasks = prev.tasks.map((task) => {
+        if (task.department !== department) return task;
+        const nextTask = reorderedDepartmentTasks[departmentIdx];
+        departmentIdx += 1;
+        return nextTask;
+      });
       return { ...prev, tasks };
     });
   };
@@ -497,6 +562,7 @@ export function TemplateGroupsClient() {
           title: t.title.trim(),
           description: t.description.trim(),
           frequency: t.frequency,
+          type: t.type,
         })),
       }),
     });
@@ -560,11 +626,17 @@ export function TemplateGroupsClient() {
               const isEditing = editingId === group._id;
               const isExpanded = expandedGroup === group._id;
               const depCount = new Set(group.tasks.map((t) => t.department)).size;
-              const deptGroups = DEPARTMENT_SEQUENCE
+              const orderedDepartments = [
+                ...departments,
+                ...[...new Set(group.tasks.map((t) => t.department))]
+                  .filter((department) => !departments.some((item) => item.name === department))
+                  .map((name) => ({ name, label: DEPARTMENT_LABELS[name] || name })),
+              ];
+              const deptGroups = orderedDepartments
                 .map((d) => ({
-                  department: d,
-                  label: DEPARTMENT_LABELS[d],
-                  tasks: group.tasks.filter((t) => t.department === d),
+                  department: d.name,
+                  label: d.label,
+                  tasks: group.tasks.filter((t) => t.department === d.name),
                 }))
                 .filter((g) => g.tasks.length > 0);
               const freqCounts = group.tasks.reduce((acc, t) => {
@@ -623,7 +695,7 @@ export function TemplateGroupsClient() {
                   {!isEditing && isExpanded && (
                     <div className="px-5 py-2 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2 flex-wrap">
                       <span className="text-[9px] font-mono uppercase tracking-wider text-gray-500 font-bold">Frequency:</span>
-                      {Object.entries(freqCounts).map(([freq, count]) => (
+                      {Object.keys(freqCounts).map((freq) => (
                         <FrequencyBadge key={freq} freq={freq} />
                       ))}
                       <span className="text-[9px] text-gray-400 font-mono ml-1">({Object.keys(freqCounts).length} types)</span>
@@ -698,6 +770,7 @@ export function TemplateGroupsClient() {
                       {/* Department tabs for editing */}
                       <DepartmentTabs
                         tasks={editDraft.tasks}
+                        departments={departments}
                         activeTab={editDepartmentTab}
                         onTabChange={setEditDepartmentTab}
                       />
@@ -705,6 +778,7 @@ export function TemplateGroupsClient() {
                       {/* Task table filtered by selected department */}
                       <TaskTable
                         tasks={editDraft.tasks.filter((t) => t.department === editDepartmentTab)}
+                        departments={departments}
                         onUpdate={(localIdx, key, value) => {
                           const globalTasks = editDraft.tasks.filter((t) => t.department === editDepartmentTab);
                           const globalIdx = editDraft.tasks.indexOf(globalTasks[localIdx]);
@@ -717,11 +791,14 @@ export function TemplateGroupsClient() {
                         }}
                         onAdd={() => addEditTask(editDepartmentTab)}
                         onMove={(localIdx, direction) => {
-                          const deptTasks = editDraft.tasks.filter((t) => t.department === editDepartmentTab);
-                          const globalIdx = editDraft.tasks.indexOf(deptTasks[localIdx]);
-                          moveEditTask(globalIdx, direction);
+                          reorderEditTasksInDepartment(
+                            editDepartmentTab,
+                            localIdx,
+                            direction === 'up' ? localIdx - 1 : localIdx + 1
+                          );
                         }}
-                        addLabel={`Add ${DEPARTMENT_LABELS[editDepartmentTab]} task`}
+                        onReorder={(fromIdx, toIdx) => reorderEditTasksInDepartment(editDepartmentTab, fromIdx, toIdx)}
+                        addLabel={`Add ${departments.find((item) => item.name === editDepartmentTab)?.label || DEPARTMENT_LABELS[editDepartmentTab] || editDepartmentTab} task`}
                       />
 
                       <div className="flex items-center justify-between">
@@ -783,10 +860,12 @@ export function TemplateGroupsClient() {
 
             <TaskTable
               tasks={draft.tasks}
+              departments={departments}
               onUpdate={updateTaskInDraft}
               onRemove={removeTaskFromDraft}
               onAdd={addTaskToDraft}
               onMove={moveTaskInDraft}
+              onReorder={reorderTasksInDraft}
             />
 
             <div className="flex items-center justify-between">

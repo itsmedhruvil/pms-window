@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { AlertTriangle, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import { FilterDrawer, MobileFilterButton } from '@/components/ui/FilterDrawer';
-import { cn, ALERT_TYPE_LABEL, DEPARTMENT_LABELS, timeAgo, apiFetch } from '@/lib/utils';
+import { cn, ALERT_TYPE_LABEL, getDepartmentLabel, timeAgo, apiFetch } from '@/lib/utils';
 import {
   AlertSeverityBadge,
   AlertStatusBadge,
@@ -348,7 +348,7 @@ function AlertRow({
                     key={dept}
                     className="text-[10px] font-mono px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-600 uppercase tracking-wide"
                   >
-                    {DEPARTMENT_LABELS[dept]}
+                    {getDepartmentLabel(dept)}
                   </span>
                 ))}
               </div>

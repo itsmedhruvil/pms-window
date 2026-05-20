@@ -6,7 +6,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { TaskStatusBadge } from '@/components/ui/badges';
 import { Modal } from '@/components/ui/Modal';
 import { CreateInternalTaskForm } from '@/components/forms/CreateInternalTaskForm';
-import { apiFetch, formatDate, DEPARTMENT_LABELS, cn } from '@/lib/utils';
+import { apiFetch, formatDate, getDepartmentLabel, cn } from '@/lib/utils';
 import type { ITask, Department, ITemplateGroup } from '@/types';
 import { TaskStatus } from '@/types';
 
@@ -132,7 +132,7 @@ export function InternalTasksPageClient({
               <div key={department} className="border border-gray-200 rounded-lg overflow-hidden">
                 <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
                   <h2 className="text-sm font-bold text-gray-900">
-                    {DEPARTMENT_LABELS[department as Department]}
+                    {getDepartmentLabel(department)}
                   </h2>
                   <p className="text-xs text-gray-500 font-mono mt-0.5">
                     {deptTasks.length} task{deptTasks.length !== 1 ? 's' : ''}

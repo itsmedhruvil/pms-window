@@ -5,6 +5,7 @@ import { AlertCircle, Layers } from 'lucide-react';
 import { apiFetch, DEPARTMENT_LABELS, cn } from '@/lib/utils';
 import { Department } from '@/types';
 import type { ITask, ITemplateGroup } from '@/types';
+import { useDepartments } from '@/hooks/useDepartments';
 
 interface CreateInternalTaskFormProps {
   onSuccess?: (task: ITask) => void;
@@ -22,13 +23,14 @@ interface FormData {
 }
 
 export function CreateInternalTaskForm({ onSuccess, onCancel, department, templateGroups = [] }: CreateInternalTaskFormProps) {
+  const departments = useDepartments();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedTemplateGroupId, setSelectedTemplateGroupId] = useState('');
   const [form, setForm] = useState<FormData>({
     title: '',
     description: '',
-    department: department || Department.PRODUCTION,
+    department: department || departments[0]?.name || Department.PRODUCTION,
     dueDate: '',
     frequency: 'daily',
   });
@@ -53,7 +55,7 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
       setForm({
         title: '',
         description: '',
-        department: department || Department.PRODUCTION,
+        department: department || departments[0]?.name || Department.PRODUCTION,
         dueDate: '',
         frequency: 'daily',
       });
@@ -142,7 +144,7 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
               <p className="text-sm font-semibold text-gray-900">{selectedTemplateTask.title}</p>
               <p className="mt-1 text-xs text-gray-600">{selectedTemplateTask.description}</p>
               <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-mono uppercase tracking-wide text-blue-700">
-                <span>{DEPARTMENT_LABELS[selectedTemplateTask.department]}</span>
+                <span>{departments.find((department) => department.name === selectedTemplateTask.department)?.label || DEPARTMENT_LABELS[selectedTemplateTask.department] || selectedTemplateTask.department}</span>
                 <span>{selectedTemplateTask.frequency.replace('_', ' ')}</span>
               </div>
             </div>
@@ -184,8 +186,8 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
               onChange={(e) => setForm({ ...form, department: e.target.value as Department })}
               className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
             >
-              {Object.entries(DEPARTMENT_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
+              {departments.map((department) => (
+                <option key={department.name} value={department.name}>{department.label}</option>
               ))}
             </select>
           </label>

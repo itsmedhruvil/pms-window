@@ -4,8 +4,9 @@ import { notFound, redirect } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TasksClient } from '@/app/tasks/TasksClient';
 import { getProjectDetail, getAlerts, getProjects, serialize } from '@/lib/server-data';
-import { AlertStatus, DEPARTMENT_SEQUENCE, Department, UserRole } from '@/types';
+import { AlertStatus, Department, UserRole } from '@/types';
 import type { ITask, IProject } from '@/types';
+import { getActiveDepartmentNames, formatDepartmentName } from '@/lib/departments';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,8 @@ export default async function ProjectDepartmentTasksPage(
   const { id: projectId, department: departmentSlug } = params;
 
   const department = departmentSlug as Department;
-  if (!DEPARTMENT_SEQUENCE.includes(department)) notFound();
+  const activeDepartments = await getActiveDepartmentNames();
+  if (!activeDepartments.includes(department)) notFound();
 
   const user = await getCurrentUser();
   if (!user) redirect('/sign-in');
@@ -64,7 +66,7 @@ export default async function ProjectDepartmentTasksPage(
             <span className="text-gray-700 font-bold uppercase">{department}</span>
           </div>
           <h1 className="text-xl font-black text-gray-900 tracking-tight">
-            {project.projectTitle} — {department.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())} Tasks
+            {project.projectTitle} — {formatDepartmentName(department)} Tasks
           </h1>
           <p className="text-xs text-gray-500 font-mono mt-0.5">
             {deptTasks.length} task{deptTasks.length === 1 ? '' : 's'} in this department

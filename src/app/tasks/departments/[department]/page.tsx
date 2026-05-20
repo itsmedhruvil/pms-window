@@ -3,8 +3,9 @@ import { notFound, redirect } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TasksClient } from '../../TasksClient';
 import { getAlerts, getTasks, getProjects, serialize } from '@/lib/server-data';
-import { AlertStatus, DEPARTMENT_SEQUENCE, Department, UserRole } from '@/types';
+import { AlertStatus, Department, UserRole } from '@/types';
 import type { ITask, IProject } from '@/types';
+import { getActiveDepartmentNames } from '@/lib/departments';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,8 @@ export default async function DepartmentTasksPage(
 ) {
   const params = await props.params;
   const department = params.department as Department;
-  if (!DEPARTMENT_SEQUENCE.includes(department)) notFound();
+  const activeDepartments = await getActiveDepartmentNames();
+  if (!activeDepartments.includes(department)) notFound();
 
   const user = await getCurrentUser();
   if (!user) redirect('/sign-in');

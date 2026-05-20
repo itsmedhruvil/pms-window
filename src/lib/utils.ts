@@ -71,18 +71,35 @@ export const PROJECT_STATUS_STYLE: Record<ProjectStatus, string> = {
 };
 
 export const PRIORITY_LABEL: Record<ProjectPriority, string> = {
-  [ProjectPriority.LOW]: 'Low',
-  [ProjectPriority.MEDIUM]: 'Medium',
-  [ProjectPriority.HIGH]: 'High',
-  [ProjectPriority.URGENT]: 'URGENT',
+  [ProjectPriority.STANDARD]: 'Standard',
+  [ProjectPriority.NECESSARY]: 'Necessary',
+  [ProjectPriority.PRIORITY]: 'Priority',
+  [ProjectPriority.URGENT]: 'Urgent',
 };
 
 export const PRIORITY_STYLE: Record<ProjectPriority, string> = {
-  [ProjectPriority.LOW]: 'text-gray-500 border-gray-200',
-  [ProjectPriority.MEDIUM]: 'text-gray-700 border-gray-400',
-  [ProjectPriority.HIGH]: 'text-black border-black font-semibold',
+  [ProjectPriority.STANDARD]: 'text-gray-500 border-gray-200',
+  [ProjectPriority.NECESSARY]: 'text-gray-700 border-gray-400',
+  [ProjectPriority.PRIORITY]: 'text-black border-black font-semibold',
   [ProjectPriority.URGENT]: 'text-red-600 border-red-500 font-bold',
 };
+
+export function normalizeProjectPriority(priority: ProjectPriority | string | undefined): ProjectPriority {
+  switch (priority) {
+    case ProjectPriority.STANDARD:
+    case 'low':
+      return ProjectPriority.STANDARD;
+    case ProjectPriority.PRIORITY:
+    case 'high':
+      return ProjectPriority.PRIORITY;
+    case ProjectPriority.URGENT:
+      return ProjectPriority.URGENT;
+    case ProjectPriority.NECESSARY:
+    case 'medium':
+    default:
+      return ProjectPriority.NECESSARY;
+  }
+}
 
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   [TaskStatus.TODO]: 'To Do',
@@ -124,7 +141,7 @@ export const ALERT_STATUS_LABEL: Record<AlertStatus, string> = {
 
 export { DEPARTMENT_LABELS };
 
-export const DEPARTMENT_ABBR: Record<Department, string> = {
+export const DEPARTMENT_ABBR: Record<string, string> = {
   [Department.PRODUCTION]: 'PROD',
   [Department.PURCHASE]: 'PUR',
   [Department.OPERATIONS]: 'OPS',
@@ -132,6 +149,20 @@ export const DEPARTMENT_ABBR: Record<Department, string> = {
   [Department.STORE]: 'STR',
   [Department.SITE]: 'SITE',
 };
+
+export function getDepartmentLabel(department: string | undefined) {
+  return department ? DEPARTMENT_LABELS[department] || department.replace(/[_-]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()) : '';
+}
+
+export function getDepartmentAbbreviation(department: string | undefined) {
+  if (!department) return '';
+  return DEPARTMENT_ABBR[department] || department
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase())
+    .join('')
+    .slice(0, 6) || department.slice(0, 3).toUpperCase();
+}
 
 // ============================================================
 // API FETCH HELPERS

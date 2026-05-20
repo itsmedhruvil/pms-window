@@ -2,12 +2,13 @@
 
 import { useState, useMemo } from 'react';
 import { Trash2, Plus } from 'lucide-react';
-import { cn, DEPARTMENT_LABELS, apiFetch } from '@/lib/utils';
+import { cn, getDepartmentLabel, apiFetch } from '@/lib/utils';
 import { Modal } from '@/components/ui/Modal';
 import { FilterDrawer, MobileFilterButton } from '@/components/ui/FilterDrawer';
 import { CreateUserForm } from '@/components/forms/CreateUserForm';
 import type { IUser } from '@/types';
 import { Department, UserRole } from '@/types';
+import { useDepartments } from '@/hooks/useDepartments';
 
 const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.SUPER_ADMIN]: 'Super Admin',
@@ -30,6 +31,7 @@ export function UsersClient({
   currentUserId: string;
   isSuperAdmin: boolean;
 }) {
+  const departments = useDepartments();
   const [users, setUsers] = useState<IUser[]>(initialUsers);
   const [deptFilter, setDeptFilter] = useState<Department | 'all'>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -107,12 +109,12 @@ export function UsersClient({
           </button>
 
           <div className="flex gap-2">
-            {Object.values(Department).map((dept) => {
+            {departments.map(({ name: dept, label }) => {
               const count = users.filter((u) => u.department === dept).length;
               return (
                 <div key={dept} className="text-center px-3 py-1.5 border border-gray-200">
                   <p className="text-[10px] font-mono text-gray-400 uppercase tracking-wide">
-                    {dept.split('_')[0]}
+                    {label.split(' ')[0]}
                   </p>
                   <p className="text-sm font-black text-gray-900">{count}</p>
                 </div>
@@ -124,7 +126,7 @@ export function UsersClient({
 
       {/* Filter — desktop */}
       <div className="hidden sm:flex gap-1.5 mb-4 items-center">
-        {(['all', ...Object.values(Department)] as const).map((d) => (
+        {(['all', ...departments.map((department) => department.name)] as const).map((d) => (
           <button
             key={d}
             onClick={() => setDeptFilter(d)}
@@ -135,7 +137,7 @@ export function UsersClient({
                 : 'border-gray-200 text-gray-500 hover:border-gray-400'
             )}
           >
-            {d === 'all' ? 'All' : DEPARTMENT_LABELS[d].split(' ')[0]}
+            {d === 'all' ? 'All' : departments.find((department) => department.name === d)?.label.split(' ')[0] || getDepartmentLabel(d)}
           </button>
         ))}
       </div>
@@ -153,7 +155,7 @@ export function UsersClient({
             Department
           </label>
           <div className="flex flex-wrap gap-1.5">
-            {(['all', ...Object.values(Department)] as const).map((d) => (
+            {(['all', ...departments.map((department) => department.name)] as const).map((d) => (
               <button
                 key={d}
                 onClick={() => setDeptFilter(d)}
@@ -164,7 +166,7 @@ export function UsersClient({
                     : 'border-gray-200 text-gray-500 hover:border-gray-400'
                 )}
               >
-                {d === 'all' ? 'All' : DEPARTMENT_LABELS[d].split(' ')[0]}
+                {d === 'all' ? 'All' : departments.find((department) => department.name === d)?.label.split(' ')[0] || getDepartmentLabel(d)}
               </button>
             ))}
           </div>
@@ -223,13 +225,13 @@ export function UsersClient({
                         onChange={(e) => setEditForm({ ...editForm, department: e.target.value as Department })}
                         className="text-[10px] font-mono border border-gray-300 px-1.5 py-1 focus:outline-none focus:border-black"
                       >
-                        {Object.values(Department).map((d) => (
-                          <option key={d} value={d}>{DEPARTMENT_LABELS[d]}</option>
+                        {departments.map((d) => (
+                          <option key={d.name} value={d.name}>{d.label}</option>
                         ))}
                       </select>
                     ) : (
                       <span className="text-[11px] font-mono text-gray-600 uppercase tracking-wide">
-                        {DEPARTMENT_LABELS[user.department]}
+                        {departments.find((department) => department.name === user.department)?.label || getDepartmentLabel(user.department)}
                       </span>
                     )}
                   </td>

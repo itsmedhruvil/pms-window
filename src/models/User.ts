@@ -41,8 +41,9 @@ const UserSchema = new Schema<IUserDocument>(
     },
     department: {
       type: String,
-      enum: Object.values(Department),
       required: true,
+      lowercase: true,
+      trim: true,
     },
     avatar: {
       type: String,
