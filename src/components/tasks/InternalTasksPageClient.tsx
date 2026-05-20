@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ClipboardList, AlertTriangle, CheckSquare, Square, Plus } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TaskStatusBadge } from '@/components/ui/badges';
 import { Modal } from '@/components/ui/Modal';
 import { CreateInternalTaskForm } from '@/components/forms/CreateInternalTaskForm';
-import { formatDate, DEPARTMENT_LABELS, cn } from '@/lib/utils';
-import type { ITask, Department } from '@/types';
+import { apiFetch, formatDate, DEPARTMENT_LABELS, cn } from '@/lib/utils';
+import type { ITask, Department, ITemplateGroup } from '@/types';
 import { TaskStatus } from '@/types';
 
 interface InternalTasksPageClientProps {
@@ -25,6 +25,22 @@ export function InternalTasksPageClient({
 }: InternalTasksPageClientProps) {
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [templateGroups, setTemplateGroups] = useState<ITemplateGroup[]>([]);
+
+  // Fetch template groups for the task creation modal
+  useEffect(() => {
+    if (!taskModalOpen) return;
+    let mounted = true;
+    apiFetch<ITemplateGroup[]>('/api/template-groups')
+      .then((result) => {
+        if (!mounted) return;
+        if (result.success && result.data) {
+          setTemplateGroups(result.data);
+        }
+      })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, [taskModalOpen]);
 
   // Group tasks by department
   const tasksByDepartment = tasks.reduce((acc, task) => {
@@ -232,6 +248,7 @@ export function InternalTasksPageClient({
       <Modal open={taskModalOpen} onClose={() => setTaskModalOpen(false)} size="lg">
         <CreateInternalTaskForm
           department={userDepartment}
+          templateGroups={templateGroups}
           onSuccess={() => {
             setTaskModalOpen(false);
             window.location.reload();

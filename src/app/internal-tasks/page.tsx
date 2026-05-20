@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { InternalTasksPageClient } from '@/components/tasks/InternalTasksPageClient';
 import { getTasks, getAlerts, serialize } from '@/lib/server-data';
 import { UserRole, AlertStatus, TaskStatus } from '@/types';
+import { generateRecurringInternalTasks } from '@/lib/generate-recurring';
 import type { ITask, IAlert } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -12,6 +13,15 @@ export default async function InternalTasksPage() {
   if (!user) redirect('/sign-in');
 
   const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
+
+  // Trigger recurring task generation (daily, weekly, monthly) for admin users
+  if (isAdmin) {
+    try {
+      await generateRecurringInternalTasks();
+    } catch {
+      // Non-blocking — recurring generation is best-effort
+    }
+  }
 
   const [rawTasks, rawAlerts] = await Promise.all([
     getTasks({
