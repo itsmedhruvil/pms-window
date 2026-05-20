@@ -32,7 +32,7 @@ async function fix() {
       console.log('✅ clerkId index already uses partialFilterExpression — nothing to do.');
     } else {
       console.log(`🗑️  Dropping old index: ${oldIndex.name}...`);
-      await coll.dropIndex(oldIndex.name);
+      await coll.dropIndex(oldIndex.name as string);
       console.log('✅ Old clerkId index dropped.');
       console.log('📝 The new unique index with partialFilterExpression will be created by Mongoose on next app restart.');
     }
