@@ -10,6 +10,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="manifest" href="https://progressier.app/Ko1ajWkNu7OtNVumtGzu/progressier.json"/>
+        <script defer src="https://progressier.app/Ko1ajWkNu7OtNVumtGzu/script.js"></script>
+      </head>
       <body className="antialiased">
         <ClerkAppProvider>{children}</ClerkAppProvider>
       </body>
