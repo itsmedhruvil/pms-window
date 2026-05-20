@@ -34,13 +34,18 @@ export const POST = withAuth(async (req: NextRequest) => {
     return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
   }
 
-  const existingUser = await UserModel.findOne({ email: parsed.data.email });
+  const userData = {
+    ...parsed.data,
+    email: parsed.data.email.trim().toLowerCase(),
+    name: parsed.data.name.trim(),
+  };
+
+  const existingUser = await UserModel.findOne({ email: userData.email });
   if (existingUser) {
     return NextResponse.json({ success: false, error: 'A user with this email already exists' }, { status: 400 });
   }
 
-  const createdUser = await UserModel.create(parsed.data);
+  const createdUser = await UserModel.create(userData);
   return NextResponse.json({ success: true, data: createdUser });
 });
-
 

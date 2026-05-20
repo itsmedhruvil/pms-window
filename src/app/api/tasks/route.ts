@@ -44,6 +44,23 @@ export const POST = withAuth(async (req: NextRequest) => {
     return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
   }
 
-  const newTask = await TaskModel.create(parsed.data);
+  const taskData = {
+    ...parsed.data,
+    dueDate: parsed.data.dueDate || undefined,
+  };
+
+  const lastTask = await TaskModel.findOne({
+    projectId: taskData.projectId || null,
+    department: taskData.department,
+  })
+    .sort({ sequence: -1 })
+    .select('sequence')
+    .lean();
+
+  const newTask = await TaskModel.create({
+    ...taskData,
+    sequence: (lastTask?.sequence ?? 0) + 1,
+  });
+
   return NextResponse.json({ success: true, data: newTask });
 });

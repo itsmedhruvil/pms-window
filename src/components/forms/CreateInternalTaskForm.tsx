@@ -24,6 +24,7 @@ interface FormData {
 export function CreateInternalTaskForm({ onSuccess, onCancel, department, templateGroups = [] }: CreateInternalTaskFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTemplateGroupId, setSelectedTemplateGroupId] = useState('');
   const [form, setForm] = useState<FormData>({
     title: '',
     description: '',
@@ -34,19 +35,35 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
 
   // Filter template groups to only those with internal tasks
   const internalTemplateGroups = templateGroups.filter((g) =>
-    g.tasks.some((t) => (t as any).type === 'internal')
+    g.tasks.some((t) => t.type === 'internal')
   );
+  const selectedTemplateTask = selectedTemplateGroupId
+    ? templateGroups
+        .find((g) => g._id === selectedTemplateGroupId)
+        ?.tasks.find((t) => t.type === 'internal')
+    : null;
 
   const isValid =
     form.title.trim().length >= 3 &&
     form.description.trim().length >= 10;
 
   const handleTemplateSelect = (groupId: string) => {
+    setSelectedTemplateGroupId(groupId);
+    if (!groupId) {
+      setForm({
+        title: '',
+        description: '',
+        department: department || Department.PRODUCTION,
+        dueDate: '',
+        frequency: 'daily',
+      });
+      return;
+    }
+
     const group = templateGroups.find((g) => g._id === groupId);
     if (!group || group.tasks.length === 0) return;
 
-    // Find the first task that doesn't have a completed task for today
-    const internalTasks = group.tasks.filter((t) => (t as any).type === 'internal');
+    const internalTasks = group.tasks.filter((t) => t.type === 'internal');
     if (internalTasks.length === 0) return;
 
     // Pre-fill with the first internal task
@@ -109,43 +126,57 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
             Select a template group to auto-fill task details from an existing template.
           </p>
           <select
-            value=""
-            onChange={(e) => e.target.value && handleTemplateSelect(e.target.value)}
+            value={selectedTemplateGroupId}
+            onChange={(e) => handleTemplateSelect(e.target.value)}
             className="w-full px-3 py-2 text-xs font-mono border border-blue-200 focus:outline-none focus:border-blue-700 transition-colors bg-white"
           >
-            <option value="">— Select template group —</option>
+            <option value="">No template reference</option>
             {internalTemplateGroups.map((g) => (
               <option key={g._id} value={g._id}>
-                {g.name} ({g.tasks.filter((t) => (t as any).type === 'internal').length} tasks)
+                {g.name} ({g.tasks.filter((t) => t.type === 'internal').length} tasks)
               </option>
             ))}
           </select>
+          {selectedTemplateTask && (
+            <div className="mt-3 border border-blue-100 bg-white p-3">
+              <p className="text-sm font-semibold text-gray-900">{selectedTemplateTask.title}</p>
+              <p className="mt-1 text-xs text-gray-600">{selectedTemplateTask.description}</p>
+              <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-mono uppercase tracking-wide text-blue-700">
+                <span>{DEPARTMENT_LABELS[selectedTemplateTask.department]}</span>
+                <span>{selectedTemplateTask.frequency.replace('_', ' ')}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       <div className="grid gap-4">
-        <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
-          Task Title
-          <input
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
-            placeholder="E.g. Review production schedules"
-          />
-        </label>
+        {!selectedTemplateGroupId && (
+          <>
+            <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+              Task Title
+              <input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+                placeholder="E.g. Review production schedules"
+              />
+            </label>
 
-        <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
-          Description
-          <textarea
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            rows={4}
-            className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
-            placeholder="Describe the task and expected outcome"
-          />
-        </label>
+            <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+              Description
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                rows={4}
+                className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+                placeholder="Describe the task and expected outcome"
+              />
+            </label>
+          </>
+        )}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className={cn('grid gap-4 sm:grid-cols-2', selectedTemplateGroupId && 'hidden')}>
           <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
             Department
             <select
@@ -170,7 +201,7 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
           </label>
         </div>
 
-        <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+        <label className={cn('block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold', selectedTemplateGroupId && 'hidden')}>
           Frequency
           <select
             value={form.frequency}

@@ -146,12 +146,20 @@ export async function apiFetch<T>(
       headers: { 'Content-Type': 'application/json' },
       ...options,
     });
-    const json = await res.json();
+
+    const contentType = res.headers.get('content-type') || '';
+    const json = contentType.includes('application/json')
+      ? await res.json()
+      : { success: false, error: await res.text() };
+
     if (!res.ok) {
-      return { success: false, error: json.error || 'Request failed' };
+      return { success: false, error: json.error || `Request failed (${res.status})` };
     }
     return json;
   } catch (error) {
-    return { success: false, error: 'Network error' };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error',
+    };
   }
 }
