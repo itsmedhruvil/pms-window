@@ -13,6 +13,7 @@ import {
   Plus,
   MessageCircle,
   Menu,
+  Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AlertStatus, DEPARTMENT_LABELS, DEPARTMENT_SEQUENCE, UserRole } from '@/types';
@@ -187,7 +188,7 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
       </nav>
 
       {isAdmin && (
-        <div className="px-3 lg:px-4 py-3 border-t border-gray-200">
+        <div className="px-3 lg:px-4 py-3 border-t border-gray-200 space-y-0.5">
           <Link
             href="/access"
             className={cn(
@@ -199,6 +200,18 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
           >
             <Users className="w-4 h-4 flex-shrink-0" />
             <span>Access Summary</span>
+          </Link>
+          <Link
+            href="/departments"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',
+              pathname === '/departments'
+                ? 'bg-black text-white'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            )}
+          >
+            <Building2 className="w-4 h-4 flex-shrink-0" />
+            <span>Departments</span>
           </Link>
         </div>
       )}
