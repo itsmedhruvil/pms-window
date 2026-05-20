@@ -59,6 +59,7 @@ export const POST = withAuth(
       let created = 0;
       let updated = 0;
       let skipped = 0;
+      const errors: Array<{ clerkId: string; email: string; error: string }> = [];
 
       for (const clerkUser of allClerkUsers) {
         const primaryEmail =
@@ -72,20 +73,12 @@ export const POST = withAuth(
         const fullName = `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || 'New User';
 
         // Try to find existing user by clerkId first, then by email
-        let existingUser = await UserModel.findOne({ clerkId: clerkUser.id });
-
-        if (!existingUser) {
-          existingUser = await UserModel.findOne({ email: normalizedEmail });
-        }
+        const existingUser = await UserModel.findOne({ clerkId: clerkUser.id });
 
         if (existingUser) {
           // Update existing user — merge Clerk fields without overwriting local role/department
           let changed = false;
 
-          if (existingUser.clerkId !== clerkUser.id) {
-            existingUser.clerkId = clerkUser.id;
-            changed = true;
-          }
           if (existingUser.email !== normalizedEmail) {
             existingUser.email = normalizedEmail;
             changed = true;
@@ -106,24 +99,72 @@ export const POST = withAuth(
             skipped++;
           }
         } else {
-          // Create new user record
+          // Check for existing user by email
+          const existingByEmail = await UserModel.findOne({ email: normalizedEmail });
+          if (existingByEmail) {
+            // Link the clerkId to the existing user record
+            existingByEmail.clerkId = clerkUser.id;
+            if (fullName) existingByEmail.name = fullName;
+            if (clerkUser.imageUrl) existingByEmail.avatar = clerkUser.imageUrl;
+            await existingByEmail.save();
+            updated++;
+            continue;
+          }
+
+          // Create new user record using findOneAndUpdate for upsert safety
           try {
-            await UserModel.create({
-              clerkId: clerkUser.id,
-              email: normalizedEmail,
-              name: fullName,
-              avatar: clerkUser.imageUrl,
-              role: UserRole.DEPARTMENT_USER,
-              department: Department.PRODUCTION,
-              isActive: true,
-            });
+            await UserModel.findOneAndUpdate(
+              { clerkId: clerkUser.id },
+              {
+                $setOnInsert: {
+                  clerkId: clerkUser.id,
+                  email: normalizedEmail,
+                  name: fullName,
+                  avatar: clerkUser.imageUrl,
+                  role: UserRole.DEPARTMENT_USER,
+                  department: Department.PRODUCTION,
+                  isActive: true,
+                },
+              },
+              { upsert: true, new: true },
+            );
             created++;
-          } catch (createError) {
-            console.error(`[Sync Clerk] Failed to create user ${normalizedEmail}:`, createError);
-            skipped++;
+          } catch (createError: any) {
+            // If upsert fails (e.g. duplicate email), try updating by email
+            if (createError?.code === 11000 || createError?.message?.includes('duplicate')) {
+              const existing = await UserModel.findOne({ email: normalizedEmail });
+              if (existing) {
+                existing.clerkId = clerkUser.id;
+                if (fullName) existing.name = fullName;
+                if (clerkUser.imageUrl) existing.avatar = clerkUser.imageUrl;
+                await existing.save();
+                updated++;
+              } else {
+                console.error(`[Sync Clerk] Failed to create user ${normalizedEmail}:`, createError);
+                errors.push({ clerkId: clerkUser.id, email: normalizedEmail, error: createError.message });
+                skipped++;
+              }
+            } else {
+              console.error(`[Sync Clerk] Failed to create user ${normalizedEmail}:`, createError);
+              errors.push({ clerkId: clerkUser.id, email: normalizedEmail, error: createError.message });
+              skipped++;
+            }
           }
         }
       }
+
+      // Include details about each user for debugging
+      const userDetails = allClerkUsers.map(u => {
+        const primaryEmail =
+          u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId)?.emailAddress ||
+          u.emailAddresses[0]?.emailAddress ||
+          '(no email)';
+        return {
+          clerkId: u.id,
+          email: primaryEmail,
+          name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'New User',
+        };
+      });
 
       return NextResponse.json({
         success: true,
@@ -132,6 +173,7 @@ export const POST = withAuth(
           created,
           updated,
           skipped,
+          users: userDetails,
         },
         message: `Synced ${allClerkUsers.length} Clerk users. Created: ${created}, Updated: ${updated}, Skipped: ${skipped}.`,
       });

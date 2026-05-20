@@ -96,14 +96,11 @@ export function UsersClient({
     setSyncResult(null);
 
     try {
-      const result = await apiFetch<{ message?: string }>('/api/users/sync-clerk', { method: 'POST' });
+      const result = await apiFetch('/api/users/sync-clerk', { method: 'POST' });
       if (result.success) {
-        setSyncResult({ message: result.data?.message || 'Sync completed.' });
-        // Refresh the users list
-        const refresh = await apiFetch<IUser[]>('/api/users');
-        if (refresh.success && Array.isArray(refresh.data)) {
-          setUsers(refresh.data);
-        }
+        setSyncResult({ message: 'Sync completed. Reloading...' });
+        // Hard-reload the page to get fresh data from the server component
+        setTimeout(() => window.location.reload(), 500);
       } else {
         setSyncResult({ message: result.error || 'Sync failed.', error: result.error });
       }
@@ -111,8 +108,6 @@ export function UsersClient({
       setSyncResult({ message: 'Failed to sync Clerk users.', error: String(err) });
     } finally {
       setSyncing(false);
-      // Auto-clear result after 8 seconds
-      setTimeout(() => setSyncResult(null), 8000);
     }
   };
 
