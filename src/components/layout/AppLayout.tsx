@@ -37,7 +37,6 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/template-groups', label: 'Template Groups', icon: ClipboardList },
   { href: '/discussions', label: 'Discussions', icon: MessageCircle },
   { href: '/alerts', label: 'Alerts', icon: AlertTriangle },
-  { href: '/users', label: 'Users', icon: Users },
 ];
 
 const DEPT_USER_NAV_ITEMS: NavItem[] = [
