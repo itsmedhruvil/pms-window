@@ -53,6 +53,8 @@ export async function generateProjectTasks(
 
 /**
  * Generate tasks from a selected template group (project-level, no window specs)
+ * Now separates project tasks from internal tasks.
+ * Project tasks get projectId; internal tasks are standalone (no projectId).
  */
 export async function generateFromSelectedTemplateGroup(
   projectId: Types.ObjectId,
@@ -66,29 +68,37 @@ export async function generateFromSelectedTemplateGroup(
     return generateFromTaskTemplates(projectId, createdByUserId);
   }
 
-  const tasks = [];
+  // Separate project tasks from internal tasks
+  const projectTasks: any[] = [];
+  const internalTasks: any[] = [];
   let globalSequence = 0;
 
-  // Group tasks by department
-  const deptMap = new Map<string, typeof group.tasks>();
+  // Group tasks by type then by department
+  const projectDeptMap = new Map<string, typeof group.tasks>();
+  const internalDeptMap = new Map<string, typeof group.tasks>();
+
   for (const task of group.tasks) {
-    if (!deptMap.has(task.department)) {
-      deptMap.set(task.department, []);
+    if ((task as any).type === 'internal') {
+      if (!internalDeptMap.has(task.department)) {
+        internalDeptMap.set(task.department, []);
+      }
+      internalDeptMap.get(task.department)!.push(task);
+    } else {
+      if (!projectDeptMap.has(task.department)) {
+        projectDeptMap.set(task.department, []);
+      }
+      projectDeptMap.get(task.department)!.push(task);
     }
-    deptMap.get(task.department)!.push(task);
   }
 
-  // Process departments in order
+  // Create project tasks (linked to this project)
   for (const dept of DEPARTMENT_SEQUENCE) {
-    const deptTasks = (deptMap.get(dept) || []).sort((a, b) => a.sequence - b.sequence);
+    const deptTasks = (projectDeptMap.get(dept) || []).sort((a, b) => a.sequence - b.sequence);
     if (deptTasks.length === 0) continue;
 
-    for (let i = 0; i < deptTasks.length; i++) {
-      const taskData = deptTasks[i];
-      const taskId = new Types.ObjectId();
-
-      tasks.push({
-        _id: taskId,
+    for (const taskData of deptTasks) {
+      projectTasks.push({
+        _id: new Types.ObjectId(),
         projectId,
         department: dept as Department,
         title: taskData.title,
@@ -102,14 +112,50 @@ export async function generateFromSelectedTemplateGroup(
     }
   }
 
-  await TaskModel.insertMany(tasks);
+  // Create internal tasks (standalone, no projectId)
+  for (const dept of DEPARTMENT_SEQUENCE) {
+    const deptTasks = (internalDeptMap.get(dept) || []).sort((a, b) => a.sequence - b.sequence);
+    if (deptTasks.length === 0) continue;
 
-  await CommentModel.create({
-    taskId: tasks[0]._id,
-    content: `Project workflow initialized from template group "${group.name}". ${tasks.length} tasks created across ${new Set(group.tasks.map((t: any) => t.department)).size} departments.`,
-    author: createdByUserId,
-    isSystemLog: true,
-  });
+    for (const taskData of deptTasks) {
+      internalTasks.push({
+        _id: new Types.ObjectId(),
+        // No projectId — internal task
+        department: dept as Department,
+        title: taskData.title,
+        description: taskData.description,
+        status: TaskStatus.TODO,
+        frequency: (taskData as any).frequency || 'project',
+        dependencyTaskId: null,
+        isLocked: false,
+        sequence: globalSequence++,
+      });
+    }
+  }
+
+  // Insert project tasks
+  if (projectTasks.length > 0) {
+    await TaskModel.insertMany(projectTasks);
+
+    await CommentModel.create({
+      taskId: projectTasks[0]._id,
+      content: `Project workflow initialized from template group "${group.name}". ${projectTasks.length} project tasks created across departments.`,
+      author: createdByUserId,
+      isSystemLog: true,
+    });
+  }
+
+  // Insert internal tasks
+  if (internalTasks.length > 0) {
+    await TaskModel.insertMany(internalTasks);
+
+    const deptLabels = [...new Set(internalTasks.map((t: any) => t.department))].join(', ');
+    await CommentModel.create({
+      content: `Internal tasks auto-generated from template group "${group.name}": ${internalTasks.length} tasks created for ${deptLabels}.`,
+      author: createdByUserId,
+      isSystemLog: true,
+    });
+  }
 }
 
 /**
@@ -257,11 +303,13 @@ export async function unlockDependentTasks(completedTaskId: string): Promise<voi
     }
     await task.save();
 
-    await triggerEvent(CHANNELS.project(task.projectId.toString()), EVENTS.TASK_UPDATED, {
-      taskId: task._id,
-      status: task.status,
-      isLocked: false,
-    });
+    if (task.projectId) {
+      await triggerEvent(CHANNELS.project(task.projectId.toString()), EVENTS.TASK_UPDATED, {
+        taskId: task._id,
+        status: task.status,
+        isLocked: false,
+      });
+    }
   }
 }
 

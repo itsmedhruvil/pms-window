@@ -621,35 +621,42 @@ async function seedUaTemplateGroup() {
     console.log(`     ${dept}: ${count} tasks`);
   }
 
+  // Mark accounts tasks as internal (not project-linked)
+  const allGroupTasksWithType = allGroupTasks.map((t) => ({
+    ...t,
+    type: t.department === Department.ACCOUNTS ? 'internal' : 'project',
+  }));
+
   // Check if template group already exists
   const GROUP_NAME = 'UA Master Tasks';
   const existingGroup = await TemplateGroup.findOne({ name: GROUP_NAME });
   if (existingGroup) {
     console.log(`\n  ⚠️  Template group "${GROUP_NAME}" already exists, updating...`);
-    existingGroup.tasks = allGroupTasks as any;
+    existingGroup.tasks = allGroupTasksWithType as any;
     existingGroup.description = 'Complete department-wise task template extracted from UA Master Role Task Template v2 — Production, Purchase, Operations, Finance, Site & Store';
     await existingGroup.save();
-    console.log(`  ✅ Updated template group with ${allGroupTasks.length} tasks`);
+    console.log(`  ✅ Updated template group with ${allGroupTasksWithType.length} tasks`);
   } else {
     await TemplateGroup.create({
       name: GROUP_NAME,
       description: 'Complete department-wise task template extracted from UA Master Role Task Template v2 — Production, Purchase, Operations, Finance, Site & Store',
-      tasks: allGroupTasks,
+      tasks: allGroupTasksWithType,
       isActive: true,
     });
-    console.log(`  ✅ Created template group "${GROUP_NAME}" with ${allGroupTasks.length} tasks`);
+    console.log(`  ✅ Created template group "${GROUP_NAME}" with ${allGroupTasksWithType.length} tasks`);
   }
 
   // Summary
   console.log('\n✅ Seed complete!');
   console.log('─'.repeat(55));
   console.log(`  Template Group: ${GROUP_NAME}`);
-  console.log(`  Total tasks:    ${allGroupTasks.length}`);
+  console.log(`  Total tasks:    ${allGroupTasksWithType.length}`);
   console.log('  Breakdown:');
   for (const dept of Object.values(Department)) {
-    const count = allGroupTasks.filter((t) => t.department === dept).length;
+    const count = allGroupTasksWithType.filter((t) => t.department === dept).length;
+    const typeInfo = allGroupTasksWithType.find((t) => t.department === dept)?.type || 'project';
     const freqCounts: Record<string, number> = {};
-    allGroupTasks
+    allGroupTasksWithType
       .filter((t) => t.department === dept)
       .forEach((t) => {
         freqCounts[t.frequency] = (freqCounts[t.frequency] || 0) + 1;
@@ -657,7 +664,7 @@ async function seedUaTemplateGroup() {
     const freqSummary = Object.entries(freqCounts)
       .map(([f, c]) => `${f}: ${c}`)
       .join(', ');
-    console.log(`    ${dept.padEnd(15)} ${count} tasks (${freqSummary})`);
+    console.log(`    ${dept.padEnd(15)} ${count} tasks (${typeInfo}, ${freqSummary})`);
   }
   console.log('─'.repeat(55));
   console.log('Now available in Template Groups UI for project creation.\n');

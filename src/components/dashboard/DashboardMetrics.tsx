@@ -49,7 +49,7 @@ export function DashboardMetrics({ data }: { data: DashboardMetricsData }) {
   return (
     <div className="space-y-6">
       {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <MetricCard
           label="Active Projects"
           value={metrics.totalActiveProjects}
@@ -95,10 +95,11 @@ export function DashboardMetrics({ data }: { data: DashboardMetricsData }) {
       )}
 
       {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Tasks per department */}
         <ChartCard title="Tasks by Department" subtitle="Breakdown by status">
-          <ResponsiveContainer width="100%" height={220}>
+          <div className="-mx-1 sm:mx-0">
+            <ResponsiveContainer width="100%" height={220}>
             <BarChart data={charts.tasksByDepartment} barSize={18}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis
@@ -116,12 +117,14 @@ export function DashboardMetrics({ data }: { data: DashboardMetricsData }) {
               <Bar dataKey="todo" stackId="a" fill="#ddd" name="Todo" />
               <Bar dataKey="blocked" stackId="a" fill="#ef4444" name="Blocked" />
             </BarChart>
-          </ResponsiveContainer>
+            </ResponsiveContainer>
+          </div>
         </ChartCard>
 
         {/* Completion trend */}
         <ChartCard title="Completion Trend" subtitle="Last 14 days">
-          <ResponsiveContainer width="100%" height={220}>
+          <div className="-mx-1 sm:mx-0">
+            <ResponsiveContainer width="100%" height={220}>
             <LineChart data={charts.completionTrend}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis
@@ -142,7 +145,8 @@ export function DashboardMetrics({ data }: { data: DashboardMetricsData }) {
                 name="Completed"
               />
             </LineChart>
-          </ResponsiveContainer>
+            </ResponsiveContainer>
+          </div>
         </ChartCard>
       </div>
 

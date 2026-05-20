@@ -11,6 +11,7 @@ type TaskDraft = {
   title: string;
   description: string;
   frequency: string;
+  type: 'project' | 'internal';
 };
 
 type GroupDraft = {
@@ -42,6 +43,7 @@ const emptyTaskDraft: TaskDraft = {
   title: '',
   description: '',
   frequency: TaskFrequency.PROJECT,
+  type: 'project',
 };
 
 const emptyGroupDraft: GroupDraft = {
@@ -119,12 +121,13 @@ function TaskTable({
   return (
     <div className="border border-gray-200 overflow-x-auto">
       {/* Table header */}
-      <div className="grid grid-cols-[36px_44px_1fr_1fr_130px_110px_36px] min-w-[700px] bg-gray-50 border-b border-gray-200 text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
+      <div className="grid grid-cols-[36px_44px_1fr_1fr_130px_90px_90px_36px] min-w-[760px] bg-gray-50 border-b border-gray-200 text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
         <div className="px-2 py-2 text-center">#</div>
         <div className="px-1 py-2 text-center">Move</div>
         <div className="px-3 py-2">Task Title</div>
         <div className="px-3 py-2">Description</div>
         <div className="px-3 py-2">Department</div>
+        <div className="px-3 py-2">Type</div>
         <div className="px-3 py-2">Frequency</div>
         <div className="px-2 py-2"></div>
       </div>
@@ -137,7 +140,7 @@ function TaskTable({
           </div>
         )}
         {tasks.map((task, idx) => (
-          <div key={idx} className="grid grid-cols-[36px_44px_1fr_1fr_130px_110px_36px] gap-0 items-start group">
+          <div key={idx} className="grid grid-cols-[36px_44px_1fr_1fr_130px_90px_90px_36px] gap-0 items-start group">
             <div className="px-2 py-2.5 text-[10px] font-mono text-gray-400 text-center pt-3.5">
               {idx + 1}
             </div>
@@ -203,6 +206,21 @@ function TaskTable({
                 {DEPARTMENT_SEQUENCE.map((d) => (
                   <option key={d} value={d}>{DEPARTMENT_LABELS[d]}</option>
                 ))}
+              </select>
+            </div>
+            {/* Type selector */}
+            <div className="px-2 py-1.5">
+              <select
+                value={task.type || 'project'}
+                onChange={(e) => onUpdate(idx, 'type', e.target.value)}
+                disabled={readOnly}
+                className={cn(
+                  'w-full px-2 py-1.5 text-[10px] font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white',
+                  readOnly && 'bg-gray-50 cursor-default'
+                )}
+              >
+                <option value="project">Project</option>
+                <option value="internal">Internal</option>
               </select>
             </div>
             <div className="px-2 py-1.5">
@@ -417,6 +435,7 @@ export function TemplateGroupsClient() {
         title: t.title,
         description: t.description,
         frequency: t.frequency || 'project',
+        type: (t as any).type || 'project',
       })),
     });
   };

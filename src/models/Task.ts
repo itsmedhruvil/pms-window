@@ -10,7 +10,7 @@ interface TaskImageAttachment {
 }
 
 export interface ITaskDocument extends Document {
-  projectId: mongoose.Types.ObjectId;
+  projectId?: mongoose.Types.ObjectId;
   templateTaskId?: mongoose.Types.ObjectId;
   department: Department;
   title: string;
@@ -34,7 +34,7 @@ const TaskSchema = new Schema<ITaskDocument>(
     projectId: {
       type: Schema.Types.ObjectId,
       ref: 'Project',
-      required: true,
+      default: null,
       index: true,
     },
     templateTaskId: {

@@ -269,6 +269,7 @@ export interface ITemplateGroup {
     description: string;
     sequence: number;
     frequency: TaskFrequency;
+    type?: 'project' | 'internal';
   }>;
   isActive: boolean;
   createdAt: Date;

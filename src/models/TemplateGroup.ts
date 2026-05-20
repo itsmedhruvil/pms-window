@@ -7,6 +7,7 @@ interface ITemplateGroupTask {
   description: string;
   sequence: number;
   frequency: TaskFrequency;
+  type?: 'project' | 'internal';
 }
 
 export interface ITemplateGroupDocument extends Document {
@@ -43,6 +44,11 @@ const TemplateGroupTaskSchema = new Schema<ITemplateGroupTask>(
       type: String,
       enum: Object.values(TaskFrequency),
       default: TaskFrequency.PROJECT,
+    },
+    type: {
+      type: String,
+      enum: ['project', 'internal'],
+      default: 'project',
     },
   },
   { _id: false }

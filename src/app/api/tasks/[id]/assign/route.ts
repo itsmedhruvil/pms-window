@@ -83,11 +83,13 @@ export const POST = withAuth(async (req: NextRequest, ctx, { user }) => {
     .populate('assignedUser', 'name email department avatar')
     .lean();
 
-  await triggerEvent(
-    CHANNELS.project(task.projectId.toString()),
-    EVENTS.TASK_UPDATED,
-    updated
-  );
+  if (task.projectId) {
+    await triggerEvent(
+      CHANNELS.project(task.projectId.toString()),
+      EVENTS.TASK_UPDATED,
+      updated
+    );
+  }
 
   return NextResponse.json({ success: true, data: updated });
 });

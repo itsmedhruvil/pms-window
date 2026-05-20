@@ -94,7 +94,9 @@ export const PATCH = withAuth(async (req: NextRequest, ctx, { user }) => {
       await unlockDependentTasks(id);
     }
 
-    await updateProjectCompletion(task.projectId.toString());
+    if (task.projectId) {
+      await updateProjectCompletion(task.projectId.toString());
+    }
   }
 
   if (parsed.data.imageAttachments) {
@@ -134,7 +136,9 @@ export const DELETE = withAuth(
     await TaskModel.findByIdAndDelete(id);
 
     // Update project completion percentage
-    await updateProjectCompletion(projectId.toString());
+    if (projectId) {
+      await updateProjectCompletion(projectId.toString());
+    }
 
     return NextResponse.json({ success: true, message: 'Task deleted' });
   },

@@ -81,7 +81,7 @@ export const UpdateProjectSchema = z.object({
   windowSpecifications: z.array(WindowSpecSchema).min(1).optional(),
   excelSheetName: z.string().optional(),
   excelRows: z
-    .array(z.record(z.union([z.string(), z.number(), z.null()])))
+    .array(z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])))
     .optional(),
   priority: z.nativeEnum(ProjectPriority).optional(),
   deadline: z

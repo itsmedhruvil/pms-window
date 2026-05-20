@@ -45,6 +45,8 @@ export function ProjectDetail({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [excelError, setExcelError] = useState<string | null>(null);
+  const [excelLoading, setExcelLoading] = useState(false);
   const [editForm, setEditForm] = useState({
     clientName: initialProject.clientName,
     projectTitle: initialProject.projectTitle,
@@ -58,19 +60,29 @@ export function ProjectDetail({
   const [editError, setEditError] = useState<string | null>(null);
 
   const handleExcelUpload = async (file: File) => {
-    const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+    setExcelError(null);
+    setExcelLoading(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
 
-    const result = await apiFetch(`/api/projects/${project._id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ excelSheetName: sheetName, excelRows: rows }),
-    });
+      const result = await apiFetch(`/api/projects/${project._id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ excelSheetName: sheetName, excelRows: rows }),
+      });
 
-    if (result.success && result.data) {
-      setProject(result.data as IProject);
+      if (result.success && result.data) {
+        setProject(result.data as IProject);
+      } else {
+        setExcelError(result.error || 'Failed to upload Excel data');
+      }
+    } catch (err) {
+      setExcelError('Could not read the Excel file. Make sure it is a valid .xlsx or .xls file.');
+    } finally {
+      setExcelLoading(false);
     }
   };
 
@@ -351,8 +363,14 @@ export function ProjectDetail({
             </summary>
 
             <div className="mt-4">
+              {excelError && (
+                <div className="flex items-center gap-2 p-3 mb-3 border border-red-300 bg-red-50">
+                  <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                  <p className="text-xs text-red-700 font-mono">{excelError}</p>
+                </div>
+              )}
               {!project.excelRows && (
-                <ExcelUpload onUpload={handleExcelUpload} />
+                <ExcelUpload onUpload={handleExcelUpload} loading={excelLoading} />
               )}
 
               {project.excelRows && project.excelRows.length > 0 && (
@@ -361,7 +379,7 @@ export function ProjectDetail({
                     <span className="text-xs font-mono text-gray-500">
                       Sheet: {project.excelSheetName || 'Imported'}
                     </span>
-                    <ExcelUpload onUpload={handleExcelUpload} />
+                    <ExcelUpload onUpload={handleExcelUpload} loading={excelLoading} />
                   </div>
                   <div className="overflow-x-auto border border-gray-200 rounded-lg">
                     <table className="min-w-full text-left text-xs font-mono">
@@ -758,17 +776,24 @@ export function ProjectDetail({
   );
 }
 
-function ExcelUpload({ onUpload }: { onUpload: (file: File) => Promise<void> }) {
+function ExcelUpload({ onUpload, loading = false }: { onUpload: (file: File) => Promise<void>; loading?: boolean }) {
   const handleFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     await onUpload(file);
+    // Reset input so the same file can be re-uploaded
+    event.target.value = '';
   };
 
   return (
-    <label className="inline-flex items-center gap-2 px-4 py-2 text-xs font-mono font-bold uppercase tracking-wide border border-gray-200 rounded-md cursor-pointer hover:bg-gray-50 transition-colors">
-      Upload Excel
-      <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileSelect} />
+    <label className={cn(
+      'inline-flex items-center gap-2 px-4 py-2 text-xs font-mono font-bold uppercase tracking-wide border rounded-md cursor-pointer transition-colors',
+      loading
+        ? 'border-gray-300 text-gray-400 bg-gray-50 pointer-events-none'
+        : 'border-gray-200 hover:bg-gray-50'
+    )}>
+      {loading ? 'Uploading...' : 'Upload Excel'}
+      <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileSelect} disabled={loading} />
     </label>
   );
 }

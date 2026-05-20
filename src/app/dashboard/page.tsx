@@ -19,7 +19,7 @@ export default async function DashboardPage() {
 
   return (
     <AppLayout activeAlertCount={data?.metrics?.activeAlertCount ?? 0}>
-      <div className="p-6 max-w-screen-xl mx-auto">
+      <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
         <div className="mb-6 pb-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>

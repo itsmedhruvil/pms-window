@@ -40,7 +40,9 @@ export const POST = withAuth(
           throw new Error('You cannot delete tasks outside your department');
         }
 
-        projectIds.add(task.projectId.toString());
+        if (task.projectId) {
+          projectIds.add(task.projectId.toString());
+        }
         await CommentModel.deleteMany({ taskId }, { session });
         await TaskModel.findByIdAndDelete(taskId, { session });
       }

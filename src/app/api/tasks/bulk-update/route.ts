@@ -47,13 +47,15 @@ export const POST = withAuth(
         await task.save({ session });
         updatedTasks.push(task);
 
-        // Trigger realtime update
-        await triggerEvent(CHANNELS.project(task.projectId.toString()), EVENTS.TASK_UPDATED, {
-          taskId: task._id.toString(),
-          projectId: task.projectId.toString(),
-          status: task.status,
-          completedAt: task.completedAt,
-        });
+        // Trigger realtime update (only for project tasks)
+        if (task.projectId) {
+          await triggerEvent(CHANNELS.project(task.projectId.toString()), EVENTS.TASK_UPDATED, {
+            taskId: task._id.toString(),
+            projectId: task.projectId.toString(),
+            status: task.status,
+            completedAt: task.completedAt,
+          });
+        }
       }
 
       await session.commitTransaction();

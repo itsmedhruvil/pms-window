@@ -2,10 +2,11 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, AlertTriangle, Plus, CheckSquare, Square, Search, Trash2, ChevronDown } from 'lucide-react';
+import { Lock, AlertTriangle, Plus, CheckSquare, Square, Search, Trash2, ChevronDown, X } from 'lucide-react';
 import { cn, DEPARTMENT_LABELS, formatDate } from '@/lib/utils';
 import { TaskStatusBadge } from '@/components/ui/badges';
 import { Modal } from '@/components/ui/Modal';
+import { FilterDrawer, MobileFilterButton } from '@/components/ui/FilterDrawer';
 import { CreateTaskForm } from '@/components/forms/CreateTaskForm';
 import type { ITask, IProject } from '@/types';
 import { TaskStatus, Department } from '@/types';
@@ -37,6 +38,7 @@ export function TasksClient({
   const [projectFilter, setProjectFilter] = useState<string>(initialProjectFilter || 'all');
   const [projectSearch, setProjectSearch] = useState('');
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const projectDropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -156,9 +158,13 @@ export function TasksClient({
     setSelectedTasks(newSelected);
   };
 
-  const selectAll = () => {
-    const allTaskIds = filtered.map(task => task._id);
-    setSelectedTasks(new Set(allTaskIds));
+  const toggleSelectAll = () => {
+    if (selectedTasks.size === filtered.length && filtered.length > 0) {
+      setSelectedTasks(new Set());
+    } else {
+      const allTaskIds = filtered.map(task => task._id);
+      setSelectedTasks(new Set(allTaskIds));
+    }
   };
 
   const filteredProjects = useMemo(() => {
@@ -170,6 +176,14 @@ export function TasksClient({
         p.clientName.toLowerCase().includes(q)
     );
   }, [allProjects, projectSearch]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (statusFilter !== 'all') count++;
+    if (projectFilter !== 'all') count++;
+    if (searchText.trim()) count++;
+    return count;
+  }, [statusFilter, projectFilter, searchText]);
 
   const selectedProjectName = projectFilter === 'all'
     ? 'All Projects'
@@ -197,7 +211,7 @@ export function TasksClient({
             </div>
 
             <div className="flex items-center gap-2">
-              {isAdmin && selectedTasks.size > 0 && (
+              {selectedTasks.size > 0 && (
                 <>
                   <button
                     onClick={handleBulkMarkDone}
@@ -206,13 +220,15 @@ export function TasksClient({
                     <CheckSquare className="w-3.5 h-3.5" />
                     Mark Done ({selectedTasks.size})
                   </button>
-                  <button
-                    onClick={handleBulkDelete}
-                    className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-red-600 text-white hover:bg-red-700 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Delete ({selectedTasks.size})
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={handleBulkDelete}
+                      className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-red-600 text-white hover:bg-red-700 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete ({selectedTasks.size})
+                    </button>
+                  )}
                 </>
               )}
               {isAdmin && (
@@ -243,122 +259,206 @@ export function TasksClient({
           </div>
         </div>
 
-        <div className="flex-shrink-0 px-6 py-2.5 border-b border-gray-100 flex flex-col gap-3 bg-gray-50 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Search className="w-4 h-4 text-gray-400" />
-            <input
-              type="search"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              placeholder="Search tasks..."
-              className="text-[10px] font-mono border border-gray-200 px-2 py-1 bg-white focus:outline-none focus:border-black w-full sm:w-64"
+        <div className="flex-shrink-0 px-4 sm:px-6 py-2.5 border-b border-gray-100 flex flex-col gap-3 bg-gray-50">
+          {/* Search + Mobile Filter button row */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <input
+                type="search"
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="Search tasks..."
+                className="text-[10px] font-mono border border-gray-200 px-2 py-1 bg-white focus:outline-none focus:border-black w-full sm:w-64"
+              />
+            </div>
+
+            {/* Desktop filters — hidden on mobile */}
+            <div className="hidden sm:flex items-center gap-2">
+              {/* Project filter dropdown with search */}
+              {allProjects.length > 0 && (
+                <div className="relative" ref={projectDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
+                    className="flex items-center gap-2 text-[10px] font-mono border border-gray-200 px-2 py-1 bg-white focus:outline-none focus:border-black whitespace-nowrap"
+                  >
+                    <span className="max-w-[140px] truncate">{selectedProjectName}</span>
+                    <ChevronDown className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                  </button>
+
+                  {projectDropdownOpen && (
+                    <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-gray-200 shadow-lg z-50">
+                      {/* Search within projects */}
+                      <div className="p-2 border-b border-gray-100">
+                        <div className="flex items-center gap-1.5">
+                          <Search className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                          <input
+                            type="text"
+                            value={projectSearch}
+                            onChange={(e) => setProjectSearch(e.target.value)}
+                            placeholder="Search projects..."
+                            className="w-full text-[10px] font-mono border-0 focus:outline-none p-0 bg-transparent"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+
+                      <div className="max-h-48 overflow-y-auto">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProjectFilter('all');
+                            setProjectDropdownOpen(false);
+                            setProjectSearch('');
+                          }}
+                          className={cn(
+                            'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-gray-50 transition-colors',
+                            projectFilter === 'all' ? 'bg-gray-100 font-bold' : ''
+                          )}
+                        >
+                          All Projects
+                        </button>
+                        {filteredProjects.map((project) => (
+                          <button
+                            key={project._id}
+                            type="button"
+                            onClick={() => {
+                              setProjectFilter(project._id);
+                              setProjectDropdownOpen(false);
+                              setProjectSearch('');
+                            }}
+                            className={cn(
+                              'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-gray-50 transition-colors',
+                              projectFilter === project._id ? 'bg-gray-100 font-bold' : ''
+                            )}
+                          >
+                            <span className="block truncate">{project.projectTitle}</span>
+                            <span className="block text-[9px] text-gray-400 truncate">{project.clientName}</span>
+                          </button>
+                        ))}
+                        {filteredProjects.length === 0 && (
+                          <p className="px-3 py-3 text-[10px] text-gray-400 font-mono text-center">
+                            No projects found
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as TaskStatus | 'all')}
+                className="text-[10px] font-mono border border-gray-200 px-2 py-1 bg-white focus:outline-none focus:border-black"
+              >
+                <option value="all">All Statuses</option>
+                {Object.values(TaskStatus).map((s) => (
+                  <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Mobile filter button */}
+            <MobileFilterButton
+              onClick={() => setMobileFilterOpen(true)}
+              activeCount={activeFilterCount}
             />
           </div>
 
-          {/* Project filter dropdown with search */}
-          {allProjects.length > 0 && (
-            <div className="relative" ref={projectDropdownRef}>
-              <button
-                type="button"
-                onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
-                className="flex items-center gap-2 text-[10px] font-mono border border-gray-200 px-2 py-1 bg-white focus:outline-none focus:border-black whitespace-nowrap"
-              >
-                <span className="max-w-[140px] truncate">{selectedProjectName}</span>
-                <ChevronDown className="w-3 h-3 text-gray-400 flex-shrink-0" />
-              </button>
-
-              {projectDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-gray-200 shadow-lg z-50">
-                  {/* Search within projects */}
-                  <div className="p-2 border-b border-gray-100">
-                    <div className="flex items-center gap-1.5">
-                      <Search className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                      <input
-                        type="text"
-                        value={projectSearch}
-                        onChange={(e) => setProjectSearch(e.target.value)}
-                        placeholder="Search projects..."
-                        className="w-full text-[10px] font-mono border-0 focus:outline-none p-0 bg-transparent"
-                        autoFocus
-                      />
-                    </div>
-                  </div>
-
-                  <div className="max-h-48 overflow-y-auto">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProjectFilter('all');
-                        setProjectDropdownOpen(false);
-                        setProjectSearch('');
-                      }}
-                      className={cn(
-                        'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-gray-50 transition-colors',
-                        projectFilter === 'all' ? 'bg-gray-100 font-bold' : ''
-                      )}
-                    >
-                      All Projects
-                    </button>
-                    {filteredProjects.map((project) => (
-                      <button
-                        key={project._id}
-                        type="button"
-                        onClick={() => {
-                          setProjectFilter(project._id);
-                          setProjectDropdownOpen(false);
-                          setProjectSearch('');
-                        }}
-                        className={cn(
-                          'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-gray-50 transition-colors',
-                          projectFilter === project._id ? 'bg-gray-100 font-bold' : ''
-                        )}
-                      >
-                        <span className="block truncate">{project.projectTitle}</span>
-                        <span className="block text-[9px] text-gray-400 truncate">{project.clientName}</span>
-                      </button>
-                    ))}
-                    {filteredProjects.length === 0 && (
-                      <p className="px-3 py-3 text-[10px] text-gray-400 font-mono text-center">
-                        No projects found
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as TaskStatus | 'all')}
-            className="text-[10px] font-mono border border-gray-200 px-2 py-1 bg-white focus:outline-none focus:border-black"
-          >
-            <option value="all">All Statuses</option>
-            {Object.values(TaskStatus).map((s) => (
-              <option key={s} value={s}>{s.replace('_', ' ')}</option>
-            ))}
-          </select>
           <div className="flex items-center gap-3 flex-wrap">
-            {isAdmin && (
-              <button
-                onClick={selectAll}
-                className="text-[10px] font-mono text-blue-600 hover:text-blue-800 underline"
-              >
-                Select all
-              </button>
-            )}
+            <button
+              onClick={toggleSelectAll}
+              className="text-[10px] font-mono text-blue-600 hover:text-blue-800 underline"
+            >
+              {selectedTasks.size === filtered.length && filtered.length > 0 ? 'Deselect all' : 'Select all'}
+            </button>
             <span className="text-[10px] text-gray-500 font-mono">
               {selectedTasks.size > 0 ? `${selectedTasks.size} selected • ` : ''}{filtered.length} tasks
             </span>
           </div>
         </div>
-        <div className="flex-1 overflow-auto p-6">
+
+        {/* Mobile filter drawer */}
+        <FilterDrawer open={mobileFilterOpen} onClose={() => setMobileFilterOpen(false)} title="Task Filters">
+          {/* Status filter */}
+          <div className="mb-5">
+            <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
+              Status
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {(['all', ...Object.values(TaskStatus)] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={cn(
+                    'px-2.5 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide border transition-colors',
+                    statusFilter === s
+                      ? 'bg-black text-white border-black'
+                      : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                  )}
+                >
+                  {s === 'all' ? 'All' : s.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Project filter */}
+          {allProjects.length > 0 && (
+            <div className="mb-5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
+                Project
+              </label>
+              <div className="max-h-48 overflow-y-auto space-y-0.5">
+                <button
+                  onClick={() => { setProjectFilter('all'); setMobileFilterOpen(false); }}
+                  className={cn(
+                    'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-gray-50 transition-colors',
+                    projectFilter === 'all' ? 'bg-gray-100 font-bold' : ''
+                  )}
+                >
+                  All Projects
+                </button>
+                {allProjects.map((project) => (
+                  <button
+                    key={project._id}
+                    onClick={() => { setProjectFilter(project._id); setMobileFilterOpen(false); }}
+                    className={cn(
+                      'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-gray-50 transition-colors',
+                      projectFilter === project._id ? 'bg-gray-100 font-bold' : ''
+                    )}
+                  >
+                    <span className="block truncate">{project.projectTitle}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Clear filters */}
+          {activeFilterCount > 0 && (
+            <button
+              onClick={() => {
+                setStatusFilter('all');
+                setProjectFilter('all');
+                setSearchText('');
+                setMobileFilterOpen(false);
+              }}
+              className="w-full px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide border border-red-300 text-red-600 hover:bg-red-50 transition-colors"
+            >
+              Clear All Filters
+            </button>
+          )}
+        </FilterDrawer>
+
+        <div className="flex-1 overflow-auto p-4 sm:p-6">
           <TaskListView
             tasks={filtered}
             selectedTasks={selectedTasks}
             onToggleSelection={toggleTaskSelection}
             onOpenTask={(task) => router.push(`/tasks/${task._id}`)}
-            isAdmin={isAdmin}
             showDepartmentColumn={showDepartmentColumn}
           />
         </div>
@@ -380,14 +480,12 @@ function TaskListView({
   selectedTasks,
   onToggleSelection,
   onOpenTask,
-  isAdmin,
   showDepartmentColumn = true,
 }: {
   tasks: ITask[];
   selectedTasks: Set<string>;
   onToggleSelection: (taskId: string) => void;
   onOpenTask: (task: ITask) => void;
-  isAdmin: boolean;
   showDepartmentColumn?: boolean;
 }) {
   if (tasks.length === 0) {
@@ -403,7 +501,7 @@ function TaskListView({
       <table className="erp-table">
         <thead>
           <tr>
-            {isAdmin && <th className="w-12"></th>}
+            <th className="w-10"></th>
             <th>Task</th>
             {showDepartmentColumn && <th>Department</th>}
             <th>Status</th>
@@ -432,23 +530,21 @@ function TaskListView({
                   onOpenTask(task);
                 }}
               >
-                {isAdmin && (
-                  <td data-checkbox>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleSelection(task._id);
-                      }}
-                      className="flex items-center justify-center w-5 h-5"
-                    >
-                      {selectedTasks.has(task._id) ? (
-                        <CheckSquare className="w-4 h-4 text-blue-600" />
-                      ) : (
-                        <Square className="w-4 h-4 text-gray-300" />
-                      )}
-                    </button>
-                  </td>
-                )}
+                <td data-checkbox>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleSelection(task._id);
+                    }}
+                    className="flex items-center justify-center w-5 h-5"
+                  >
+                    {selectedTasks.has(task._id) ? (
+                      <CheckSquare className="w-4 h-4 text-blue-600" />
+                    ) : (
+                      <Square className="w-4 h-4 text-gray-300" />
+                    )}
+                  </button>
+                </td>
                 <td>
                   <div className="flex items-center gap-2">
                     {task.isLocked && <Lock className="w-3 h-3 text-gray-400 flex-shrink-0" />}

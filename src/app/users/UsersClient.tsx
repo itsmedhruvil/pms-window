@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Trash2, Plus } from 'lucide-react';
 import { cn, DEPARTMENT_LABELS, apiFetch } from '@/lib/utils';
 import { Modal } from '@/components/ui/Modal';
+import { FilterDrawer, MobileFilterButton } from '@/components/ui/FilterDrawer';
 import { CreateUserForm } from '@/components/forms/CreateUserForm';
 import type { IUser } from '@/types';
 import { Department, UserRole } from '@/types';
@@ -35,6 +36,11 @@ export function UsersClient({
   const [editForm, setEditForm] = useState<{ role: UserRole; department: Department } | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
   const [userModalOpen, setUserModalOpen] = useState(false);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  
+  const activeFilterCount = useMemo(() => {
+    return deptFilter !== 'all' ? 1 : 0;
+  }, [deptFilter]);
 
   const handleUserCreated = (user: IUser) => {
     setUsers((prev) => [user, ...prev]);
@@ -116,8 +122,8 @@ export function UsersClient({
         </div>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-1.5 mb-4">
+      {/* Filter — desktop */}
+      <div className="hidden sm:flex gap-1.5 mb-4 items-center">
         {(['all', ...Object.values(Department)] as const).map((d) => (
           <button
             key={d}
@@ -133,6 +139,45 @@ export function UsersClient({
           </button>
         ))}
       </div>
+
+      {/* Mobile filter button */}
+      <div className="flex sm:hidden mb-4">
+        <MobileFilterButton
+          onClick={() => setMobileFilterOpen(true)}
+          activeCount={activeFilterCount}
+        />
+      </div>
+      <FilterDrawer open={mobileFilterOpen} onClose={() => setMobileFilterOpen(false)} title="User Filters">
+        <div className="mb-5">
+          <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
+            Department
+          </label>
+          <div className="flex flex-wrap gap-1.5">
+            {(['all', ...Object.values(Department)] as const).map((d) => (
+              <button
+                key={d}
+                onClick={() => setDeptFilter(d)}
+                className={cn(
+                  'px-2.5 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide border transition-colors',
+                  deptFilter === d
+                    ? 'bg-black text-white border-black'
+                    : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                )}
+              >
+                {d === 'all' ? 'All' : DEPARTMENT_LABELS[d].split(' ')[0]}
+              </button>
+            ))}
+          </div>
+        </div>
+        {activeFilterCount > 0 && (
+          <button
+            onClick={() => { setDeptFilter('all'); setMobileFilterOpen(false); }}
+            className="w-full px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide border border-red-300 text-red-600 hover:bg-red-50 transition-colors"
+          >
+            Clear Filter
+          </button>
+        )}
+      </FilterDrawer>
 
       {/* Users table */}
       <div className="erp-table-wrap border border-gray-200">

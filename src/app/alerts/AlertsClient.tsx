@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { AlertTriangle, Filter, ChevronDown, ChevronUp } from 'lucide-react';
+import { FilterDrawer, MobileFilterButton } from '@/components/ui/FilterDrawer';
 import { cn, ALERT_TYPE_LABEL, DEPARTMENT_LABELS, timeAgo, apiFetch } from '@/lib/utils';
 import {
   AlertSeverityBadge,
@@ -25,6 +26,7 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
   const [typeFilter, setTypeFilter] = useState<AlertType | 'all'>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   // Listen for new alerts globally
   useGlobalAlerts(useCallback((alert: IAlert) => {
@@ -38,6 +40,13 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
   });
 
   const activeCount = alerts.filter((a) => a.status === AlertStatus.ACTIVE).length;
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (statusFilter !== 'all') count++;
+    if (typeFilter !== 'all') count++;
+    return count;
+  }, [statusFilter, typeFilter]);
 
   const handleAction = async (alertId: string, action: 'acknowledge' | 'resolve') => {
     setActionLoading(alertId + action);
@@ -98,40 +107,111 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
       <div className="flex items-center gap-3 mb-5">
         <Filter className="w-3.5 h-3.5 text-gray-400" />
 
-        <div className="flex gap-1.5">
-          {(['all', ...Object.values(AlertStatus)] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={cn(
-                'px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wide border transition-colors',
-                statusFilter === s
-                  ? s === 'all'
-                    ? 'bg-black text-white border-black'
-                    : s === AlertStatus.ACTIVE
-                    ? 'bg-red-600 text-white border-red-700'
-                    : 'bg-gray-800 text-white border-gray-800'
-                  : 'border-gray-200 text-gray-500 hover:border-gray-400'
-              )}
-            >
-              {s === 'all' ? 'All' : s}
-            </button>
-          ))}
+        {/* Desktop filters */}
+        <div className="hidden sm:flex items-center gap-3">
+          <div className="flex gap-1.5">
+            {(['all', ...Object.values(AlertStatus)] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={cn(
+                  'px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wide border transition-colors',
+                  statusFilter === s
+                    ? s === 'all'
+                      ? 'bg-black text-white border-black'
+                      : s === AlertStatus.ACTIVE
+                      ? 'bg-red-600 text-white border-red-700'
+                      : 'bg-gray-800 text-white border-gray-800'
+                    : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                )}
+              >
+                {s === 'all' ? 'All' : s}
+              </button>
+            ))}
+          </div>
+
+          <div className="w-px h-4 bg-gray-200" />
+
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as AlertType | 'all')}
+            className="text-[10px] font-mono border border-gray-200 px-2 py-1 focus:outline-none focus:border-black"
+          >
+            <option value="all">All Types</option>
+            {Object.values(AlertType).map((t) => (
+              <option key={t} value={t}>{ALERT_TYPE_LABEL[t]}</option>
+            ))}
+          </select>
         </div>
 
-        <div className="w-px h-4 bg-gray-200" />
-
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value as AlertType | 'all')}
-          className="text-[10px] font-mono border border-gray-200 px-2 py-1 focus:outline-none focus:border-black"
-        >
-          <option value="all">All Types</option>
-          {Object.values(AlertType).map((t) => (
-            <option key={t} value={t}>{ALERT_TYPE_LABEL[t]}</option>
-          ))}
-        </select>
+        {/* Mobile filter button */}
+        <MobileFilterButton
+          onClick={() => setMobileFilterOpen(true)}
+          activeCount={activeFilterCount}
+        />
       </div>
+
+      {/* Mobile filter drawer */}
+      <FilterDrawer open={mobileFilterOpen} onClose={() => setMobileFilterOpen(false)} title="Alert Filters">
+        <div className="mb-5">
+          <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
+            Status
+          </label>
+          <div className="flex flex-wrap gap-1.5">
+            {(['all', ...Object.values(AlertStatus)] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={cn(
+                  'px-2.5 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide border transition-colors',
+                  statusFilter === s
+                    ? s === 'all'
+                      ? 'bg-black text-white border-black'
+                      : s === AlertStatus.ACTIVE
+                      ? 'bg-red-600 text-white border-red-700'
+                      : 'bg-gray-800 text-white border-gray-800'
+                    : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                )}
+              >
+                {s === 'all' ? 'All' : s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-5">
+          <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
+            Type
+          </label>
+          <div className="space-y-0.5">
+            {(['all', ...Object.values(AlertType)] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => { setTypeFilter(t); setMobileFilterOpen(false); }}
+                className={cn(
+                  'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-gray-50 transition-colors',
+                  typeFilter === t ? 'bg-gray-100 font-bold' : ''
+                )}
+              >
+                {t === 'all' ? 'All Types' : ALERT_TYPE_LABEL[t]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {activeFilterCount > 0 && (
+          <button
+            onClick={() => {
+              setStatusFilter('all');
+              setTypeFilter('all');
+              setMobileFilterOpen(false);
+            }}
+            className="w-full px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide border border-red-300 text-red-600 hover:bg-red-50 transition-colors"
+          >
+            Clear All Filters
+          </button>
+        )}
+      </FilterDrawer>
 
       {/* Alert list */}
       {filtered.length === 0 ? (
