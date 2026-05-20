@@ -9,7 +9,8 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "migrate:departments": "ts-node -r dotenv/config -r tsconfig-paths/register --project tsconfig.scripts.json scripts/migrate-departments.ts",
-    "seed": "ts-node --project tsconfig.json scripts/seed.ts"
+    "seed": "ts-node --project tsconfig.json scripts/seed.ts",
+    "seed:departments": "ts-node -r dotenv/config -r tsconfig-paths/register --project tsconfig.scripts.json scripts/seed-departments.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.12",
