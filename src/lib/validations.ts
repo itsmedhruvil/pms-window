@@ -24,7 +24,7 @@ const OptionalDateSchema = z.preprocess(
 // ============================================================
 
 export const CreateUserSchema = z.object({
-  clerkId: z.string().min(1),
+  clerkId: z.string().optional(),
   email: z.string().email(),
   name: z.string().min(2).max(100),
   role: z.nativeEnum(UserRole),

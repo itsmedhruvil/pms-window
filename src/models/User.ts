@@ -2,7 +2,7 @@ import mongoose, { Document, Model, Schema } from 'mongoose';
 import { Department, UserRole } from '@/types';
 
 export interface IUserDocument extends Document {
-  clerkId: string;
+  clerkId?: string;
   email: string;
   name: string;
   role: UserRole;
@@ -17,8 +17,8 @@ const UserSchema = new Schema<IUserDocument>(
   {
     clerkId: {
       type: String,
-      required: true,
       unique: true,
+      sparse: true,
       index: true,
     },
     email: {

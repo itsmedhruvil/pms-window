@@ -12,7 +12,6 @@ interface CreateUserFormProps {
 }
 
 interface FormData {
-  clerkId: string;
   email: string;
   name: string;
   role: UserRole;
@@ -21,7 +20,6 @@ interface FormData {
 
 export function CreateUserForm({ onSuccess, onCancel }: CreateUserFormProps) {
   const [form, setForm] = useState<FormData>({
-    clerkId: '',
     email: '',
     name: '',
     role: UserRole.DEPARTMENT_USER,
@@ -31,7 +29,6 @@ export function CreateUserForm({ onSuccess, onCancel }: CreateUserFormProps) {
   const [error, setError] = useState<string | null>(null);
 
   const isValid =
-    form.clerkId.trim().length > 0 &&
     form.email.trim().length > 0 &&
     form.name.trim().length >= 2;
 
@@ -70,16 +67,6 @@ export function CreateUserForm({ onSuccess, onCancel }: CreateUserFormProps) {
       )}
 
       <div className="grid gap-4">
-        <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
-          Clerk User ID
-          <input
-            value={form.clerkId}
-            onChange={(e) => setForm({ ...form, clerkId: e.target.value })}
-            placeholder="user_..."
-            className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
-          />
-        </label>
-
         <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
           Email
           <input

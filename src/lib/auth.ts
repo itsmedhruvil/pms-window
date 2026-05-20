@@ -36,7 +36,7 @@ export function withAuth<TContext = RouteHandlerContext>(
           { status: 401 },
         );
       }
-      const userId = user.clerkId;
+      const userId = user.clerkId!;
 
       await connectDB();
       const dbUser = await UserModel.findOne({ clerkId: userId });

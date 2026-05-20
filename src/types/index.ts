@@ -85,7 +85,7 @@ export interface WindowSpec {
 
 export interface IUser {
   _id: string;
-  clerkId: string;
+  clerkId?: string;
   email: string;
   name: string;
   role: UserRole;
@@ -121,7 +121,7 @@ export interface IProject {
 
 export interface ITask {
   _id: string;
-  projectId: string | IProject;
+  projectId?: string | IProject;
   templateTaskId?: string | ITaskTemplate;
   department: Department;
   title: string;
