@@ -1,4 +1,4 @@
-'use client';
+cle'use client';
 
 import { useRef, useState } from 'react';
 import Image from 'next/image';
@@ -14,21 +14,20 @@ import {
   Image as ImageIcon,
   Loader2,
   Lock,
-  MessageCircle,
   MessageSquare,
   PlayCircle,
   RotateCcw,
+  Send,
   Upload,
   User,
   X,
 } from 'lucide-react';
 import { CommentThread } from '@/components/comment/CommentThread';
 import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
-import { TaskDiscussion } from '@/components/task/TaskDiscussion';
 import { Modal } from '@/components/ui/Modal';
 import { TaskStatusBadge } from '@/components/ui/badges';
 import { apiFetch, cn, getDepartmentLabel, formatDate, formatDateTime } from '@/lib/utils';
-import { AlertType, IAlert, IProject, ITask, IUser, TaskImageAttachment, TaskStatus } from '@/types';
+import { IAlert, IProject, ITask, IUser, TaskImageAttachment, TaskStatus } from '@/types';
 
 interface TaskDetailClientProps {
   initialTask: ITask;
@@ -39,7 +38,7 @@ interface TaskDetailClientProps {
 const MAX_IMAGE_SIZE = 2_500_000;
 const MAX_IMAGES = 6;
 
-type TabId = 'images' | 'comments' | 'discussion';
+type TabId = 'comments' | 'images';
 
 function getProject(task: ITask) {
   return typeof task.projectId === 'object' && task.projectId !== null
@@ -64,6 +63,9 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
   const [statusError, setStatusError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [alertModalOpen, setAlertModalOpen] = useState(false);
+  const [doneModalOpen, setDoneModalOpen] = useState(false);
+  const [doneComment, setDoneComment] = useState('');
+  const [submittingDone, setSubmittingDone] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('comments');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -72,6 +74,39 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
   const projectId = getProjectId(task);
   const assignedUser = getAssignedUser(task);
   const images = task.imageAttachments ?? [];
+
+  const handleMarkDoneWithComment = async () => {
+    if (!doneComment.trim()) return;
+    setSubmittingDone(true);
+    setStatusError(null);
+
+    // First update the task status
+    const result = await apiFetch<ITask>(`/api/tasks/${task._id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: TaskStatus.DONE }),
+    });
+
+    if (result.success && result.data) {
+      setTask(result.data);
+      // Then post the comment
+      await apiFetch('/api/comments', {
+        method: 'POST',
+        body: JSON.stringify({
+          taskId: task._id,
+          content: doneComment.trim(),
+          mentions: [],
+        }),
+      });
+      setDoneModalOpen(false);
+      setDoneComment('');
+      setActiveTab('comments');
+      router.refresh();
+    } else {
+      setStatusError(typeof result.error === 'string' ? result.error : 'Could not update task status.');
+    }
+
+    setSubmittingDone(false);
+  };
 
   const updateTask = async (patch: Partial<ITask>) => {
     setSaving(true);
@@ -140,7 +175,6 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
 
   const tabs: { id: TabId; label: string; icon: typeof ImageIcon }[] = [
     { id: 'comments', label: 'Comments', icon: MessageSquare },
-    { id: 'discussion', label: 'Discussion', icon: MessageCircle },
     { id: 'images', label: 'Images', icon: ImageIcon },
   ];
 
@@ -285,18 +319,6 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
               <CommentThread taskId={task._id} currentUser={currentUser} />
             </section>
           )}
-
-          {/* Discussion tab */}
-          {activeTab === 'discussion' && (
-            <section className="border border-gray-200 h-[520px] flex flex-col">
-              <TaskDiscussion
-                taskId={task._id}
-                projectId={projectId}
-                currentUser={currentUser}
-                projectTitle={project?.projectTitle}
-              />
-            </section>
-          )}
         </main>
 
         <aside className="space-y-4">
@@ -325,7 +347,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                   label="Mark Done"
                   active={task.status === TaskStatus.DONE}
                   disabled={saving || task.isLocked || task.status === TaskStatus.BLOCKED}
-                  onClick={() => updateTask({ status: TaskStatus.DONE })}
+                  onClick={() => setDoneModalOpen(true)}
                 />
               </div>
               {statusError && (
@@ -376,6 +398,65 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
         </aside>
       </div>
 
+      {/* Done with comment modal */}
+      <Modal open={doneModalOpen} onClose={() => { if (!submittingDone) setDoneModalOpen(false); }} size="sm">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-900">
+              Add Completion Note
+            </h2>
+            {!submittingDone && (
+              <button
+                type="button"
+                onClick={() => { setDoneModalOpen(false); setDoneComment(''); }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] font-mono text-gray-500 mb-3">
+            Please add a comment explaining what was completed before marking this task as done.
+          </p>
+          <textarea
+            value={doneComment}
+            onChange={(e) => setDoneComment(e.target.value)}
+            placeholder="Describe what was completed, any issues encountered, or handover notes..."
+            rows={4}
+            className="w-full text-xs font-mono border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors resize-none placeholder:text-gray-400"
+            autoFocus
+          />
+          <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={() => { setDoneModalOpen(false); setDoneComment(''); }}
+              disabled={submittingDone}
+              className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 hover:text-black disabled:opacity-40 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleMarkDoneWithComment}
+              disabled={submittingDone || !doneComment.trim()}
+              className="flex items-center gap-2 px-4 py-2 text-[10px] font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {submittingDone ? (
+                <>
+                  <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Mark Done
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       <Modal open={alertModalOpen} onClose={() => setAlertModalOpen(false)} size="md">
         <CreateAlertForm
           projectId={projectId}
@@ -384,9 +465,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
           defaultAffectedDepartments={[task.department]}
           title="Raise Task Alert"
           onSuccess={(alert: IAlert) => {
-            if (alert.type !== AlertType.DISCUSSION) {
-              setTask((prev) => ({ ...prev, status: TaskStatus.BLOCKED }));
-            }
+            setTask((prev) => ({ ...prev, status: TaskStatus.BLOCKED }));
             setAlertModalOpen(false);
           }}
           onCancel={() => setAlertModalOpen(false)}

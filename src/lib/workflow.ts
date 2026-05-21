@@ -414,27 +414,11 @@ export async function updateProjectCompletion(projectId: string): Promise<void> 
 
 /**
  * Apply alert effects: put project on hold, block affected tasks.
- * DISCUSSION type alerts are non-blocking and just create a discussion thread.
+ * (DISCUSSION type was removed from alerts — discussions are now a standalone model.)
  */
 export async function applyAlertEffects(alertId: string): Promise<void> {
   const alert = await AlertModel.findById(alertId).populate('projectId');
   if (!alert) return;
-
-  // DISCUSSION alerts are non-blocking — they just create a thread
-  if (alert.type === AlertType.DISCUSSION) {
-    // Still track in activeAlertIds so discussions appear in project context
-    await ProjectModel.findByIdAndUpdate(alert.projectId, {
-      $addToSet: { activeAlertIds: alert._id },
-    });
-
-    await triggerEvent(CHANNELS.global, EVENTS.ALERT_CREATED, {
-      alertId: alert._id,
-      projectId: alert.projectId,
-      severity: alert.severity,
-      type: alert.type,
-    });
-    return;
-  }
 
   // Put project on hold
   await ProjectModel.findByIdAndUpdate(alert.projectId, {

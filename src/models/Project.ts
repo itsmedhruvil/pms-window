@@ -4,6 +4,14 @@ import { ProjectPriority, ProjectStatus } from '@/types';
 export interface IProjectDocument extends Document {
   projectTitle: string;
   clientName: string;
+  description?: string;
+  pdfAttachments?: Array<{
+    id: string;
+    name: string;
+    url: string;
+    size: number;
+    uploadedAt: Date;
+  }>;
   totalWindows: number;
   windowSpecifications: Array<{
     width: number;
@@ -35,6 +43,16 @@ const ProjectSchema = new Schema<IProjectDocument>(
   {
     projectTitle: { type: String, required: true, trim: true },
     clientName: { type: String, required: true, trim: true },
+    description: { type: String, trim: true },
+    pdfAttachments: [
+      {
+        id: { type: String, required: true },
+        name: { type: String, required: true },
+        url: { type: String, required: true },
+        size: { type: Number, required: true },
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
     totalWindows: { type: Number, default: 0, min: 0 },
     windowSpecifications: [
       {

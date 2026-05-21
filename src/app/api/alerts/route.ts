@@ -50,10 +50,10 @@ export const POST = withAuth(
       );
     }
 
-    // Department users can only create DISCUSSION type alerts
-    if (user.role === UserRole.DEPARTMENT_USER && parsed.data.type !== AlertType.DISCUSSION) {
+    // Department users cannot create alerts directly (admin only)
+    if (user.role === UserRole.DEPARTMENT_USER) {
       return NextResponse.json(
-        { success: false, error: 'Department users can only create discussion threads' },
+        { success: false, error: 'Only admins can create alerts' },
         { status: 403 }
       );
     }

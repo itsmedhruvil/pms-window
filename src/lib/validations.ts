@@ -63,12 +63,13 @@ export const WindowSpecSchema = z.object({
 export const CreateProjectSchema = z.object({
   clientName: z.string().min(2, 'Client name must be at least 2 characters'),
   projectTitle: z.string().min(3, 'Project title must be at least 3 characters'),
+  description: z.string().optional(),
   totalWindows: z.number().int().positive('Total windows must be positive'),
   selectedTemplateGroupId: z.string().optional(),
   windowSpecifications: z.array(WindowSpecSchema).min(1).optional(),
   priority: ProjectPrioritySchema,
   address: z.string().min(5, 'Address must be at least 5 characters'),
-  contactPhone: z.string().min(7, 'Contact phone must be at least 7 digits'),
+  contactPhone: z.string().optional(),
   deadline: z.string()
     .refine((str) => {
       const date = new Date(str);
@@ -86,12 +87,21 @@ export const UpdateProjectSchema = z.object({
   projectTitle: z.string().min(3).optional(),
   totalWindows: z.number().int().positive().optional(),
   address: z.string().min(5).optional(),
-  contactPhone: z.string().min(7).optional(),
+  contactPhone: z.string().optional(),
   selectedTemplateGroupId: z.string().optional(),
   windowSpecifications: z.array(WindowSpecSchema).min(1).optional(),
   excelSheetName: z.string().optional(),
   excelRows: z
     .array(z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])))
+    .optional(),
+  pdfAttachments: z
+    .array(z.object({
+      id: z.string(),
+      name: z.string(),
+      url: z.string(),
+      size: z.number(),
+      uploadedAt: z.string().optional(),
+    }))
     .optional(),
   priority: ProjectPrioritySchema.optional(),
   deadline: z
@@ -186,11 +196,20 @@ export const AcknowledgeAlertSchema = z.object({
 export const CreateCommentSchema = z.object({
   taskId: z.string().optional(),
   alertId: z.string().optional(),
+  discussionId: z.string().optional(),
   content: z.string().min(1, 'Comment cannot be empty'),
   mentions: z.array(z.string()).optional().default([]),
+  attachments: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    url: z.string(),
+    type: z.string(),
+    size: z.number(),
+    uploadedAt: z.string().optional(),
+  })).optional().default([]),
 }).refine(
-  (data) => data.taskId || data.alertId,
-  { message: 'Comment must belong to a task or alert' }
+  (data) => data.taskId || data.alertId || data.discussionId,
+  { message: 'Comment must belong to a task, alert, or discussion' }
 );
 
 // ============================================================

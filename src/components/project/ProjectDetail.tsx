@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useCallback, type ChangeEvent } from 'react';
+import { useState, useCallback, useRef, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import {
   AlertTriangle, Calendar, Package, ChevronRight,
   CheckCircle2, Copy, Trash2, ArrowUpRight, Edit3,
-  X, Save,
+  X, Save, Upload, FileText,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 import { cn, getDepartmentLabel, formatDate, ALERT_TYPE_LABEL, normalizeProjectPriority } from '@/lib/utils';
@@ -48,6 +48,9 @@ export function ProjectDetail({
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [excelError, setExcelError] = useState<string | null>(null);
   const [excelLoading, setExcelLoading] = useState(false);
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const [editForm, setEditForm] = useState({
     clientName: initialProject.clientName,
     projectTitle: initialProject.projectTitle,
@@ -94,6 +97,64 @@ export function ProjectDetail({
   };
 
   // Realtime updates
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    setPdfUploading(true);
+    setPdfError(null);
+
+    const newPdfs: Array<{ id: string; name: string; url: string; size: number; uploadedAt: string }> = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.type !== 'application/pdf') {
+        setPdfError('Only PDF files are allowed.');
+        setPdfUploading(false);
+        return;
+      }
+      const reader = new FileReader();
+      await new Promise<void>((resolve) => {
+        reader.onload = () => {
+          newPdfs.push({
+            id: `${Date.now()}-${i}`,
+            name: file.name,
+            url: reader.result as string,
+            size: file.size,
+            uploadedAt: new Date().toISOString(),
+          });
+          resolve();
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    const existing = project.pdfAttachments || [];
+    const allPdfs = [...existing, ...newPdfs];
+
+    const result = await apiFetch(`/api/projects/${project._id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ pdfAttachments: allPdfs }),
+    });
+
+    setPdfUploading(false);
+    if (result.success && result.data) {
+      setProject(result.data as IProject);
+    } else {
+      setPdfError(result.error || 'Failed to upload PDF');
+    }
+    if (pdfInputRef.current) pdfInputRef.current.value = '';
+  };
+
+  const removePdf = async (pdfId: string) => {
+    const remaining = (project.pdfAttachments || []).filter((p) => p.id !== pdfId);
+    const result = await apiFetch(`/api/projects/${project._id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ pdfAttachments: remaining }),
+    });
+    if (result.success && result.data) {
+      setProject(result.data as IProject);
+    }
+  };
+
   useProjectRealtime(project._id, {
     onTaskUpdated: useCallback((updatedTask: ITask) => {
       setTasks((prev) => prev.map((t) => t._id === updatedTask._id ? updatedTask : t));
@@ -221,6 +282,9 @@ export function ProjectDetail({
             <h1 className="text-xl lg:text-2xl font-black text-gray-900 tracking-tight">
               {project.projectTitle}
             </h1>
+            {project.description && (
+              <p className="text-xs text-gray-600 mt-2 font-mono max-w-2xl">{project.description}</p>
+            )}
             <div className="flex flex-wrap items-center gap-2 mt-3">
               <ProjectStatusBadge status={project.status} />
               <PriorityBadge priority={project.priority} />
@@ -354,6 +418,74 @@ export function ProjectDetail({
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* PDF Upload Section */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-black uppercase tracking-widest text-gray-700">PDF Attachments</h2>
+            <input
+              ref={pdfInputRef}
+              type="file"
+              multiple
+              accept=".pdf"
+              className="hidden"
+              onChange={handlePdfUpload}
+            />
+            <button
+              type="button"
+              onClick={() => pdfInputRef.current?.click()}
+              disabled={pdfUploading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-gray-200 text-gray-600 hover:border-black hover:text-black disabled:opacity-50 transition-colors rounded-md"
+            >
+              <Upload className="w-3 h-3" />
+              {pdfUploading ? 'Uploading...' : 'Upload PDF'}
+            </button>
+          </div>
+
+          {pdfError && (
+            <div className="flex items-center gap-2 p-3 mb-3 border border-red-300 bg-red-50">
+              <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
+              <p className="text-xs text-red-700 font-mono">{pdfError}</p>
+            </div>
+          )}
+
+          {project.pdfAttachments && project.pdfAttachments.length > 0 ? (
+            <div className="space-y-2">
+              {project.pdfAttachments.map((pdf) => (
+                <div key={pdf.id} className="flex items-center justify-between px-3 py-2 border border-gray-200 hover:border-gray-400 transition-colors rounded-md">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="w-4 h-4 text-red-500 flex-shrink-0" />
+                    <a
+                      href={pdf.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-mono text-gray-900 hover:underline truncate"
+                    >
+                      {pdf.name}
+                    </a>
+                    <span className="text-[9px] font-mono text-gray-400 flex-shrink-0">
+                      ({(pdf.size / 1024).toFixed(0)} KB)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removePdf(pdf.id)}
+                    className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0 ml-2"
+                    title="Remove PDF"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="border border-dashed border-gray-200 rounded-md p-6 text-center">
+              <FileText className="w-6 h-6 text-gray-300 mx-auto mb-1" />
+              <p className="text-xs text-gray-400 font-mono">No PDF files attached</p>
+              <p className="text-[10px] text-gray-400 font-mono mt-0.5">Upload PDFs like drawings, contracts, or specs</p>
             </div>
           )}
         </div>
@@ -634,17 +766,15 @@ export function ProjectDetail({
           title="Raise Global Alert"
           onSuccess={(alert) => {
             setAlerts((prev) => (prev.some((a) => a._id === alert._id) ? prev : [alert, ...prev]));
-            if (alert.type !== AlertType.DISCUSSION) {
-              setProject((prev) => ({ ...prev, status: ProjectStatus.ON_HOLD }));
-              setTasks((prev) =>
-                prev.map((task) =>
-                  alert.affectedDepartments.includes(task.department) &&
-                  [TaskStatus.TODO, TaskStatus.IN_PROGRESS].includes(task.status)
-                    ? { ...task, status: TaskStatus.BLOCKED }
-                    : task
-                )
-              );
-            }
+            setProject((prev) => ({ ...prev, status: ProjectStatus.ON_HOLD }));
+            setTasks((prev) =>
+              prev.map((task) =>
+                alert.affectedDepartments.includes(task.department) &&
+                [TaskStatus.TODO, TaskStatus.IN_PROGRESS].includes(task.status)
+                  ? { ...task, status: TaskStatus.BLOCKED }
+                  : task
+              )
+            );
             setAlertModalOpen(false);
           }}
           onCancel={() => setAlertModalOpen(false)}

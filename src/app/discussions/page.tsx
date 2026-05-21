@@ -1,34 +1,18 @@
-import { currentUser } from '@clerk/nextjs/server';
+import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import connectDB from '@/lib/db';
-import UserModel from '@/models/User';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DiscussionsClient } from './DiscussionsClient';
-import type { IUser } from '@/types';
+import { serialize } from '@/lib/server-data';
+
+export const dynamic = 'force-dynamic';
 
 export default async function DiscussionsPage() {
-  const clerkUser = await currentUser();
-  if (!clerkUser) redirect('/sign-in');
-
-  let dbUser: Partial<IUser> | null = null;
-
-  await connectDB();
-  const user = await UserModel.findOne({ clerkId: clerkUser.id })
-    .select('name email department role avatar')
-    .lean();
-  if (user) {
-    dbUser = {
-      _id: user._id.toString(),
-      name: user.name,
-      email: user.email,
-      department: user.department,
-      role: user.role,
-    };
-  }
+  const user = await getCurrentUser();
+  if (!user) redirect('/sign-in');
 
   return (
     <AppLayout>
-      <DiscussionsClient currentUser={dbUser || { name: 'Unknown' }} />
+      <DiscussionsClient currentUser={serialize(user) as unknown as Partial<import('@/types').IUser>} />
     </AppLayout>
   );
 }

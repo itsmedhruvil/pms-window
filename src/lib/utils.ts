@@ -120,7 +120,6 @@ export const ALERT_TYPE_LABEL: Record<AlertType, string> = {
   [AlertType.CLIENT_ESCALATION]: 'Client Escalation',
   [AlertType.PRODUCTION_ISSUE]: 'Production Issue',
   [AlertType.MATERIAL_ISSUE]: 'Material Issue',
-  [AlertType.DISCUSSION]: 'Discussion',
 };
 
 export const ALERT_SEVERITY_STYLE: Record<AlertSeverity, string> = {

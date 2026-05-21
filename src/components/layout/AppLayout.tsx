@@ -21,6 +21,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { IAlert } from '@/types';
 import { useDepartments } from '@/hooks/useDepartments';
+import { NotificationPane } from '@/components/notifications/NotificationPane';
 
 interface NavItem {
   href: string;
@@ -237,6 +238,14 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
           </Link>
         </div>
       )}
+
+      {/* Notifications */}
+      <div className="px-3 lg:px-4 py-2 border-t border-gray-200">
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-gray-400">Alerts & Updates</span>
+          <NotificationPane />
+        </div>
+      </div>
 
       {/* User */}
       <div className="p-3 lg:p-4 border-t border-gray-200">

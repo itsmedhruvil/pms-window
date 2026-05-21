@@ -55,7 +55,6 @@ export enum AlertType {
   CLIENT_ESCALATION = 'client_escalation',
   PRODUCTION_ISSUE = 'production_issue',
   MATERIAL_ISSUE = 'material_issue',
-  DISCUSSION = 'discussion',
 }
 
 export enum AlertStatus {
@@ -80,7 +79,6 @@ export interface WindowSpec {
   design: string;
   glassType: string;
   quantity: number;
-  // Optional template group to generate tasks for this window type
   notes?: string;
   templateGroupId?: string;
 }
@@ -102,6 +100,14 @@ export interface IProject {
   _id: string;
   clientName: string;
   projectTitle: string;
+  description?: string;
+  pdfAttachments?: Array<{
+    id: string;
+    name: string;
+    url: string;
+    size: number;
+    uploadedAt: Date;
+  }>;
   totalWindows: number;
   windowSpecifications: WindowSpec[];
   selectedTemplateGroupId?: string;
@@ -179,13 +185,59 @@ export interface IAlert {
   updatedAt: Date;
 }
 
+export interface IDiscussion {
+  _id: string;
+  projectId: string | IProject;
+  title: string;
+  description: string;
+  startedBy: string | IUser;
+  mentions: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface INotification {
+  _id: string;
+  userId: string | IUser;
+  type: NotificationType;
+  title: string;
+  message: string;
+  link?: string;
+  relatedId?: string;
+  relatedModel?: string;
+  isRead: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type NotificationType =
+  | 'discussion_mention'
+  | 'discussion_reply'
+  | 'task_due_soon'
+  | 'task_overdue'
+  | 'task_assigned'
+  | 'alert_created'
+  | 'alert_acknowledged'
+  | 'alert_resolved';
+
+export interface ICommentAttachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  uploadedAt: Date;
+}
+
 export interface IComment {
   _id: string;
   taskId?: string;
   alertId?: string;
+  discussionId?: string;
   content: string;
   author: string | IUser;
   mentions: string[];
+  attachments: ICommentAttachment[];
   isSystemLog: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -221,6 +273,7 @@ export interface DashboardMetrics {
   avgTaskCompletionTime: number;
   alertFrequency: Record<AlertType, number>;
   bottleneckDepartment: Department | null;
+  unreadNotificationCount: number;
 }
 
 export interface TaskTrend {
@@ -237,7 +290,9 @@ export type RealtimeEvent =
   | { type: 'alert_created'; payload: IAlert }
   | { type: 'alert_updated'; payload: IAlert }
   | { type: 'task_updated'; payload: ITask }
-  | { type: 'project_status_changed'; payload: { projectId: string; status: ProjectStatus } };
+  | { type: 'project_status_changed'; payload: { projectId: string; status: ProjectStatus } }
+  | { type: 'discussion_created'; payload: IDiscussion }
+  | { type: 'notification_created'; payload: INotification };
 
 // ============================================================
 // WORKFLOW CONSTANTS

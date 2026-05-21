@@ -32,7 +32,7 @@ const AlertSchema = new Schema<IAlertDocument>(
     },
     type: {
       type: String,
-      enum: Object.values(AlertType),
+      enum: [AlertType.DESIGN_CHANGE, AlertType.CLIENT_ESCALATION, AlertType.PRODUCTION_ISSUE, AlertType.MATERIAL_ISSUE],
       required: true,
     },
     message: {

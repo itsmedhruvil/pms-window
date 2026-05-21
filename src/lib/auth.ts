@@ -97,7 +97,10 @@ export function isAdmin(user: IUserDocument): boolean {
 /**
  * Get current user from Clerk + DB
  */
-export const MAIN_ADMIN_EMAIL = 'corp.weexalate@gmail.com';
+export const SUPER_ADMIN_EMAILS = [
+  'corp.weexalate@gmail.com',
+  'uav.acc1@gmail.com',
+];
 
 export async function getCurrentUser(): Promise<IUserDocument | null> {
   try {
@@ -122,7 +125,7 @@ export async function getCurrentUser(): Promise<IUserDocument | null> {
       `${clerkUserData.id}@clerk.local`;
     const normalizedEmail = primaryEmail.toLowerCase();
     const fullName = `${clerkUserData.firstName || ""} ${clerkUserData.lastName || ""}`.trim();
-    const isMainAdmin = normalizedEmail === MAIN_ADMIN_EMAIL;
+    const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(normalizedEmail);
 
     let user = await UserModel.findOne({
       $or: [{ clerkId: clerkUserData.id }, { email: normalizedEmail }],
@@ -137,7 +140,7 @@ export async function getCurrentUser(): Promise<IUserDocument | null> {
           email: normalizedEmail,
           name: fullName || "New User",
           avatar: clerkUserData.imageUrl,
-          role: isMainAdmin ? UserRole.SUPER_ADMIN : UserRole.DEPARTMENT_USER,
+          role: isSuperAdmin ? UserRole.SUPER_ADMIN : UserRole.DEPARTMENT_USER,
           department: Department.PRODUCTION,
           isActive: true,
         });
@@ -160,7 +163,7 @@ export async function getCurrentUser(): Promise<IUserDocument | null> {
     }
 
     // Force super admin role if email matches — always enforce on every login
-    if (user.email.toLowerCase() === MAIN_ADMIN_EMAIL) {
+    if (SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) {
       if (user.role !== UserRole.SUPER_ADMIN) {
         user.role = UserRole.SUPER_ADMIN;
         shouldSave = true;

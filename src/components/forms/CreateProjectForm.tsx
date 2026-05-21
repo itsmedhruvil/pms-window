@@ -17,6 +17,7 @@ const PRIORITIES = [
 interface FormData {
   clientName: string;
   projectTitle: string;
+  description: string;
   priority: ProjectPriority;
   deadline: string;
   address: string;
@@ -39,6 +40,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
   const [form, setForm] = useState<FormData>({
     clientName: '',
     projectTitle: '',
+    description: '',
     priority: ProjectPriority.NECESSARY,
     deadline: '',
     address: '',
@@ -79,7 +81,6 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
     form.projectTitle.trim().length >= 3 &&
     deadlineIsFuture &&
     form.address.trim().length >= 5 &&
-    /^\+?[0-9]{7,15}$/.test(form.contactPhone) &&
     form.totalWindows > 0;
 
   const [dateError, setDateError] = useState<string | null>(null);
@@ -118,6 +119,10 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
     };
 
     // If a template group is selected, pass it along (window specifications will be populated from excel later)
+    if (form.description.trim()) {
+      body.description = form.description.trim();
+    }
+
     if (form.templateGroupId) {
       body.selectedTemplateGroupId = form.templateGroupId;
     }
@@ -214,6 +219,16 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             />
           </Field>
 
+          <Field label="Project Description">
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="Brief description of the project scope, requirements, or special instructions..."
+              rows={3}
+              className="w-full text-xs font-mono border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors resize-none placeholder:text-gray-400"
+            />
+          </Field>
+
           <Field label="Address" required>
             <input
               type="text"
@@ -224,12 +239,12 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             />
           </Field>
 
-          <Field label="Contact Phone" required>
+          <Field label="Contact Phone">
             <input
               type="tel"
               value={form.contactPhone}
               onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
-              placeholder="e.g. +919876543210"
+              placeholder="e.g. +919876543210 (optional)"
               className={inputClass}
             />
           </Field>
@@ -333,8 +348,13 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
 
           <ReviewBlock label="Client">{form.clientName}</ReviewBlock>
           <ReviewBlock label="Project">{form.projectTitle}</ReviewBlock>
+          {form.description && (
+            <ReviewBlock label="Description">{form.description}</ReviewBlock>
+          )}
           <ReviewBlock label="Address">{form.address}</ReviewBlock>
-          <ReviewBlock label="Contact">{form.contactPhone}</ReviewBlock>
+          {form.contactPhone && (
+            <ReviewBlock label="Contact">{form.contactPhone}</ReviewBlock>
+          )}
           <ReviewBlock label="Total Windows">
             <span className="font-bold">{form.totalWindows}</span>
           </ReviewBlock>

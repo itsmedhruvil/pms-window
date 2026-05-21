@@ -1,18 +1,17 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Link from 'next/link';
-import { MessageCircle, ChevronDown, ChevronUp, Send, Loader2, User, ExternalLink, Search } from 'lucide-react';
-import { apiFetch, cn, DEPARTMENT_LABELS, DEPARTMENT_ABBR, timeAgo } from '@/lib/utils';
-import { AlertType, AlertSeverity, Department, AlertStatus, DEPARTMENT_SEQUENCE } from '@/types';
+import { MessageCircle, ChevronDown, ChevronUp, Send, Loader2, User, Search, Upload, Paperclip, X } from 'lucide-react';
+import { apiFetch, cn, DEPARTMENT_LABELS, timeAgo } from '@/lib/utils';
+import { Department } from '@/types';
 import type { ReactNode } from 'react';
-import type { IAlert, IComment, IUser, IProject, ITask } from '@/types';
+import type { IDiscussion, IComment, IUser, IProject, ICommentAttachment } from '@/types';
 
 interface DiscussionsClientProps {
   currentUser: Partial<IUser>;
 }
 
-// ── Module-level components (prevents re-mount on parent re-render) ────────
+// ── Helper components ──────────────────────────────────────────────
 
 type SearchableSelectProps<T extends { _id: string }> = {
   items: T[];
@@ -21,7 +20,6 @@ type SearchableSelectProps<T extends { _id: string }> = {
   placeholder: string;
   loading?: boolean;
   emptyText?: string;
-  disabled?: boolean;
   getSearchText: (item: T) => string;
   renderItem: (item: T) => ReactNode;
 };
@@ -33,7 +31,6 @@ function SearchableSelect<T extends { _id: string }>({
   placeholder,
   loading,
   emptyText,
-  disabled,
   getSearchText,
   renderItem,
 }: SearchableSelectProps<T>) {
@@ -75,41 +72,29 @@ function SearchableSelect<T extends { _id: string }>({
             setShowDropdown(true);
           }}
           placeholder={loading ? 'Loading...' : placeholder}
-          disabled={disabled || loading}
+          disabled={loading}
           className="w-full pl-8 pr-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white disabled:bg-gray-50 disabled:cursor-not-allowed"
         />
         {value && (
           <button
             type="button"
-            onClick={() => {
-              onChange('');
-              setSearch('');
-              setShowDropdown(false);
-            }}
+            onClick={() => { onChange(''); setSearch(''); setShowDropdown(false); }}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-3.5 h-3.5" />
           </button>
         )}
       </div>
       {showDropdown && (
         <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 shadow-lg max-h-48 overflow-y-auto">
           {filteredItems.length === 0 ? (
-            <div className="px-3 py-4 text-center text-[10px] font-mono text-gray-400">
-              {emptyText || 'No results'}
-            </div>
+            <div className="px-3 py-4 text-center text-[10px] font-mono text-gray-400">{emptyText || 'No results'}</div>
           ) : (
             filteredItems.map((item) => (
               <button
                 key={item._id}
                 type="button"
-                onClick={() => {
-                  onChange(item._id);
-                  setSearch('');
-                  setShowDropdown(false);
-                }}
+                onClick={() => { onChange(item._id); setSearch(''); setShowDropdown(false); }}
                 className={cn(
                   'w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 border-b border-gray-100 last:border-0 transition-colors',
                   value === item._id ? 'bg-gray-100 font-bold' : ''
@@ -125,282 +110,164 @@ function SearchableSelect<T extends { _id: string }>({
   );
 }
 
-function MentionDropdown({
-  users,
-  onSelect,
-}: {
-  users: Partial<IUser>[];
-  onSelect: (user: Partial<IUser>) => void;
-}) {
-  if (users.length === 0) return null;
-  return (
-    <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-200 shadow-lg z-10 max-h-32 overflow-y-auto">
-      {users.map((user) => (
-        <button
-          key={user._id}
-          onClick={() => onSelect(user)}
-          className="w-full text-left px-3 py-2 text-[11px] hover:bg-gray-50 flex items-center gap-2 border-b border-gray-100 last:border-0"
-        >
-          <User className="w-3 h-3 text-gray-400" />
-          <span className="font-medium text-gray-900">{user.name}</span>
-          <span className="text-gray-400 font-mono text-[9px] uppercase ml-auto">
-            {user.department ? DEPARTMENT_LABELS[user.department as Department] : ''}
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
+// ── Main component ─────────────────────────────────────────────────
 
-function renderContent(content: string) {
-  const parts = content.split(/(@\w+\s*\w*)/g);
-  return parts.map((part, i) =>
-    part.startsWith('@') ? (
-      <span key={i} className="text-blue-600 font-bold">
-        {part}
-      </span>
-    ) : (
-      part
-    )
-  );
-}
-
-// ── Main component ────────────────────────────────────────────────────────
-
-export function DiscussionsClient({ currentUser: _currentUser }: DiscussionsClientProps) {
-  const [discussions, setDiscussions] = useState<IAlert[]>([]);
+export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
+  const [discussions, setDiscussions] = useState<IDiscussion[]>([]);
   const [comments, setComments] = useState<Record<string, IComment[]>>({});
   const [loading, setLoading] = useState(true);
-  const [expandedDiscussion, setExpandedDiscussion] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [availableUsers, setAvailableUsers] = useState<Partial<IUser>[]>([]);
-  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
-  const [mentionQuery, setMentionQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<ICommentAttachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  // New discussion form state
-  const [showNewDiscussionForm, setShowNewDiscussionForm] = useState(false);
+  // New thread form
+  const [showNewForm, setShowNewForm] = useState(false);
   const [projects, setProjects] = useState<IProject[]>([]);
-  const [tasks, setTasks] = useState<ITask[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<Partial<IUser>[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
-  const [loadingTasks, setLoadingTasks] = useState(false);
-  const [discussionForm, setDiscussionForm] = useState({
+  const [newThread, setNewThread] = useState({
     projectId: '',
-    taskId: '',
-    severity: AlertSeverity.LOW as AlertSeverity,
-    message: '',
-    affectedDepartments: [] as Department[],
+    title: '',
+    description: '',
+    mentionIds: [] as string[],
   });
-  const [creatingDiscussion, setCreatingDiscussion] = useState(false);
+  const [creating, setCreating] = useState(false);
 
-  // Fetch all discussion-type alerts
   const fetchDiscussions = useCallback(async () => {
     setLoading(true);
-    const result = await apiFetch<IAlert[]>(`/api/alerts?type=discussion&limit=100`);
+    const result = await apiFetch<IDiscussion[]>('/api/discussions?limit=100');
     if (result.success && result.data) {
       const items = Array.isArray(result.data) ? result.data : [];
       setDiscussions(items);
-      const unresolved = items.find((a: IAlert) => a.status !== AlertStatus.RESOLVED);
-      if (unresolved) {
-        setExpandedDiscussion(unresolved._id);
-      } else if (items.length > 0) {
-        setExpandedDiscussion(items[0]._id);
-      }
     }
     setLoading(false);
   }, []);
 
   const fetchUsers = useCallback(async () => {
     const result = await apiFetch<Partial<IUser>[]>('/api/users');
-    if (result.success && result.data) {
-      setAvailableUsers(result.data);
-    }
+    if (result.success && result.data) setAvailableUsers(result.data);
   }, []);
 
   const fetchProjects = useCallback(async () => {
     setLoadingProjects(true);
     const result = await apiFetch<{ items: IProject[] }>('/api/projects?limit=100');
-    if (result.success && result.data) {
-      setProjects(result.data.items || []);
-    }
+    if (result.success && result.data) setProjects(result.data.items || []);
     setLoadingProjects(false);
   }, []);
 
-  useEffect(() => {
-    fetchDiscussions();
-    fetchUsers();
-  }, [fetchDiscussions, fetchUsers]);
+  useEffect(() => { fetchDiscussions(); fetchUsers(); }, [fetchDiscussions, fetchUsers]);
 
-  // Fetch tasks when project changes
-  useEffect(() => {
-    if (!discussionForm.projectId) {
-      setTasks([]);
-      return;
-    }
-    setLoadingTasks(true);
-    apiFetch<ITask[]>(`/api/tasks?projectId=${discussionForm.projectId}&limit=200`)
-      .then((result) => {
-        if (result.success && result.data) {
-          const items = Array.isArray(result.data) ? result.data : [];
-          setTasks(items);
-        }
-      })
-      .finally(() => setLoadingTasks(false));
-  }, [discussionForm.projectId]);
-
-  const fetchComments = useCallback(async (alertId: string) => {
-    const result = await apiFetch<{ items: IComment[] }>(`/api/comments?alertId=${alertId}&limit=100`);
-    if (result.success && result.data && result.data.items) {
-      setComments((prev) => ({ ...prev, [alertId]: result.data!.items }));
+  const fetchComments = useCallback(async (discussionId: string) => {
+    const result = await apiFetch<{ items: IComment[] }>(`/api/comments?discussionId=${discussionId}&limit=100`);
+    if (result.success && result.data?.items) {
+      setComments((prev) => ({ ...prev, [discussionId]: result.data!.items }));
     }
   }, []);
 
-  const toggleExpand = (alertId: string) => {
-    if (expandedDiscussion === alertId) {
-      setExpandedDiscussion(null);
-    } else {
-      setExpandedDiscussion(alertId);
-      if (!comments[alertId]) {
-        fetchComments(alertId);
-      }
-    }
+  const toggleExpand = (id: string) => {
+    if (expandedId === id) { setExpandedId(null); return; }
+    setExpandedId(id);
+    if (!comments[id]) fetchComments(id);
   };
 
-  const handleSendComment = async (alertId: string) => {
-    if (!newMessage.trim()) return;
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const newFiles: ICommentAttachment[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const reader = new FileReader();
+      await new Promise<void>((resolve) => {
+        reader.onload = () => {
+          newFiles.push({
+            id: `${Date.now()}-${i}`,
+            name: file.name,
+            url: reader.result as string,
+            type: file.type,
+            size: file.size,
+            uploadedAt: new Date(),
+          });
+          resolve();
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    setUploadedFiles((prev) => [...prev, ...newFiles]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeFile = (id: string) => setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
+
+  const handleSend = async (discussionId: string) => {
+    if (!newMessage.trim() && uploadedFiles.length === 0) return;
     setSending(true);
     setError(null);
 
     const result = await apiFetch<IComment>('/api/comments', {
       method: 'POST',
       body: JSON.stringify({
-        alertId,
+        discussionId,
         content: newMessage.trim(),
         mentions: [],
+        attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined,
       }),
     });
 
     if (result.success && result.data) {
       setComments((prev) => ({
         ...prev,
-        [alertId]: [...(prev[alertId] || []), result.data!],
+        [discussionId]: [...(prev[discussionId] || []), result.data!],
       }));
       setNewMessage('');
+      setUploadedFiles([]);
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     } else {
       setError(result.error || 'Failed to send message');
     }
-
     setSending(false);
   };
 
-  const handleTextareaChange = (val: string, isNew?: boolean) => {
-    if (isNew) {
-      setDiscussionForm((prev) => ({ ...prev, message: val }));
-    } else {
-      setNewMessage(val);
-    }
-    const atIndex = val.lastIndexOf('@');
-    if (atIndex !== -1) {
-      const query = val.slice(atIndex + 1);
-      if (!query.includes(' ')) {
-        setMentionQuery(query);
-        setShowMentionDropdown(true);
-        return;
-      }
-    }
-    setShowMentionDropdown(false);
-  };
-
-  const insertMention = (user: Partial<IUser>) => {
-    if (!user.name) return;
-    if (showNewDiscussionForm) {
-      const val = discussionForm.message;
-      const atIndex = val.lastIndexOf('@');
-      setDiscussionForm((prev) => ({ ...prev, message: val.slice(0, atIndex) + `@${user.name} ` }));
-    } else {
-      const atIndex = newMessage.lastIndexOf('@');
-      setNewMessage(newMessage.slice(0, atIndex) + `@${user.name} `);
-    }
-    setShowMentionDropdown(false);
-  };
-
-  const filteredUsers = availableUsers.filter((u) =>
-    u.name?.toLowerCase().includes(mentionQuery.toLowerCase())
-  );
-
-  const toggleDept = (dept: Department) => {
-    setDiscussionForm((prev) => ({
+  const toggleMentionUser = (user: Partial<IUser>) => {
+    if (!user._id) return;
+    setNewThread((prev) => ({
       ...prev,
-      affectedDepartments: prev.affectedDepartments.includes(dept)
-        ? prev.affectedDepartments.filter((d) => d !== dept)
-        : [...prev.affectedDepartments, dept],
+      mentionIds: prev.mentionIds.includes(user._id!)
+        ? prev.mentionIds.filter((id) => id !== user._id)
+        : [...prev.mentionIds, user._id!],
     }));
   };
 
-  const handleCreateDiscussion = async () => {
-    if (!discussionForm.projectId) {
-      setError('Please select a project');
+  const handleCreate = async () => {
+    if (!newThread.projectId || !newThread.title.trim()) {
+      setError('Project and title are required');
       return;
     }
-    if (discussionForm.message.trim().length < 10) {
-      setError('Message must be at least 10 characters');
-      return;
-    }
-    if (discussionForm.affectedDepartments.length === 0) {
-      setError('Select at least one affected department');
-      return;
-    }
-    setCreatingDiscussion(true);
+    setCreating(true);
     setError(null);
 
-    const body: Record<string, unknown> = {
-      projectId: discussionForm.projectId,
-      type: AlertType.DISCUSSION,
-      severity: discussionForm.severity,
-      message: discussionForm.message.trim(),
-      affectedDepartments: discussionForm.affectedDepartments,
-    };
-    if (discussionForm.taskId) {
-      body.taskId = discussionForm.taskId;
-    }
-
-    const result = await apiFetch<IAlert>('/api/alerts', {
+    const result = await apiFetch<IDiscussion>('/api/discussions', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        projectId: newThread.projectId,
+        title: newThread.title.trim(),
+        description: newThread.description.trim(),
+        mentions: newThread.mentionIds,
+      }),
     });
 
     if (result.success && result.data) {
       setDiscussions((prev) => [result.data!, ...prev]);
-      setExpandedDiscussion(result.data._id);
-      window.dispatchEvent(new CustomEvent('erp-alert-created', { detail: result.data }));
-      setDiscussionForm({
-        projectId: '',
-        taskId: '',
-        severity: AlertSeverity.LOW,
-        message: '',
-        affectedDepartments: [],
-      });
-      setShowNewDiscussionForm(false);
+      setExpandedId(result.data._id);
+      setNewThread({ projectId: '', title: '', description: '', mentionIds: [] });
+      setShowNewForm(false);
       fetchComments(result.data._id);
     } else {
-      setError(result.error || 'Failed to create discussion');
+      setError(result.error || 'Failed to create thread');
     }
-
-    setCreatingDiscussion(false);
-  };
-
-  const resolveDiscussion = async (alertId: string) => {
-    const result = await apiFetch(`/api/alerts/${alertId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: AlertStatus.RESOLVED }),
-    });
-    if (result.success) {
-      setDiscussions((prev) =>
-        prev.map((d) => (d._id === alertId ? { ...d, status: AlertStatus.RESOLVED } : d))
-      );
-      window.dispatchEvent(new CustomEvent('erp-alert-resolved'));
-    }
+    setCreating(false);
   };
 
   return (
@@ -410,29 +277,23 @@ export function DiscussionsClient({ currentUser: _currentUser }: DiscussionsClie
           <div>
             <h1 className="text-xl font-black text-gray-900">Discussions</h1>
             <p className="text-xs font-mono text-gray-500 mt-1">
-              Start or browse task-level discussion threads.
+              Chat threads for project discussions. Mention <strong>@users</strong> to notify them.
             </p>
           </div>
-          <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
+          <div className="flex items-center gap-3">
             <div className="text-right font-mono">
               <p className="text-2xl font-black text-gray-900">{discussions.length}</p>
               <p className="text-[10px] uppercase tracking-widest text-gray-400">Threads</p>
             </div>
             <button
               type="button"
-              onClick={() => {
-                setShowNewDiscussionForm(!showNewDiscussionForm);
-                setError(null);
-                if (!showNewDiscussionForm) fetchProjects();
-              }}
+              onClick={() => { setShowNewForm(!showNewForm); setError(null); if (!showNewForm) fetchProjects(); }}
               className={cn(
                 'px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide transition-colors',
-                showNewDiscussionForm
-                  ? 'bg-gray-200 text-gray-600'
-                  : 'bg-black text-white hover:bg-gray-800'
+                showNewForm ? 'bg-gray-200 text-gray-600' : 'bg-black text-white hover:bg-gray-800'
               )}
             >
-              {showNewDiscussionForm ? 'Cancel' : 'New Thread'}
+              {showNewForm ? 'Cancel' : 'New Thread'}
             </button>
           </div>
         </div>
@@ -440,31 +301,25 @@ export function DiscussionsClient({ currentUser: _currentUser }: DiscussionsClie
 
       <div className="mx-auto max-w-screen-xl space-y-6 p-4 sm:p-6">
         {error && (
-          <div className="border border-red-300 bg-red-50 px-4 py-3 text-xs font-mono text-red-700">
-            {error}
-          </div>
+          <div className="border border-red-300 bg-red-50 px-4 py-3 text-xs font-mono text-red-700">{error}</div>
         )}
 
-        {/* New discussion form */}
-        {showNewDiscussionForm && (
-          <div className="border border-gray-200 bg-blue-50/20">
-            <div className="px-5 py-3 border-b border-gray-200 bg-gray-50/50">
-              <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500">
-                Start a New Discussion
-              </h2>
+        {/* New thread form */}
+        {showNewForm && (
+          <div className="border border-gray-200 bg-gray-50">
+            <div className="px-5 py-3 border-b border-gray-200 bg-white">
+              <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500">Start a New Thread</h2>
             </div>
             <div className="p-5 space-y-4">
-              {/* Project selector — searchable */}
+              {/* Project */}
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
                   Project <span className="text-red-500">*</span>
                 </label>
                 <SearchableSelect
                   items={projects}
-                  value={discussionForm.projectId}
-                  onChange={(id) => {
-                    setDiscussionForm((prev) => ({ ...prev, projectId: id, taskId: '' }));
-                  }}
+                  value={newThread.projectId}
+                  onChange={(id) => setNewThread((prev) => ({ ...prev, projectId: id }))}
                   placeholder="Search projects..."
                   loading={loadingProjects}
                   emptyText="No projects found"
@@ -478,339 +333,229 @@ export function DiscussionsClient({ currentUser: _currentUser }: DiscussionsClie
                 />
               </div>
 
-              {/* Task selector — searchable */}
+              {/* Title */}
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
-                  Task <span className="text-gray-400 font-normal normal-case">(optional)</span>
+                  Title <span className="text-red-500">*</span>
                 </label>
-                <SearchableSelect
-                  key={discussionForm.projectId}
-                  items={tasks}
-                  value={discussionForm.taskId}
-                  onChange={(id) => setDiscussionForm((prev) => ({ ...prev, taskId: id }))}
-                  placeholder={!discussionForm.projectId ? 'Select a project first' : 'Search tasks...'}
-                  disabled={!discussionForm.projectId}
-                  loading={loadingTasks}
-                  emptyText={discussionForm.projectId ? 'No tasks found' : 'Select a project first'}
-                  getSearchText={(t: ITask) => `${t.title} ${t.department}`}
-                  renderItem={(t: ITask) => (
-                    <>
-                      <span className="text-gray-500 font-mono text-[10px] font-bold uppercase w-12 flex-shrink-0">
-                        [{DEPARTMENT_ABBR[t.department]}]
-                      </span>
-                      <span className="text-gray-900 truncate">{t.title}</span>
-                    </>
-                  )}
+                <input
+                  type="text"
+                  value={newThread.title}
+                  onChange={(e) => setNewThread((prev) => ({ ...prev, title: e.target.value }))}
+                  placeholder="e.g., Production planning discussion"
+                  className="w-full text-xs font-mono border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors placeholder:text-gray-400"
                 />
               </div>
 
-              {/* Severity */}
+              {/* Description */}
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
-                  Severity <span className="text-red-500">*</span>
+                  Description <span className="text-gray-400 font-normal normal-case">(optional)</span>
                 </label>
-                <div className="flex items-center gap-2">
-                  {[AlertSeverity.LOW, AlertSeverity.HIGH, AlertSeverity.CRITICAL].map((sev) => (
+                <textarea
+                  value={newThread.description}
+                  onChange={(e) => setNewThread((prev) => ({ ...prev, description: e.target.value }))}
+                  placeholder="What's this thread about?"
+                  rows={2}
+                  className="w-full text-xs font-mono border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors resize-none placeholder:text-gray-400"
+                />
+              </div>
+
+              {/* Mention users */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
+                  Mention Users (they get notified + can see history)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {availableUsers.map((u) => (
                     <button
-                      key={sev}
+                      key={u._id}
                       type="button"
-                      onClick={() => setDiscussionForm((prev) => ({ ...prev, severity: sev }))}
+                      onClick={() => toggleMentionUser(u)}
                       className={cn(
-                        'px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider border transition-colors',
-                        discussionForm.severity === sev
-                          ? sev === AlertSeverity.LOW
-                            ? 'border-blue-400 bg-blue-50 text-blue-700'
-                            : sev === AlertSeverity.CRITICAL
-                              ? 'border-red-700 bg-red-600 text-white'
-                              : 'border-red-400 bg-red-50 text-red-700'
-                          : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                        'px-2.5 py-1 text-[10px] font-mono border transition-colors',
+                        newThread.mentionIds.includes(u._id!)
+                          ? 'border-black bg-black text-white'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-400'
                       )}
                     >
-                      {sev === AlertSeverity.LOW ? '● Info' : sev === AlertSeverity.HIGH ? '▲ High' : '▲ Critical'}
+                      {u.name}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Affected departments */}
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
-                  Affected Departments <span className="text-red-500">*</span>
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {DEPARTMENT_SEQUENCE.map((dept) => {
-                    const isSelected = discussionForm.affectedDepartments.includes(dept);
-                    return (
-                      <button
-                        key={dept}
-                        type="button"
-                        onClick={() => toggleDept(dept)}
-                        className={cn(
-                          'px-2.5 py-1 text-[10px] font-mono border transition-colors',
-                          isSelected
-                            ? 'border-black bg-black text-white'
-                            : 'border-gray-200 text-gray-600 hover:border-gray-400'
-                        )}
-                      >
-                        {DEPARTMENT_LABELS[dept]}
-                      </button>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDiscussionForm((prev) => ({
-                        ...prev,
-                        affectedDepartments:
-                          prev.affectedDepartments.length === DEPARTMENT_SEQUENCE.length
-                            ? []
-                            : [...DEPARTMENT_SEQUENCE],
-                      }))
-                    }
-                    className="text-[10px] font-mono text-gray-500 hover:text-black underline px-1"
-                  >
-                    {discussionForm.affectedDepartments.length === DEPARTMENT_SEQUENCE.length
-                      ? 'Clear all'
-                      : 'All depts'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Message */}
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
-                  Message <span className="text-red-500">*</span>
-                  <span className="normal-case font-normal text-gray-400 ml-2">(min 10 chars)</span>
-                </label>
-                <div className="relative">
-                  <textarea
-                    value={discussionForm.message}
-                    onChange={(e) => handleTextareaChange(e.target.value, true)}
-                    placeholder="Describe your discussion topic... Use @name to mention someone"
-                    rows={3}
-                    className="w-full text-xs font-mono border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors resize-none placeholder:text-gray-400"
-                  />
-                  {showMentionDropdown && showNewDiscussionForm && (
-                    <MentionDropdown users={filteredUsers} onSelect={insertMention} />
-                  )}
-                </div>
-              </div>
-
               {/* Submit */}
-              <div className="flex items-center justify-end gap-2 pt-2">
+              <div className="flex justify-end pt-2">
                 <button
                   type="button"
-                  onClick={handleCreateDiscussion}
-                  disabled={creatingDiscussion || discussionForm.message.trim().length < 10 || !discussionForm.projectId || discussionForm.affectedDepartments.length === 0}
+                  onClick={handleCreate}
+                  disabled={creating || !newThread.title.trim() || !newThread.projectId}
                   className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-mono font-bold bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  {creatingDiscussion ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <MessageCircle className="w-3 h-3" />
-                  )}
-                  Start Discussion
+                  {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageCircle className="w-3 h-3" />}
+                  Start Thread
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Discussions list */}
+        {/* Threads list */}
         {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
-          </div>
+          <div className="flex items-center justify-center h-32"><Loader2 className="w-5 h-5 text-gray-400 animate-spin" /></div>
         ) : discussions.length === 0 ? (
           <div className="border border-dashed border-gray-200 p-12 text-center">
             <MessageCircle className="w-8 h-8 text-gray-300 mx-auto mb-3" />
             <p className="text-sm font-mono text-gray-400">No discussions yet.</p>
-            <p className="text-xs font-mono text-gray-400 mt-1">
-              Click &ldquo;New Thread&rdquo; to start one.
-            </p>
+            <p className="text-xs font-mono text-gray-400 mt-1">Click &ldquo;New Thread&rdquo; to start one.</p>
           </div>
         ) : (
           <div className="space-y-3">
             {discussions.map((discussion) => {
-              const isExpanded = expandedDiscussion === discussion._id;
-              const discussionComments = comments[discussion._id] || [];
-              const raisedBy = typeof discussion.raisedBy === 'object' ? discussion.raisedBy as Partial<IUser> : null;
+              const isExpanded = expandedId === discussion._id;
+              const msgs = comments[discussion._id] || [];
+              const startedBy = typeof discussion.startedBy === 'object' ? discussion.startedBy as Partial<IUser> : null;
               const project = typeof discussion.projectId === 'object' ? discussion.projectId as Partial<IProject> : null;
 
               return (
                 <div key={discussion._id} className="border border-gray-200">
+                  {/* Thread header */}
                   <button
                     type="button"
                     onClick={() => toggleExpand(discussion._id)}
-                    className="flex w-full items-start gap-3 px-3 py-3.5 text-left transition-colors hover:bg-gray-50/50 sm:px-5"
+                    className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-gray-50/50"
                   >
-                    <div className={cn(
-                      'mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full sm:h-9 sm:w-9',
-                      discussion.severity === AlertSeverity.CRITICAL
-                        ? 'bg-red-100'
-                        : discussion.severity === AlertSeverity.HIGH
-                          ? 'bg-orange-100'
-                          : 'bg-blue-100'
-                    )}>
-                      <MessageCircle className={cn(
-                        'w-4 h-4',
-                        discussion.severity === AlertSeverity.CRITICAL
-                          ? 'text-red-600'
-                          : discussion.severity === AlertSeverity.HIGH
-                            ? 'text-orange-600'
-                            : 'text-blue-600'
-                      )} />
+                    <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
+                      <MessageCircle className="w-4 h-4 text-blue-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className={cn(
-                          'px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider rounded-sm',
-                          discussion.severity === AlertSeverity.LOW
-                            ? 'bg-blue-100 text-blue-800'
-                            : discussion.severity === AlertSeverity.HIGH
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-red-600 text-white'
-                        )}>
-                          {discussion.severity === AlertSeverity.LOW ? 'Info' : discussion.severity === AlertSeverity.HIGH ? 'High' : 'Critical'}
-                        </span>
-                        <span className={cn(
-                          'px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider rounded-sm',
-                          discussion.status === AlertStatus.RESOLVED
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        )}>
-                          {discussion.status === AlertStatus.RESOLVED ? 'Resolved' : 'Active'}
-                        </span>
-                        {discussion.affectedDepartments && discussion.affectedDepartments.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1">
-                            {discussion.affectedDepartments.map((d) => (
-                              <span key={d} className="text-[8px] font-mono px-1 py-0.5 bg-gray-100 text-gray-600 uppercase tracking-wider rounded-sm">
-                                {DEPARTMENT_ABBR[d]}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-sm font-medium text-gray-900 line-clamp-2">
-                        {discussion.message}
-                      </p>
-                      <div className="flex items-center gap-3 mt-2 text-[10px] font-mono text-gray-400 flex-wrap">
-                        <span>{raisedBy?.name || 'Unknown'}</span>
-                        {raisedBy?.department && (
-                          <span className="uppercase">{DEPARTMENT_LABELS[raisedBy.department as Department]}</span>
-                        )}
+                      <h3 className="text-sm font-bold text-gray-900">{discussion.title}</h3>
+                      {discussion.description && (
+                        <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">{discussion.description}</p>
+                      )}
+                      <div className="flex items-center gap-3 mt-1.5 text-[10px] font-mono text-gray-400 flex-wrap">
+                        <span>{startedBy?.name || 'Unknown'}</span>
+                        {startedBy?.department && <span className="uppercase">{DEPARTMENT_LABELS[startedBy.department as Department]}</span>}
                         <span>·</span>
                         <span>{timeAgo(discussion.createdAt)}</span>
                         <span>·</span>
-                        <span>{discussionComments.length} replies</span>
-                        {discussion.taskId && (
-                          <>
-                            <span>·</span>
-                            <Link
-                              href={`/tasks/${typeof discussion.taskId === 'string' ? discussion.taskId : discussion.taskId._id}`}
-                              className="inline-flex items-center gap-1 text-gray-600 hover:text-black underline underline-offset-2"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              View Task <ExternalLink className="w-3 h-3" />
-                            </Link>
-                          </>
-                        )}
+                        <span>{msgs.length} message{msgs.length === 1 ? '' : 's'}</span>
                         {project?.projectTitle && (
-                          <span className="max-w-full truncate text-gray-400 sm:max-w-[200px]">
-                            · {project.projectTitle}
+                          <span className="truncate max-w-[200px] font-medium text-gray-600">📁 {project.projectTitle}</span>
+                        )}
+                        {discussion.mentions.length > 0 && (
+                          <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-sm flex items-center gap-1">
+                            <User className="w-2.5 h-2.5" />
+                            {discussion.mentions.map((m: any) => (m as Partial<IUser>)?.name).filter(Boolean).join(', ')}
                           </span>
                         )}
                       </div>
                     </div>
-                    <div className="flex-shrink-0 pt-1">
-                      {isExpanded ? (
-                        <ChevronUp className="w-4 h-4 text-gray-400" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-gray-400" />
-                      )}
-                    </div>
+                    {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
                   </button>
 
-                  {/* Expanded discussion */}
+                  {/* Expanded chat */}
                   {isExpanded && (
-                    <div className="border-t border-gray-100 bg-gray-50/30">
-                      <div className="max-h-[400px] space-y-3 overflow-y-auto p-3 sm:p-4">
-                        {discussionComments.length === 0 ? (
-                          <p className="text-[10px] font-mono text-gray-400 text-center py-4">
-                            No replies yet.
-                          </p>
+                    <div className="border-t border-gray-100">
+                      {/* Messages */}
+                      <div className="max-h-[500px] overflow-y-auto p-4 space-y-4">
+                        {msgs.length === 0 ? (
+                          <p className="text-[10px] font-mono text-gray-400 text-center py-6">No messages yet. Say something!</p>
                         ) : (
-                          discussionComments.map((comment) => {
-                            const author = typeof comment.author === 'object' ? comment.author as Partial<IUser> : null;
+                          msgs.map((msg) => {
+                            const author = typeof msg.author === 'object' ? msg.author as Partial<IUser> : null;
                             return (
-                              <div key={comment._id} className="flex items-start gap-2.5">
-                                <div className="w-6 h-6 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                  <span className="text-[9px] text-white font-bold">
-                                    {author?.name?.charAt(0).toUpperCase() || '?'}
-                                  </span>
+                              <div key={msg._id} className="flex items-start gap-2.5">
+                                <div className="w-7 h-7 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                  <span className="text-[10px] text-white font-bold">{author?.name?.charAt(0).toUpperCase() || '?'}</span>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="mb-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                    <span className="text-[11px] font-bold text-gray-900">
-                                      {author?.name || 'Unknown'}
-                                    </span>
-                                    <span className="text-[9px] font-mono text-gray-400 uppercase">
-                                      {author?.department ? DEPARTMENT_LABELS[author.department as Department] : ''}
-                                    </span>
-                                    <span className="ml-0 text-[9px] text-gray-400 sm:ml-auto">
-                                      {timeAgo(comment.createdAt)}
-                                    </span>
+                                  <div className="flex items-baseline gap-2 mb-0.5">
+                                    <span className="text-[11px] font-bold text-gray-900">{author?.name || 'Unknown'}</span>
+                                    <span className="text-[9px] font-mono text-gray-400 uppercase">{author?.department ? DEPARTMENT_LABELS[author.department as Department] : ''}</span>
+                                    <span className="text-[9px] text-gray-400 ml-auto">{timeAgo(msg.createdAt)}</span>
                                   </div>
-                                  <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                    {renderContent(comment.content)}
-                                  </p>
+                                  <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                                  {msg.attachments && msg.attachments.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                      {msg.attachments.map((att) => (
+                                        <a
+                                          key={att.id}
+                                          href={att.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-mono bg-gray-50 border border-gray-200 text-gray-600 hover:border-black transition-colors"
+                                        >
+                                          {att.type.startsWith('image/') ? (
+                                            <img src={att.url} alt={att.name} className="w-5 h-5 object-cover rounded" />
+                                          ) : (
+                                            <Paperclip className="w-3 h-3" />
+                                          )}
+                                          {att.name}
+                                        </a>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             );
                           })
                         )}
+                        <div ref={bottomRef} />
                       </div>
 
-                      {/* Reply input */}
-                      <div className="border-t border-gray-200 p-3 bg-white relative">
-                        {showMentionDropdown && !showNewDiscussionForm && (
-                          <MentionDropdown users={filteredUsers} onSelect={insertMention} />
+                      {/* Input */}
+                      <div className="border-t border-gray-200 p-3 bg-white">
+                        {uploadedFiles.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {uploadedFiles.map((f) => (
+                              <span key={f.id} className="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-mono bg-gray-50 border border-gray-200 text-gray-700">
+                                <Paperclip className="w-3 h-3" />
+                                {f.name}
+                                <button type="button" onClick={() => removeFile(f.id)} className="text-gray-400 hover:text-red-500"><X className="w-3 h-3" /></button>
+                              </span>
+                            ))}
+                          </div>
                         )}
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                          <div className="flex-1">
+                        <div className="flex gap-2 items-end">
+                          <div className="flex-1 relative">
                             <textarea
                               value={newMessage}
-                              onChange={(e) => handleTextareaChange(e.target.value)}
-                              placeholder="Reply... Use @name to mention someone"
+                              onChange={(e) => setNewMessage(e.target.value)}
+                              placeholder="Type a message..."
                               rows={2}
                               className="w-full text-xs resize-none border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors placeholder:text-gray-400 font-mono"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && e.metaKey) handleSendComment(discussion._id);
-                              }}
+                              onKeyDown={(e) => { if (e.key === 'Enter' && e.metaKey) handleSend(discussion._id); }}
                             />
                           </div>
-                          <div className="flex gap-1 sm:flex-col">
+                          <div className="flex gap-1">
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              multiple
+                              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                              className="hidden"
+                              onChange={(e) => handleFileUpload(e.target.files)}
+                            />
                             <button
-                              onClick={() => handleSendComment(discussion._id)}
-                              disabled={sending || !newMessage.trim()}
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="p-2 text-gray-400 hover:text-black border border-gray-200 hover:border-black transition-colors"
+                              title="Attach file"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleSend(discussion._id)}
+                              disabled={sending || (!newMessage.trim() && uploadedFiles.length === 0)}
                               className="p-2 bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                             >
-                              <Send className="w-3.5 h-3.5" />
+                              {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                             </button>
-                            {discussion.status !== AlertStatus.RESOLVED && (
-                              <button
-                                onClick={() => resolveDiscussion(discussion._id)}
-                                title="Mark as resolved"
-                                className="p-2 text-gray-400 hover:text-green-600 border border-gray-200 hover:border-green-400 transition-colors"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                              </button>
-                            )}
                           </div>
                         </div>
-                        <p className="text-[9px] text-gray-400 mt-1 font-mono">⌘+Enter to send</p>
+                        <p className="text-[9px] text-gray-400 mt-1 font-mono">⌘+Enter to send · Attach files with paperclip</p>
                       </div>
                     </div>
                   )}

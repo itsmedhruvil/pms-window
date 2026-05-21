@@ -43,7 +43,6 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: Proj
                   <th>Progress</th>
                   <th>Windows</th>
                   <th>Deadline</th>
-                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -98,14 +97,6 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: Proj
                             {formatDate(project.deadline)}
                           </span>
                         </div>
-                      </td>
-                      <td>
-                        <Link
-                          href={`/projects/${project._id}`}
-                          className="text-[10px] font-mono text-gray-500 hover:text-black uppercase tracking-wide"
-                        >
-                          View →
-                        </Link>
                       </td>
                     </tr>
                   );

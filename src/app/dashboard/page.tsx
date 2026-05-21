@@ -2,6 +2,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DashboardMetrics } from '@/components/dashboard/DashboardMetrics';
+import { DashboardAlertsPane } from '@/components/dashboard/DashboardAlertsPane';
 import { getDashboardData, serialize } from '@/lib/server-data';
 
 export const dynamic = 'force-dynamic';
@@ -35,14 +36,24 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {data ? (
-          <DashboardMetrics data={{ metrics: data.metrics, charts: data.charts }} />
-        ) : (
-          <div className="border border-gray-200 p-12 text-center">
-            <p className="text-sm text-gray-500 font-mono">No data available yet.</p>
-            <p className="text-xs text-gray-400 font-mono mt-1">Create your first project to see metrics here.</p>
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+          {/* Main metrics */}
+          <div className="xl:col-span-3">
+            {data ? (
+              <DashboardMetrics data={{ metrics: data.metrics, charts: data.charts }} />
+            ) : (
+              <div className="border border-gray-200 p-12 text-center">
+                <p className="text-sm text-gray-500 font-mono">No data available yet.</p>
+                <p className="text-xs text-gray-400 font-mono mt-1">Create your first project to see metrics here.</p>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Alerts & Notifications pane */}
+          <div className="xl:col-span-1">
+            <DashboardAlertsPane />
+          </div>
+        </div>
       </div>
     </AppLayout>
   );
