@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import {
   AlertTriangle, Calendar, Package, ChevronRight,
   CheckCircle2, Copy, Trash2, ArrowUpRight, Edit3,
@@ -19,7 +19,7 @@ import { ProjectStatusControl } from '@/components/project/ProjectStatusControl'
 import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
 import { Modal } from '@/components/ui/Modal';
 import type { IProject, ITask, IAlert, IUser } from '@/types';
-import { TaskStatus, AlertStatus, AlertType, Department, ProjectPriority, ProjectStatus } from '@/types';
+import { TaskStatus, AlertStatus, Department, ProjectPriority, ProjectStatus } from '@/types';
 import { useDepartments } from '@/hooks/useDepartments';
 
 interface ProjectDetailProps {
@@ -68,20 +68,47 @@ export function ProjectDetail({
     setExcelLoading(true);
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      if (!sheetName) {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(arrayBuffer);
+      const worksheet = workbook.worksheets[0];
+      if (!worksheet) {
         setExcelError('The selected spreadsheet does not contain any sheets.');
         return;
       }
-      const sheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils
-        .sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: false })
-        .map(normalizeExcelRow);
+
+      // Get headers from first row
+      const headerRow = worksheet.getRow(1);
+      const headers: string[] = [];
+      headerRow.eachCell((cell) => {
+        headers.push(String(cell.value ?? `Column${headers.length + 1}`));
+      });
+
+      // Get data rows
+      const rows: Record<string, string | number | boolean | null>[] = [];
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // Skip header
+        const rowData: Record<string, string | number | boolean | null> = {};
+        row.eachCell((cell, colNumber) => {
+          const header = headers[colNumber - 1];
+          const val = cell.value;
+          if (val === null || val === undefined) {
+            rowData[header] = null;
+          } else if (val instanceof Date) {
+            rowData[header] = val.toISOString();
+          } else if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+            rowData[header] = val;
+          } else {
+            rowData[header] = String(val);
+          }
+        });
+        if (Object.keys(rowData).length > 0) {
+          rows.push(rowData);
+        }
+      });
 
       const result = await apiFetch(`/api/projects/${project._id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ excelSheetName: sheetName, excelRows: rows }),
+        body: JSON.stringify({ excelSheetName: worksheet.name || 'Sheet1', excelRows: rows }),
       });
 
       if (result.success && result.data) {
@@ -103,45 +130,58 @@ export function ProjectDetail({
     setPdfUploading(true);
     setPdfError(null);
 
-    const newPdfs: Array<{ id: string; name: string; url: string; size: number; uploadedAt: string }> = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (file.type !== 'application/pdf') {
-        setPdfError('Only PDF files are allowed.');
-        setPdfUploading(false);
-        return;
+    try {
+      const newPdfs: Array<{ id: string; name: string; url: string; size: number; uploadedAt: string }> = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.type !== 'application/pdf') {
+          setPdfError('Only PDF files are allowed.');
+          setPdfUploading(false);
+          return;
+        }
+
+        // Upload to Vercel Blob via API
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        const uploadData = await uploadRes.json();
+
+        if (!uploadData.success) {
+          throw new Error(uploadData.error || 'Upload failed');
+        }
+
+        newPdfs.push({
+          id: `${Date.now()}-${i}`,
+          name: uploadData.data.name,
+          url: uploadData.data.url,
+          size: uploadData.data.size,
+          uploadedAt: new Date().toISOString(),
+        });
       }
-      const reader = new FileReader();
-      await new Promise<void>((resolve) => {
-        reader.onload = () => {
-          newPdfs.push({
-            id: `${Date.now()}-${i}`,
-            name: file.name,
-            url: reader.result as string,
-            size: file.size,
-            uploadedAt: new Date().toISOString(),
-          });
-          resolve();
-        };
-        reader.readAsDataURL(file);
+
+      const existing = project.pdfAttachments || [];
+      const allPdfs = [...existing, ...newPdfs];
+
+      const result = await apiFetch(`/api/projects/${project._id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ pdfAttachments: allPdfs }),
       });
+
+      if (result.success && result.data) {
+        setProject(result.data as IProject);
+      } else {
+        setPdfError(result.error || 'Failed to save PDF to project');
+      }
+    } catch (err) {
+      setPdfError(err instanceof Error ? err.message : 'Failed to upload PDF');
+    } finally {
+      setPdfUploading(false);
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
     }
-
-    const existing = project.pdfAttachments || [];
-    const allPdfs = [...existing, ...newPdfs];
-
-    const result = await apiFetch(`/api/projects/${project._id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ pdfAttachments: allPdfs }),
-    });
-
-    setPdfUploading(false);
-    if (result.success && result.data) {
-      setProject(result.data as IProject);
-    } else {
-      setPdfError(result.error || 'Failed to upload PDF');
-    }
-    if (pdfInputRef.current) pdfInputRef.current.value = '';
   };
 
   const removePdf = async (pdfId: string) => {
@@ -914,17 +954,6 @@ export function ProjectDetail({
         </div>
       </Modal>
     </div>
-  );
-}
-
-function normalizeExcelRow(row: Record<string, unknown>): Record<string, string | number | boolean | null> {
-  return Object.fromEntries(
-    Object.entries(row).map(([key, value]) => {
-      if (value === null || value === undefined) return [key, null];
-      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return [key, value];
-      if (value instanceof Date) return [key, value.toISOString()];
-      return [key, String(value)];
-    })
   );
 }
 

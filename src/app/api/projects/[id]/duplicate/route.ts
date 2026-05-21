@@ -7,7 +7,7 @@ import { UserRole } from '@/types';
 
 // POST /api/projects/[id]/duplicate
 export const POST = withAuth(
-  async (_req: NextRequest, ctx, { user }) => {
+  async (_req: NextRequest, ctx, { user: _user }) => {
     await connectDB();
     const params = await ctx.params;
     const { id } = params;

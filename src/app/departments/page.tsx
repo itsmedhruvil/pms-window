@@ -1,7 +1,7 @@
 import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { DepartmentsClient } from './DepartmentsClient';
+import { DepartmentsClient, type DepartmentItem } from './DepartmentsClient';
 import { getAlerts, serialize } from '@/lib/server-data';
 import { UserRole, AlertStatus } from '@/types';
 import connectDB from '@/lib/db';
@@ -29,7 +29,7 @@ export default async function DepartmentsPage() {
 
   return (
     <AppLayout activeAlertCount={activeAlertCount}>
-      <DepartmentsClient initialDepartments={departments as any} />
+      <DepartmentsClient initialDepartments={departments as unknown as DepartmentItem[]} />
     </AppLayout>
   );
 }

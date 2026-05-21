@@ -41,6 +41,7 @@ export default async function ProjectDepartmentTasksPage(
   const { project, tasks: allTasks } = detail;
 
   // Filter tasks by department
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const deptTasks = allTasks.filter((t: any) => t.department === department);
   const serializedTasks = serialize(deptTasks) as unknown as ITask[];
   const projectsResult = serialize(rawProjects) as unknown as {

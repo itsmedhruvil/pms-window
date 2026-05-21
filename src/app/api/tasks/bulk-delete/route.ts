@@ -4,7 +4,6 @@ import TaskModel from '@/models/Task';
 import CommentModel from '@/models/Comment';
 import { withAuth, canModifyTask } from '@/lib/auth';
 import { UserRole } from '@/types';
-import mongoose from 'mongoose';
 import { updateProjectCompletion } from '@/lib/workflow';
 
 export const POST = withAuth(

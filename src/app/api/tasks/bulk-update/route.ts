@@ -28,7 +28,8 @@ export const POST = withAuth(
     const taskMap = new Map(tasks.map(t => [t._id.toString(), t]));
 
     // Prepare bulk operations
-    const bulkOps: Record<string, unknown>[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const bulkOps: any[] = [];
     const projectUpdates = new Set<string>();
     const eventsToTrigger: Array<{ channel: string; event: string; data: Record<string, unknown> }> = [];
 

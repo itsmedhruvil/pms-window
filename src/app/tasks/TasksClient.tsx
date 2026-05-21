@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, AlertTriangle, Plus, CheckSquare, Square, Search, Trash2, ChevronDown, X } from 'lucide-react';
+import { Lock, AlertTriangle, Plus, CheckSquare, Square, Search, Trash2, ChevronDown } from 'lucide-react';
 import { cn, getDepartmentLabel, formatDate } from '@/lib/utils';
 import { TaskStatusBadge } from '@/components/ui/badges';
 import { Modal } from '@/components/ui/Modal';

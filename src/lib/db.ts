@@ -37,7 +37,7 @@ export async function connectDB(): Promise<typeof mongoose> {
       socketTimeoutMS: 45000,
       heartbeatFrequencyMS: 10000, // Check connection health every 10s
       retryWrites: true,
-      w: 'majority' as any,      // Ensure writes are acknowledged
+      w: 'majority' as const,      // Ensure writes are acknowledged
       readPreference: 'primaryPreferred' as const, // Read from primary, fallback to secondary
     };
 

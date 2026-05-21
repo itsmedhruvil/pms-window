@@ -2,7 +2,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TemplateGroupsClient } from './TemplateGroupsClient';
-import { getAlerts, serialize } from '@/lib/server-data';
+import { getAlerts } from '@/lib/server-data';
 import { UserRole, AlertStatus } from '@/types';
 
 export const dynamic = 'force-dynamic';

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { Bell, BellRing, CheckCheck, Loader2, MessageCircle, AlertTriangle, Calendar, User, X, Clock } from 'lucide-react';
+import { Bell, BellRing, CheckCheck, Loader2, MessageCircle, AlertTriangle, User, Clock } from 'lucide-react';
 import { apiFetch, cn, timeAgo } from '@/lib/utils';
 import type { INotification } from '@/types';
 

@@ -5,7 +5,7 @@ import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import { cn, apiFetch } from '@/lib/utils';
 import { Modal } from '@/components/ui/Modal';
 
-interface DepartmentItem {
+export interface DepartmentItem {
   _id: string;
   name: string;
   label: string;
