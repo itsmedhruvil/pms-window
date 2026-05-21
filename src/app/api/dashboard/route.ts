@@ -4,10 +4,9 @@ import ProjectModel from '@/models/Project';
 import TaskModel from '@/models/Task';
 import AlertModel from '@/models/Alert';
 import { withAuth } from '@/lib/auth';
-import { ProjectStatus, TaskStatus, AlertStatus, AlertType } from '@/types';
+import { ProjectStatus, TaskStatus, AlertStatus } from '@/types';
 import type { Department } from '@/types';
 import { subDays } from 'date-fns';
-import mongoose from 'mongoose';
 
 export const GET = withAuth(async (_req: NextRequest) => {
   await connectDB();

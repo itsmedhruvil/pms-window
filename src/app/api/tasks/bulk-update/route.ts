@@ -6,7 +6,7 @@ import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 import { UserRole, TaskStatus } from '@/types';
 
 export const POST = withAuth(
-  async (req: NextRequest, _ctx, { user }) => {
+  async (req: NextRequest, _ctx, { user: _user }) => {
     await connectDB();
 
     const body = await req.json();
@@ -28,9 +28,9 @@ export const POST = withAuth(
     const taskMap = new Map(tasks.map(t => [t._id.toString(), t]));
 
     // Prepare bulk operations
-    const bulkOps: any[] = [];
+    const bulkOps: Record<string, unknown>[] = [];
     const projectUpdates = new Set<string>();
-    const eventsToTrigger: Array<{ channel: string; event: string; data: any }> = [];
+    const eventsToTrigger: Array<{ channel: string; event: string; data: Record<string, unknown> }> = [];
 
     for (const update of updates) {
       const { taskId, status, completedAt } = update;
@@ -45,7 +45,7 @@ export const POST = withAuth(
       }
 
       // Build update operation
-      const setFields: Record<string, any> = { status };
+      const setFields: Record<string, unknown> = { status };
       if (status === TaskStatus.DONE && completedAt) {
         setFields.completedAt = new Date(completedAt);
       }
@@ -82,29 +82,23 @@ export const POST = withAuth(
 
     // Trigger realtime events (fire and forget - don't block response)
     if (eventsToTrigger.length > 0) {
-      void (async () => {
-        await Promise.all(
-          eventsToTrigger.map(({ channel, event, data }) =>
-            triggerEvent(channel, event, data).catch((err: Error) =>
-              console.error('Failed to trigger event:', err)
-            )
-          )
-        );
-      })();
+      for (const { channel, event, data } of eventsToTrigger) {
+        try {
+          triggerEvent(channel, event, data);
+        } catch (err) {
+          console.error('Failed to trigger event:', err);
+        }
+      }
     }
 
     // Update project completions (fire and forget)
     if (projectUpdates.size > 0) {
-      void (async () => {
-        const { updateProjectCompletion } = await import('@/lib/workflow');
-        await Promise.all(
-          Array.from(projectUpdates).map(pid =>
-            updateProjectCompletion(pid).catch((err: Error) =>
-              console.error(`Failed to update project ${pid} completion:`, err)
-            )
-          )
-        );
-      })();
+      const { updateProjectCompletion } = await import('@/lib/workflow');
+      for (const pid of projectUpdates) {
+        updateProjectCompletion(pid).catch((err: Error) => {
+          console.error(`Failed to update project ${pid} completion:`, err);
+        });
+      }
     }
 
     return NextResponse.json({

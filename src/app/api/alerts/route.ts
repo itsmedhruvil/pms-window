@@ -3,7 +3,7 @@ import connectDB from '@/lib/db';
 import AlertModel from '@/models/Alert';
 import { withAuth } from '@/lib/auth';
 import { CreateAlertSchema } from '@/lib/validations';
-import { AlertStatus, UserRole, AlertType } from '@/types';
+import { AlertStatus, UserRole } from '@/types';
 import { applyAlertEffects, createSystemLog } from '@/lib/workflow';
 
 // GET /api/alerts

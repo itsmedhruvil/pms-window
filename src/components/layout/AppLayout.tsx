@@ -239,14 +239,6 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
         </div>
       )}
 
-      {/* Notifications */}
-      <div className="px-3 lg:px-4 py-2 border-t border-gray-200">
-        <div className="flex items-center justify-between">
-          <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-gray-400">Alerts & Updates</span>
-          <NotificationPane />
-        </div>
-      </div>
-
       {/* User */}
       <div className="p-3 lg:p-4 border-t border-gray-200">
         <div className="flex items-center gap-3">
@@ -332,16 +324,21 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
         >
           <Menu className="w-5 h-5" />
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1">
           <div className="w-6 h-6 bg-black flex items-center justify-center">
             <Factory className="w-3.5 h-3.5 text-white" />
           </div>
           <p className="text-xs font-black text-gray-900">WINDOW</p>
         </div>
+        <NotificationPane />
       </div>
 
       {/* Main content — isolated from Sidebar Clerk re-renders */}
       <main className="min-w-0 flex-1 overflow-auto pt-14 lg:pt-0">
+        {/* Desktop top bar with notifications */}
+        <div className="hidden lg:flex items-center justify-end px-6 h-12 border-b border-gray-200 bg-white sticky top-0 z-10">
+          <NotificationPane />
+        </div>
         {children}
       </main>
     </div>

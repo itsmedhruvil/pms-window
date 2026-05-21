@@ -1,6 +1,6 @@
 // Stub for pusher - not implemented
-export const triggerEvent = (...args: any[]) => {
-  // console.log('Pusher event:', args);
+export const triggerEvent = (..._args: unknown[]) => {
+  // console.log('Pusher event:', _args);
 };
 export const CHANNELS = {
   project: (id: string) => `project-${id}`,

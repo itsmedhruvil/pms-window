@@ -9,7 +9,6 @@ import {
   TaskStatus,
   ProjectStatus,
   AlertStatus,
-  AlertType,
   DEPARTMENT_SEQUENCE,
   DEFAULT_TASKS_PER_DEPARTMENT,
 } from '@/types';
