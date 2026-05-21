@@ -32,19 +32,25 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
   if (status) query.status = status;
   if (priority) query.priority = priority;
   if (search) {
+    // Use $regex for now (text index requires specific setup)
+    // If the text index exists, this will still work with $regex
     query.$or = [
       { clientName: { $regex: search, $options: 'i' } },
       { projectTitle: { $regex: search, $options: 'i' } },
     ];
   }
 
+  // Use hint to ensure the query planner picks the right index
+  const sortOption = { priority: -1 as const, deadline: 1 as const, createdAt: -1 as const };
+  const findQuery = ProjectModel.find(query)
+    .sort(sortOption)
+    .skip(skip)
+    .limit(limit)
+    .populate('createdBy', 'name email department')
+    .lean();
+
   const [items, total] = await Promise.all([
-    ProjectModel.find(query)
-      .sort({ priority: -1, deadline: 1, createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate('createdBy', 'name email department')
-      .lean(),
+    findQuery,
     ProjectModel.countDocuments(query),
   ]);
 

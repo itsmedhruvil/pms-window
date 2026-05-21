@@ -82,9 +82,11 @@ const ProjectSchema = new Schema<IProjectDocument>(
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
-ProjectSchema.index({ status: 1 });
-ProjectSchema.index({ deadline: 1 });
-ProjectSchema.index({ createdBy: 1 });
+ProjectSchema.index({ status: 1, deadline: 1, priority: -1 });
+ProjectSchema.index({ priority: -1, deadline: 1, createdAt: -1 });
+ProjectSchema.index({ createdBy: 1, status: 1 });
+ProjectSchema.index({ deadline: 1, status: 1 });
+ProjectSchema.index({ clientName: 'text', projectTitle: 'text' }); // Full-text search
 
 const ProjectModel: Model<IProjectDocument> =
   mongoose.models.Project || mongoose.model<IProjectDocument>('Project', ProjectSchema);

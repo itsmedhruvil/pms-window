@@ -215,46 +215,40 @@ export async function getDashboardData() {
   const now = new Date();
   const thirtyDaysAgo = subDays(now, 30);
 
-  const [
-    projectStats,
-    tasksByDept,
-    alertStats,
-    completionTrend,
-    overdueProjects,
-    avgCompletionTimes,
-    activeAlerts,
-  ] = await Promise.all([
+  // Use $facet to reduce 3 task aggregations into 1 query
+  const [dashboardData] = await TaskModel.aggregate([
+    {
+      $facet: {
+        tasksByDept: [
+          { $group: { _id: { department: '$department', status: '$status' }, count: { $sum: 1 } } },
+          { $group: { _id: '$_id.department', statuses: { $push: { status: '$_id.status', count: '$count' } }, total: { $sum: '$count' } } },
+        ],
+        completionTrend: [
+          { $match: { completedAt: { $gte: thirtyDaysAgo }, status: TaskStatus.DONE } },
+          { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$completedAt' } }, completed: { $sum: 1 } } },
+          { $sort: { _id: 1 } },
+        ],
+        avgCompletionTimes: [
+          { $match: { status: TaskStatus.DONE, startDate: { $exists: true, $ne: null }, completedAt: { $exists: true, $ne: null } } },
+          { $project: { department: 1, durationHours: { $divide: [{ $subtract: ['$completedAt', '$startDate'] }, 3600000] } } },
+          { $group: { _id: '$department', avgHours: { $avg: '$durationHours' }, totalCompleted: { $sum: 1 } } },
+        ],
+      },
+    },
+  ]);
+
+  const [projectStats, alertStats, overdueProjects, activeAlerts] = await Promise.all([
     ProjectModel.aggregate([
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]),
-
-    TaskModel.aggregate([
-      { $group: { _id: { department: '$department', status: '$status' }, count: { $sum: 1 } } },
-      { $group: { _id: '$_id.department', statuses: { $push: { status: '$_id.status', count: '$count' } }, total: { $sum: '$count' } } },
-    ]),
-
     AlertModel.aggregate([
       { $match: { status: { $ne: AlertStatus.RESOLVED } } },
       { $group: { _id: '$type', count: { $sum: 1 } } },
     ]),
-
-    TaskModel.aggregate([
-      { $match: { completedAt: { $gte: thirtyDaysAgo }, status: TaskStatus.DONE } },
-      { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$completedAt' } }, completed: { $sum: 1 } } },
-      { $sort: { _id: 1 } },
-    ]),
-
     ProjectModel.countDocuments({
       deadline: { $lt: now },
       status: { $nin: [ProjectStatus.COMPLETED, ProjectStatus.DISPATCHED] },
     }),
-
-    TaskModel.aggregate([
-      { $match: { status: TaskStatus.DONE, startDate: { $exists: true, $ne: null }, completedAt: { $exists: true, $ne: null } } },
-      { $project: { department: 1, durationHours: { $divide: [{ $subtract: ['$completedAt', '$startDate'] }, 3600000] } } },
-      { $group: { _id: '$department', avgHours: { $avg: '$durationHours' }, totalCompleted: { $sum: 1 } } },
-    ]),
-
     AlertModel.find({ status: AlertStatus.ACTIVE })
       .populate('projectId', 'projectTitle clientName')
       .populate('raisedBy', 'name')
@@ -272,6 +266,10 @@ export async function getDashboardData() {
     (projectStatusMap[ProjectStatus.IN_PRODUCTION] || 0) +
     (projectStatusMap[ProjectStatus.ON_HOLD] || 0);
 
+  const tasksByDeptData = dashboardData?.tasksByDept || [];
+  const completionTrendData = dashboardData?.completionTrend || [];
+  const avgCompletionData = dashboardData?.avgCompletionTimes || [];
+
   // Task completion rates
   const taskCompletionRate: Record<string, number> = {};
   const tasksByDeptFormatted: Array<{
@@ -279,7 +277,7 @@ export async function getDashboardData() {
     inProgress: number; blocked: number; todo: number; completionRate: number;
   }> = [];
 
-  tasksByDept.forEach((dept: { _id: string; statuses: Array<{ status: string; count: number }>; total: number }) => {
+  tasksByDeptData.forEach((dept: { _id: string; statuses: Array<{ status: string; count: number }>; total: number }) => {
     const sm: Record<string, number> = {};
     dept.statuses.forEach((s) => { sm[s.status] = s.count; });
     const done = sm[TaskStatus.DONE] || 0;
@@ -312,7 +310,7 @@ export async function getDashboardData() {
   let globalAvgHours = 0;
   let deptCount = 0;
   const avgCompletionByDept: Record<string, number> = {};
-  avgCompletionTimes.forEach((d: { _id: string; avgHours: number }) => {
+  avgCompletionData.forEach((d: { _id: string; avgHours: number }) => {
     avgCompletionByDept[d._id] = Math.round(d.avgHours * 10) / 10;
     globalAvgHours += d.avgHours;
     deptCount++;
@@ -321,7 +319,7 @@ export async function getDashboardData() {
 
   // Fill completion trend for last 14 days
   const trendMap: Record<string, number> = {};
-  completionTrend.forEach((t: { _id: string; completed: number }) => { trendMap[t._id] = t.completed; });
+  completionTrendData.forEach((t: { _id: string; completed: number }) => { trendMap[t._id] = t.completed; });
   const trend = Array.from({ length: 14 }, (_, i) => {
     const date = subDays(now, 13 - i).toISOString().split('T')[0];
     return { date, completed: trendMap[date] || 0, created: 0 };

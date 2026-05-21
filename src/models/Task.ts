@@ -122,11 +122,19 @@ const TaskSchema = new Schema<ITaskDocument>(
   }
 );
 
-// Compound indexes
-TaskSchema.index({ projectId: 1, department: 1 });
-TaskSchema.index({ projectId: 1, status: 1 });
-TaskSchema.index({ assignedUser: 1, status: 1 });
-TaskSchema.index({ projectId: 1, sequence: 1 });
+// Compound indexes - optimized for common query patterns
+TaskSchema.index({ projectId: 1, department: 1, status: 1 });
+TaskSchema.index({ projectId: 1, department: 1, sequence: 1 });
+TaskSchema.index({ projectId: 1, status: 1, sequence: 1 });
+TaskSchema.index({ department: 1, status: 1 });
+TaskSchema.index({ status: 1, department: 1 }); // Dashboard aggregation
+TaskSchema.index({ assignedUser: 1, status: 1, department: 1 });
+TaskSchema.index({ projectId: 1, assignedUser: 1 });
+TaskSchema.index({ completedAt: 1, status: 1 }); // Completion trend queries
+TaskSchema.index({ dependencyTaskId: 1, isLocked: 1 }); // Dependency unlocking
+TaskSchema.index({ projectId: 1, department: 1, assignedUser: 1 });
+TaskSchema.index({ sequence: 1 });
+TaskSchema.index({ createdAt: -1 }); // Default sort
 
 // Pre-save middleware: auto-lock based on dependency and handle department migration
 TaskSchema.pre('save', async function (next) {

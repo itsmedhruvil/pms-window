@@ -300,27 +300,51 @@ async function generateFromTemplateGroups(
 
 /**
  * Check and unlock tasks whose dependencies are now met
+ * Uses bulkWrite to update all dependent tasks in one operation
  */
 export async function unlockDependentTasks(completedTaskId: string): Promise<void> {
   const dependentTasks = await TaskModel.find({
     dependencyTaskId: completedTaskId,
     isLocked: true,
+  })
+    .select('_id projectId status')
+    .lean();
+
+  if (dependentTasks.length === 0) return;
+
+  // Bulk update all dependent tasks in one operation
+  const bulkOps = dependentTasks.map((task) => {
+    const setFields: Record<string, any> = { isLocked: false };
+    if (task.status === TaskStatus.BLOCKED) {
+      setFields.status = TaskStatus.TODO;
+    }
+    return {
+      updateOne: {
+        filter: { _id: task._id },
+        update: { $set: setFields },
+      },
+    };
   });
 
-  for (const task of dependentTasks) {
-    task.isLocked = false;
-    if (task.status === TaskStatus.BLOCKED) {
-      task.status = TaskStatus.TODO;
-    }
-    await task.save();
+  await TaskModel.bulkWrite(bulkOps);
 
-    if (task.projectId) {
-      await triggerEvent(CHANNELS.project(task.projectId.toString()), EVENTS.TASK_UPDATED, {
-        taskId: task._id,
-        status: task.status,
-        isLocked: false,
-      });
-    }
+  // Fire and forget realtime events
+  const events = dependentTasks
+    .filter((t) => t.projectId)
+    .map((task) =>
+      triggerEvent(
+        CHANNELS.project(task.projectId!.toString()),
+        EVENTS.TASK_UPDATED,
+        {
+          taskId: task._id,
+          status: task.status === TaskStatus.BLOCKED ? TaskStatus.TODO : task.status,
+          isLocked: false,
+        }
+      )
+    );
+
+  if (events.length > 0) {
+    void Promise.all(events).catch((err) => console.error('Failed to trigger unlock events:', err));
   }
 }
 
@@ -385,29 +409,51 @@ export async function reconcileBlockedTasksWithAlerts(projectId?: string): Promi
 
 /**
  * Update project completion percentage based on task status
+ * Uses aggregation pipeline to calculate completion without loading all tasks
  */
 export async function updateProjectCompletion(projectId: string): Promise<void> {
-  const tasks = await TaskModel.find({ projectId });
-  if (tasks.length === 0) return;
+  // Use aggregation to get counts in a single query
+  const pipeline = [
+    { $match: { projectId: new Types.ObjectId(projectId) } },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+        doneCount: {
+          $sum: { $cond: [{ $eq: ['$status', TaskStatus.DONE] }, 1, 0] },
+        },
+      },
+    },
+  ];
 
-  const doneTasks = tasks.filter((t) => t.status === TaskStatus.DONE).length;
-  const completionPercentage = Math.round((doneTasks / tasks.length) * 100);
+  // Use lean() with model.aggregate()
+  const results = await TaskModel.aggregate(pipeline).allowDiskUse(true);
+  
+  if (!results || results.length === 0) return;
+  
+  const { total, doneCount } = results[0];
+  if (total === 0) return;
 
-  const project = await ProjectModel.findById(projectId);
-  if (!project) return;
+  const completionPercentage = Math.round((doneCount / total) * 100);
 
-  project.completionPercentage = completionPercentage;
-
+  const updateFields: Record<string, any> = { completionPercentage };
+  
   // Auto-complete project if all tasks done
-  if (completionPercentage === 100 && project.status === ProjectStatus.IN_PRODUCTION) {
-    project.status = ProjectStatus.COMPLETED;
+  let shouldUpdateStatus = false;
+  if (completionPercentage === 100) {
+    updateFields.status = ProjectStatus.COMPLETED;
+    shouldUpdateStatus = true;
   }
 
-  await project.save();
+  // Use updateOne instead of find+save (single round trip)
+  await ProjectModel.updateOne(
+    { _id: new Types.ObjectId(projectId) },
+    { $set: updateFields }
+  );
 
   await triggerEvent(CHANNELS.project(projectId), EVENTS.PROJECT_STATUS_CHANGED, {
     projectId,
-    status: project.status,
+    status: shouldUpdateStatus ? ProjectStatus.COMPLETED : undefined,
     completionPercentage,
   });
 }

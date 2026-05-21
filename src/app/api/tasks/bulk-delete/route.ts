@@ -20,48 +20,55 @@ export const POST = withAuth(
       );
     }
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    // Validate and check permissions in bulk - much faster than one-by-one
+    const tasks = await TaskModel.find({
+      _id: { $in: taskIds },
+    })
+      .select('department projectId _id')
+      .lean();
 
-    try {
-      const projectIds = new Set<string>();
-
-      for (const taskId of taskIds) {
-        if (!taskId || typeof taskId !== 'string') {
-          throw new Error('Invalid task ID provided');
-        }
-
-        const task = await TaskModel.findById(taskId).session(session);
-        if (!task) {
-          throw new Error(`Task ${taskId} not found`);
-        }
-
-        if (!canModifyTask(user, task.department)) {
-          throw new Error('You cannot delete tasks outside your department');
-        }
-
-        if (task.projectId) {
-          projectIds.add(task.projectId.toString());
-        }
-        await CommentModel.deleteMany({ taskId }, { session });
-        await TaskModel.findByIdAndDelete(taskId, { session });
-      }
-
-      await Promise.all(Array.from(projectIds).map((projectId) => updateProjectCompletion(projectId)));
-
-      await session.commitTransaction();
-
-      return NextResponse.json({ success: true, data: { deletedIds: taskIds } });
-    } catch (error) {
-      await session.abortTransaction();
-      console.error('Bulk delete tasks error:', error);
+    if (tasks.length !== taskIds.length) {
+      const foundIds = new Set(tasks.map(t => t._id.toString()));
+      const missingIds = taskIds.filter((id: string) => !foundIds.has(id));
       return NextResponse.json(
-        { success: false, error: error instanceof Error ? error.message : 'Failed to delete tasks' },
-        { status: 500 }
+        { success: false, error: `Tasks not found: ${missingIds.join(', ')}` },
+        { status: 404 }
       );
-    } finally {
-      session.endSession();
     }
+
+    // Check permissions
+    for (const task of tasks) {
+      if (!canModifyTask(user, task.department)) {
+        return NextResponse.json(
+          { success: false, error: `You cannot delete tasks in department: ${task.department}` },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Collect unique project IDs for completion updates
+    const projectIds = [...new Set(
+      tasks
+        .filter(t => t.projectId)
+        .map(t => t.projectId!.toString())
+    )];
+
+    // Use bulk operations instead of transaction with individual operations
+    await Promise.all([
+      // Delete all comments for these tasks in one query
+      CommentModel.deleteMany({ taskId: { $in: taskIds } }),
+      // Delete all tasks in one query
+      TaskModel.deleteMany({ _id: { $in: taskIds } }),
+    ]);
+
+    // Update project completion percentages in parallel
+    if (projectIds.length > 0) {
+      await Promise.all(
+        projectIds.map(projectId => updateProjectCompletion(projectId))
+      );
+    }
+
+    return NextResponse.json({ success: true, data: { deletedIds: taskIds, deletedCount: tasks.length } });
   },
   [UserRole.ADMIN, UserRole.SUPER_ADMIN]
 );

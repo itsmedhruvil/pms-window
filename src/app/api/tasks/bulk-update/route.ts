@@ -4,7 +4,6 @@ import TaskModel from '@/models/Task';
 import { withAuth } from '@/lib/auth';
 import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 import { UserRole, TaskStatus } from '@/types';
-import mongoose from 'mongoose';
 
 export const POST = withAuth(
   async (req: NextRequest, _ctx, { user }) => {
@@ -20,64 +19,98 @@ export const POST = withAuth(
       );
     }
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    // Fetch all tasks in one query instead of one-by-one
+    const taskIds = updates.map(u => u.taskId).filter(Boolean);
+    const tasks = await TaskModel.find({ _id: { $in: taskIds } })
+      .select('_id projectId status completedAt')
+      .lean();
 
-    try {
-      const updatedTasks = [];
+    const taskMap = new Map(tasks.map(t => [t._id.toString(), t]));
 
-      for (const update of updates) {
-        const { taskId, status, completedAt } = update;
+    // Prepare bulk operations
+    const bulkOps: any[] = [];
+    const projectUpdates = new Set<string>();
+    const eventsToTrigger: Array<{ channel: string; event: string; data: any }> = [];
 
-        if (!taskId || !status) {
-          throw new Error(`Invalid update data for task ${taskId}`);
-        }
+    for (const update of updates) {
+      const { taskId, status, completedAt } = update;
 
-        const task = await TaskModel.findById(taskId).session(session);
-        if (!task) {
-          throw new Error(`Task ${taskId} not found`);
-        }
-
-        // Update task
-        task.status = status;
-        if (status === TaskStatus.DONE && completedAt) {
-          task.completedAt = new Date(completedAt);
-        }
-
-        await task.save({ session });
-        updatedTasks.push(task);
-
-        // Trigger realtime update (only for project tasks)
-        if (task.projectId) {
-          await triggerEvent(CHANNELS.project(task.projectId.toString()), EVENTS.TASK_UPDATED, {
-            taskId: task._id.toString(),
-            projectId: task.projectId.toString(),
-            status: task.status,
-            completedAt: task.completedAt,
-          });
-        }
+      if (!taskId || !status) {
+        throw new Error(`Invalid update data for task ${taskId}`);
       }
 
-      await session.commitTransaction();
+      const existingTask = taskMap.get(taskId);
+      if (!existingTask) {
+        throw new Error(`Task ${taskId} not found`);
+      }
 
-      return NextResponse.json({
-        success: true,
-        data: updatedTasks.map(task => ({
-          _id: task._id,
-          status: task.status,
-          completedAt: task.completedAt,
-        })),
+      // Build update operation
+      const setFields: Record<string, any> = { status };
+      if (status === TaskStatus.DONE && completedAt) {
+        setFields.completedAt = new Date(completedAt);
+      }
+      if (status === TaskStatus.DONE && existingTask.status !== TaskStatus.DONE) {
+        setFields.completedAt = new Date();
+      }
+
+      bulkOps.push({
+        updateOne: {
+          filter: { _id: taskId },
+          update: { $set: setFields },
+        },
       });
-    } catch (error) {
-      await session.abortTransaction();
-      console.error('Bulk task update error:', error);
-      return NextResponse.json(
-        { success: false, error: error instanceof Error ? error.message : 'Failed to update tasks' },
-        { status: 500 }
-      );
-    } finally {
-      session.endSession();
+
+      if (existingTask.projectId) {
+        projectUpdates.add(existingTask.projectId.toString());
+        eventsToTrigger.push({
+          channel: CHANNELS.project(existingTask.projectId.toString()),
+          event: EVENTS.TASK_UPDATED,
+          data: {
+            taskId: existingTask._id.toString(),
+            projectId: existingTask.projectId.toString(),
+            status,
+            completedAt: setFields.completedAt || existingTask.completedAt,
+          },
+        });
+      }
     }
+
+    // Execute all updates in a single bulkWrite operation
+    if (bulkOps.length > 0) {
+      await TaskModel.bulkWrite(bulkOps);
+    }
+
+    // Trigger realtime events (fire and forget - don't block response)
+    if (eventsToTrigger.length > 0) {
+      void (async () => {
+        await Promise.all(
+          eventsToTrigger.map(({ channel, event, data }) =>
+            triggerEvent(channel, event, data).catch((err: Error) =>
+              console.error('Failed to trigger event:', err)
+            )
+          )
+        );
+      })();
+    }
+
+    // Update project completions (fire and forget)
+    if (projectUpdates.size > 0) {
+      void (async () => {
+        const { updateProjectCompletion } = await import('@/lib/workflow');
+        await Promise.all(
+          Array.from(projectUpdates).map(pid =>
+            updateProjectCompletion(pid).catch((err: Error) =>
+              console.error(`Failed to update project ${pid} completion:`, err)
+            )
+          )
+        );
+      })();
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: { updatedCount: updates.length, projectIds: Array.from(projectUpdates) },
+    });
   },
   [UserRole.ADMIN, UserRole.SUPER_ADMIN]
 );
