@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import ClerkAppProvider from '@/components/ClerkAppProvider';
+import { SWRProvider } from '@/components/SWRProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -24,7 +25,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="antialiased">
-        <ClerkAppProvider>{children}</ClerkAppProvider>
+        <ClerkAppProvider>
+          <SWRProvider>
+            {children}
+          </SWRProvider>
+        </ClerkAppProvider>
       </body>
     </html>
   );

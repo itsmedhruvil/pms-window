@@ -1,62 +1,40 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, Bell, BellRing, CheckCheck, Loader2, Clock, MessageCircle, User } from 'lucide-react';
-import { apiFetch, cn, timeAgo } from '@/lib/utils';
+import { cn, timeAgo } from '@/lib/utils';
 import type { IAlert, INotification, IUser, IProject } from '@/types';
+import { useNotifications, invalidateProjects } from '@/lib/client-data';
+import { useAlerts } from '@/lib/client-data';
 
 export function DashboardAlertsPane() {
-  const [notifications, setNotifications] = useState<INotification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [activeAlerts, setActiveAlerts] = useState<IAlert[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // SWR handles caching, deduplication, and 30s poll interval automatically
+  const { data: notifData, error: notifError, isLoading: notifLoading, mutate: refreshNotifs } = useNotifications();
+  const { data: alertData, error: alertError, isLoading: alertLoading, mutate: refreshAlerts } = useAlerts({ status: 'active', limit: '5' });
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const notifications = (notifData as unknown as { items: INotification[]; unreadCount: number })?.items || [];
+  const unreadCount = (notifData as unknown as { items: INotification[]; unreadCount: number })?.unreadCount || 0;
+  const activeAlerts = Array.isArray(alertData) ? (alertData as IAlert[]) : (alertData as { items: IAlert[] })?.items || [];
 
-    const [notifResult, alertResult] = await Promise.all([
-      apiFetch<{ items: INotification[]; unreadCount: number }>('/api/notifications?limit=5'),
-      apiFetch<{ items: IAlert[] }>('/api/alerts?status=active&limit=5'),
-    ]);
-
-    if (notifResult.success && notifResult.data) {
-      setNotifications(notifResult.data.items || []);
-      setUnreadCount(notifResult.data.unreadCount || 0);
-    }
-
-    if (alertResult.success && alertResult.data) {
-      const alertData = alertResult.data as unknown;
-      setActiveAlerts(Array.isArray(alertData) ? alertData : (alertData as { items: IAlert[] }).items || []);
-    }
-
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+  const loading = notifLoading && alertLoading;
+  const error = notifError || alertError;
 
   const markAllRead = async () => {
+    const { apiFetch } = await import('@/lib/utils');
     await apiFetch('/api/notifications', {
       method: 'PATCH',
       body: JSON.stringify({ markAllRead: true }),
     });
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    setUnreadCount(0);
+    refreshNotifs();
   };
 
   const markRead = async (id: string) => {
+    const { apiFetch } = await import('@/lib/utils');
     await apiFetch('/api/notifications', {
       method: 'PATCH',
       body: JSON.stringify({ notificationIds: [id] }),
     });
-    setNotifications((prev) => prev.map((n) => (n._id === id ? { ...n, isRead: true } : n)));
-    setUnreadCount((prev) => Math.max(0, prev - 1));
+    refreshNotifs();
   };
 
   const getAlertSeverityColor = (severity?: string) => {
@@ -96,7 +74,7 @@ export function DashboardAlertsPane() {
             )}
             <button
               type="button"
-              onClick={fetchData}
+              onClick={() => { refreshNotifs(); refreshAlerts(); }}
               className="text-[9px] font-mono text-gray-400 hover:text-gray-700 px-1.5 py-0.5"
               title="Refresh"
             >
@@ -112,10 +90,10 @@ export function DashboardAlertsPane() {
         </div>
       ) : error ? (
         <div className="px-4 py-6 text-center">
-          <p className="text-[10px] font-mono text-gray-400">{error}</p>
+          <p className="text-[10px] font-mono text-gray-400">Failed to load</p>
           <button
             type="button"
-            onClick={fetchData}
+            onClick={() => { refreshNotifs(); refreshAlerts(); }}
             className="mt-2 text-[9px] font-mono text-blue-600 hover:text-blue-800"
           >
             Retry
@@ -131,7 +109,7 @@ export function DashboardAlertsPane() {
                   Active Alerts ({activeAlerts.length})
                 </span>
               </div>
-              {activeAlerts.map((alert) => {
+              {activeAlerts.map((alert: IAlert) => {
                 const project = typeof alert.projectId === 'object' ? alert.projectId as Partial<IProject> : null;
                 const raisedBy = typeof alert.raisedBy === 'object' ? alert.raisedBy as Partial<IUser> : null;
                 return (
@@ -179,7 +157,7 @@ export function DashboardAlertsPane() {
                   Recent Notifications {unreadCount > 0 && `(${unreadCount} unread)`}
                 </span>
               </div>
-              {notifications.map((notification) => (
+              {notifications.map((notification: INotification) => (
                 <div
                   key={notification._id}
                   className={cn(
