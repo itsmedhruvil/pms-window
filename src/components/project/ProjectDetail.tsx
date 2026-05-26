@@ -7,7 +7,7 @@ import ExcelJS from 'exceljs';
 import {
   AlertTriangle, Calendar, Package, ChevronRight,
   CheckCircle2, Copy, Trash2, ArrowUpRight, Edit3,
-  X, Save, Upload, FileText,
+  X, Save, Upload, FileText, Tag, Layers,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 import { cn, getDepartmentLabel, formatDate, ALERT_TYPE_LABEL, normalizeProjectPriority } from '@/lib/utils';
@@ -18,8 +18,8 @@ import { useProjectRealtime } from '@/hooks/useRealtime';
 import { ProjectStatusControl } from '@/components/project/ProjectStatusControl';
 import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
 import { Modal } from '@/components/ui/Modal';
-import type { IProject, ITask, IAlert, IUser } from '@/types';
-import { TaskStatus, AlertStatus, Department, ProjectPriority, ProjectStatus } from '@/types';
+import type { IProject, ITask, IAlert, IUser, PdfAttachment, WindowSpec } from '@/types';
+import { TaskStatus, AlertStatus, Department, ProjectPriority, ProjectStatus, UserRole } from '@/types';
 import { useDepartments } from '@/hooks/useDepartments';
 
 interface ProjectDetailProps {
@@ -28,6 +28,7 @@ interface ProjectDetailProps {
   alerts: IAlert[];
   isAdmin: boolean;
   currentUserDepartment?: Department;
+  currentUserRole?: UserRole;
 }
 
 export function ProjectDetail({
@@ -36,6 +37,7 @@ export function ProjectDetail({
   alerts: initialAlerts,
   isAdmin,
   currentUserDepartment,
+  currentUserRole,
 }: ProjectDetailProps) {
   const router = useRouter();
   const departments = useDepartments();
@@ -54,6 +56,7 @@ export function ProjectDetail({
   const [editForm, setEditForm] = useState({
     clientName: initialProject.clientName,
     projectTitle: initialProject.projectTitle,
+    description: initialProject.description || '',
     address: initialProject.address || '',
     contactPhone: initialProject.contactPhone || '',
     totalWindows: initialProject.totalWindows,
@@ -76,17 +79,15 @@ export function ProjectDetail({
         return;
       }
 
-      // Get headers from first row
       const headerRow = worksheet.getRow(1);
       const headers: string[] = [];
       headerRow.eachCell((cell) => {
         headers.push(String(cell.value ?? `Column${headers.length + 1}`));
       });
 
-      // Get data rows
       const rows: Record<string, string | number | boolean | null>[] = [];
       worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber === 1) return; // Skip header
+        if (rowNumber === 1) return;
         const rowData: Record<string, string | number | boolean | null> = {};
         row.eachCell((cell, colNumber) => {
           const header = headers[colNumber - 1];
@@ -131,7 +132,7 @@ export function ProjectDetail({
     setPdfError(null);
 
     try {
-      const newPdfs: Array<{ id: string; name: string; url: string; size: number; uploadedAt: string }> = [];
+      const newPdfs: PdfAttachment[] = [];
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -141,7 +142,6 @@ export function ProjectDetail({
           return;
         }
 
-        // Upload to Vercel Blob via API
         const formData = new FormData();
         formData.append('file', file);
         const uploadRes = await fetch('/api/upload', {
@@ -159,7 +159,7 @@ export function ProjectDetail({
           name: uploadData.data.name,
           url: uploadData.data.url,
           size: uploadData.data.size,
-          uploadedAt: new Date().toISOString(),
+          uploadedAt: new Date().toISOString() as unknown as Date,
         });
       }
 
@@ -184,11 +184,59 @@ export function ProjectDetail({
     }
   };
 
+  // Only admin can delete PDFs
   const removePdf = async (pdfId: string) => {
+    if (!isAdmin) return;
     const remaining = (project.pdfAttachments || []).filter((p) => p.id !== pdfId);
     const result = await apiFetch(`/api/projects/${project._id}`, {
       method: 'PATCH',
       body: JSON.stringify({ pdfAttachments: remaining }),
+    });
+    if (result.success && result.data) {
+      setProject(result.data as IProject);
+    }
+  };
+
+  // Design PDF upload per window specification
+  const handleDesignPdfUpload = async (specIndex: number, file: File) => {
+    if (file.type !== 'application/pdf') return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+    const uploadData = await uploadRes.json();
+    if (!uploadData.success) return;
+
+    const newSpecs = [...(project.windowSpecifications || [])];
+    const spec = { ...newSpecs[specIndex] };
+    spec.designPdf = {
+      id: `${Date.now()}-${specIndex}`,
+      name: uploadData.data.name,
+      url: uploadData.data.url,
+      size: uploadData.data.size,
+      uploadedAt: new Date().toISOString() as unknown as Date,
+    };
+    newSpecs[specIndex] = spec;
+
+    const result = await apiFetch(`/api/projects/${project._id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ windowSpecifications: newSpecs }),
+    });
+    if (result.success && result.data) {
+      setProject(result.data as IProject);
+    }
+  };
+
+  const removeDesignPdf = async (specIndex: number) => {
+    if (!isAdmin) return;
+    const newSpecs = [...(project.windowSpecifications || [])];
+    const spec = { ...newSpecs[specIndex] };
+    delete spec.designPdf;
+    newSpecs[specIndex] = spec;
+
+    const result = await apiFetch(`/api/projects/${project._id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ windowSpecifications: newSpecs }),
     });
     if (result.success && result.data) {
       setProject(result.data as IProject);
@@ -251,6 +299,7 @@ export function ProjectDetail({
       body: JSON.stringify({
         clientName: editForm.clientName,
         projectTitle: editForm.projectTitle,
+        description: editForm.description,
         address: editForm.address,
         contactPhone: editForm.contactPhone,
         totalWindows: editForm.totalWindows,
@@ -272,6 +321,7 @@ export function ProjectDetail({
     setEditForm({
       clientName: project.clientName,
       projectTitle: project.projectTitle,
+      description: project.description || '',
       address: project.address || '',
       contactPhone: project.contactPhone || '',
       totalWindows: project.totalWindows,
@@ -315,16 +365,13 @@ export function ProjectDetail({
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 lg:gap-6">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1.5 text-xs font-mono text-gray-400">
-              <span className="uppercase tracking-widest">{project.clientName}</span>
+              <span className="uppercase tracking-widest">{project.clientName || 'Project'}</span>
               <ChevronRight className="w-3 h-3" />
               <span>Project</span>
             </div>
             <h1 className="text-xl lg:text-2xl font-black text-gray-900 tracking-tight">
               {project.projectTitle}
             </h1>
-            {project.description && (
-              <p className="text-xs text-gray-600 mt-2 font-mono max-w-2xl">{project.description}</p>
-            )}
             <div className="flex flex-wrap items-center gap-2 mt-3">
               <ProjectStatusBadge status={project.status} />
               <PriorityBadge priority={project.priority} />
@@ -336,6 +383,18 @@ export function ProjectDetail({
                 <Package className="w-3.5 h-3.5" />
                 <span className="font-mono">{project.totalWindows} windows</span>
               </div>
+              {project.productTypes && project.productTypes.length > 0 && (
+                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <Layers className="w-3.5 h-3.5" />
+                  <span className="font-mono">{project.productTypes.join(', ')}</span>
+                </div>
+              )}
+              {project.tags && project.tags.length > 0 && (
+                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <Tag className="w-3.5 h-3.5" />
+                  <span className="font-mono">{project.tags.slice(0, 3).join(', ')}{project.tags.length > 3 ? ` +${project.tags.length - 3}` : ''}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -397,7 +456,7 @@ export function ProjectDetail({
         </div>
       </div>
 
-      {/* Main content — single scrollable overview */}
+      {/* Main content */}
       <div className="p-8 max-w-7xl mx-auto space-y-8">
         {/* Project Info Section */}
         <div className="bg-white border border-gray-200 rounded-xl p-6">
@@ -411,6 +470,15 @@ export function ProjectDetail({
               Edit
             </button>
           </div>
+
+          {/* Description */}
+          {project.description && (
+            <div className="mb-4 pb-4 border-b border-gray-100">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">Description</p>
+              <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{project.description}</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">Address</p>
@@ -425,8 +493,38 @@ export function ProjectDetail({
               <p className="text-xs text-gray-900">{project.totalWindows}</p>
             </div>
             <div>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">Budget</p>
+              <p className="text-xs text-gray-900">{project.budget ? `₹${project.budget.toLocaleString()}` : '—'}</p>
             </div>
           </div>
+
+          {/* Product Types */}
+          {project.productTypes && project.productTypes.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-2">Product Types</p>
+              <div className="flex flex-wrap gap-1.5">
+                {project.productTypes.map((pt) => (
+                  <span key={pt} className="px-2 py-0.5 text-[10px] font-mono bg-gray-100 text-gray-700 rounded">
+                    {pt}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Tags */}
+          {project.tags && project.tags.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-2">Tags</p>
+              <div className="flex flex-wrap gap-1.5">
+                {project.tags.map((tag) => (
+                  <span key={tag} className="px-2 py-0.5 text-[10px] font-mono bg-gray-100 text-gray-700 rounded">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Window Specifications */}
           {project.windowSpecifications && project.windowSpecifications.length > 0 && (
@@ -437,8 +535,9 @@ export function ProjectDetail({
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">#</th>
-                      <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">Size (mm)</th>
                       <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">Design</th>
+                      <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">Design PDF</th>
+                      <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">Size (mm)</th>
                       <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">Glass</th>
                       <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">Qty</th>
                       <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">Notes</th>
@@ -448,9 +547,55 @@ export function ProjectDetail({
                     {project.windowSpecifications.map((spec, i) => (
                       <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="px-3 py-2 text-gray-400">{i + 1}</td>
-                        <td className="px-3 py-2 font-bold text-gray-900">{spec.width}×{spec.height}</td>
-                        <td className="px-3 py-2 text-gray-700">{spec.design}</td>
-                        <td className="px-3 py-2 text-gray-700">{spec.glassType}</td>
+                        <td className="px-3 py-2 font-bold text-gray-900">{spec.design || '—'}</td>
+                        <td className="px-3 py-2">
+                          {spec.designPdf ? (
+                            <div className="flex items-center gap-1">
+                              <a
+                                href={spec.designPdf.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-blue-600 hover:underline"
+                              >
+                                <FileText className="w-3 h-3" />
+                                <span className="text-[10px]">{spec.designPdf.name}</span>
+                              </a>
+                              {isAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeDesignPdf(i)}
+                                  className="text-gray-400 hover:text-red-500"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <span className="text-gray-400">—</span>
+                              <input
+                                type="file"
+                                accept=".pdf"
+                                id={`spec-design-pdf-${i}`}
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleDesignPdfUpload(i, file);
+                                  e.target.value = '';
+                                }}
+                              />
+                              <label
+                                htmlFor={`spec-design-pdf-${i}`}
+                                className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-mono text-gray-400 border border-dashed border-gray-300 rounded cursor-pointer hover:border-gray-500 hover:text-gray-600"
+                              >
+                                <Upload className="w-2.5 h-2.5" />
+                                Upload
+                              </label>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">{spec.width > 0 ? `${spec.width}×${spec.height}` : '—'}</td>
+                        <td className="px-3 py-2 text-gray-700">{spec.glassType || '—'}</td>
                         <td className="px-3 py-2 font-bold">×{spec.quantity}</td>
                         <td className="px-3 py-2 text-gray-500">{spec.notes || '—'}</td>
                       </tr>
@@ -510,14 +655,16 @@ export function ProjectDetail({
                       ({(pdf.size / 1024).toFixed(0)} KB)
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removePdf(pdf.id)}
-                    className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0 ml-2"
-                    title="Remove PDF"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => removePdf(pdf.id)}
+                      className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0 ml-2"
+                      title="Remove PDF"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -530,7 +677,7 @@ export function ProjectDetail({
           )}
         </div>
 
-        {/* Excel Upload Section — directly below Project Details */}
+        {/* Excel Upload Section */}
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <details className="group">
             <summary className="flex items-center justify-between cursor-pointer list-none">
@@ -672,7 +819,7 @@ export function ProjectDetail({
           </div>
         </div>
 
-        {/* Workflow Timeline — full width */}
+        {/* Workflow Timeline */}
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
@@ -785,7 +932,6 @@ export function ProjectDetail({
                           </div>
                         </div>
 
-                        {/* Arrow indicator */}
                         <ArrowUpRight className="w-3 h-3 text-gray-300 group-hover:text-gray-600 transition-colors flex-shrink-0 mt-0.5" />
                       </Link>
                     ))}
@@ -840,7 +986,7 @@ export function ProjectDetail({
 
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Client Name</label>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Person Name</label>
               <input
                 type="text"
                 value={editForm.clientName}
@@ -856,6 +1002,16 @@ export function ProjectDetail({
                 value={editForm.projectTitle}
                 onChange={(e) => setEditForm({ ...editForm, projectTitle: e.target.value })}
                 className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Description</label>
+              <textarea
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                rows={3}
+                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors resize-none"
               />
             </div>
 
@@ -962,7 +1118,6 @@ function ExcelUpload({ onUpload, loading = false }: { onUpload: (file: File) => 
     const file = event.target.files?.[0];
     if (!file) return;
     await onUpload(file);
-    // Reset input so the same file can be re-uploaded
     event.target.value = '';
   };
 

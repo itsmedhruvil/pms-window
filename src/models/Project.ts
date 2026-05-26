@@ -21,6 +21,13 @@ export interface IProjectDocument extends Document {
     quantity: number;
     notes?: string;
     templateGroupId?: mongoose.Types.ObjectId;
+    designPdf?: {
+      id: string;
+      name: string;
+      url: string;
+      size: number;
+      uploadedAt: Date;
+    };
   }>;
   selectedTemplateGroupId?: mongoose.Types.ObjectId;
   excelSheetName?: string;
@@ -35,6 +42,8 @@ export interface IProjectDocument extends Document {
   address: string;
   contactPhone: string;
   budget: number;
+  productTypes: string[];
+  tags: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -42,7 +51,7 @@ export interface IProjectDocument extends Document {
 const ProjectSchema = new Schema<IProjectDocument>(
   {
     projectTitle: { type: String, required: true, trim: true },
-    clientName: { type: String, required: true, trim: true },
+    clientName: { type: String, trim: true, default: '' },
     description: { type: String, trim: true },
     pdfAttachments: [
       {
@@ -63,6 +72,13 @@ const ProjectSchema = new Schema<IProjectDocument>(
         quantity: { type: Number, default: 1, min: 1 },
         notes: { type: String, trim: true },
         templateGroupId: { type: Schema.Types.ObjectId, ref: 'TemplateGroup' },
+        designPdf: {
+          id: { type: String },
+          name: { type: String },
+          url: { type: String },
+          size: { type: Number },
+          uploadedAt: { type: Date, default: Date.now },
+        },
       },
     ],
     selectedTemplateGroupId: { type: Schema.Types.ObjectId, ref: 'TemplateGroup' },
@@ -78,6 +94,8 @@ const ProjectSchema = new Schema<IProjectDocument>(
     contactPhone: { type: String, trim: true, default: '' },
     budget: { type: Number, default: 0, min: 0 },
     completionPercentage: { type: Number, default: 0, min: 0, max: 100 },
+    productTypes: [{ type: String, trim: true }],
+    tags: [{ type: String, trim: true }],
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
@@ -86,7 +104,8 @@ ProjectSchema.index({ status: 1, deadline: 1, priority: -1 });
 ProjectSchema.index({ priority: -1, deadline: 1, createdAt: -1 });
 ProjectSchema.index({ createdBy: 1, status: 1 });
 ProjectSchema.index({ deadline: 1, status: 1 });
-ProjectSchema.index({ clientName: 'text', projectTitle: 'text' }); // Full-text search
+ProjectSchema.index({ clientName: 'text', projectTitle: 'text' });
+ProjectSchema.index({ tags: 1 });
 
 const ProjectModel: Model<IProjectDocument> =
   mongoose.models.Project || mongoose.model<IProjectDocument>('Project', ProjectSchema);

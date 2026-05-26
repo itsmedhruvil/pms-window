@@ -5,7 +5,7 @@ export interface IDiscussionDocument extends Document {
   title: string;
   description: string;
   startedBy: mongoose.Types.ObjectId;
-  mentions: mongoose.Types.ObjectId[];
+  mentions: mongoose.Types.ObjectId[]; // Users who have access (starter + @mentioned)
   createdAt: Date;
   updatedAt: Date;
 }

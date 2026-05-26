@@ -52,7 +52,7 @@ export const GET = withAuth(async (_req: NextRequest, ctx, { user }) => {
 
 // PATCH /api/projects/[id]
 export const PATCH = withAuth(
-  async (req: NextRequest, ctx) => {
+  async (req: NextRequest, ctx, { user }) => {
     await connectDB();
     const params = await ctx.params;
     const { id } = params;
@@ -70,6 +70,21 @@ export const PATCH = withAuth(
     const project = await ProjectModel.findById(id);
     if (!project) {
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 });
+    }
+
+    const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
+
+    // Restrict attachment/windowSpec changes to admin only
+    if (!isAdmin) {
+      if (parsed.data.pdfAttachments !== undefined ||
+          parsed.data.windowSpecifications !== undefined ||
+          parsed.data.excelRows !== undefined ||
+          parsed.data.excelSheetName !== undefined) {
+        return NextResponse.json(
+          { success: false, error: 'Only admins can modify attachments and specifications' },
+          { status: 403 }
+        );
+      }
     }
 
     // Validate status transitions

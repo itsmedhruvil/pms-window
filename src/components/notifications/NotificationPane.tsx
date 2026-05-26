@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Bell, BellRing, CheckCheck, Loader2, MessageCircle, AlertTriangle, User, Clock } from 'lucide-react';
 import { apiFetch, cn, timeAgo } from '@/lib/utils';
 import type { INotification } from '@/types';
+import Pusher from 'pusher-js';
 
 interface NotificationPaneProps {
   className?: string;
@@ -31,6 +32,27 @@ export function NotificationPane({ className }: NotificationPaneProps) {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000); // Poll every 30s
     return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  // Real-time subscription via Pusher
+  useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_PUSHER_KEY) return;
+
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'ap2',
+    });
+
+    const channel = pusher.subscribe('erp-global');
+    channel.bind('notification-created', (_data: unknown) => {
+      // Refetch to get the latest list
+      fetchNotifications();
+    });
+
+    return () => {
+      channel.unbind_all();
+      channel.unsubscribe();
+      pusher.disconnect();
+    };
   }, [fetchNotifications]);
 
   // Close on outside click
@@ -66,6 +88,7 @@ export function NotificationPane({ className }: NotificationPaneProps) {
     switch (type) {
       case 'discussion_mention':
       case 'discussion_reply':
+      case 'discussion_created':
         return <MessageCircle className="w-3.5 h-3.5 text-blue-500" />;
       case 'task_due_soon':
       case 'task_overdue':
@@ -76,6 +99,8 @@ export function NotificationPane({ className }: NotificationPaneProps) {
       case 'alert_acknowledged':
       case 'alert_resolved':
         return <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />;
+      case 'project_created':
+        return <Bell className="w-3.5 h-3.5 text-green-500" />;
       default:
         return <Bell className="w-3.5 h-3.5 text-gray-500" />;
     }

@@ -17,7 +17,6 @@ const UserSchema = new Schema<IUserDocument>(
   {
     clerkId: {
       type: String,
-      index: true,
     },
     email: {
       type: String,

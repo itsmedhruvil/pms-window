@@ -7,6 +7,7 @@ import { generateProjectTasks, generateFromSelectedTemplateGroup } from '@/lib/w
 import { ProjectStatus, UserRole } from '@/types';
 import mongoose from 'mongoose';
 import { createSystemLog } from '@/lib/workflow';
+import { notifyAdmins, notifyDepartment } from '@/lib/notifications';
 
 // GET /api/projects - List projects with filters
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
@@ -151,6 +152,34 @@ export const POST = withAuth(
       const populated = await ProjectModel.findById(project._id)
         .populate('createdBy', 'name email department')
         .lean();
+
+      // Fire-and-forget notifications - notify all admins about the new project
+      if (populated) {
+        notifyAdmins({
+          type: 'project_created',
+          title: 'New Project Created',
+          message: `"${populated.projectTitle}" was created for client "${populated.clientName}".`,
+          link: `/projects/${populated._id}`,
+          relatedId: populated._id.toString(),
+          relatedModel: 'Project',
+        }).catch(() => {});
+
+        // Notify all departments that have users
+        import('@/models/User').then(({ default: UserModel }) => {
+          UserModel.distinct('department', { isActive: true }).then((departments: string[]) => {
+            for (const dept of departments) {
+              notifyDepartment(dept as any, {
+                type: 'project_created',
+                title: 'New Project Created',
+                message: `"${populated.projectTitle}" was created for "${populated.clientName}". Check your tasks.`,
+                link: `/projects/${populated._id}`,
+                relatedId: populated._id.toString(),
+                relatedModel: 'Project',
+              }).catch(() => {});
+            }
+          });
+        });
+      }
 
       return NextResponse.json({ success: true, data: populated }, { status: 201 });
     } catch (error) {
