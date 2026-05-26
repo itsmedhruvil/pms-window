@@ -253,17 +253,25 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     setError(null);
 
     // Parse @mentions from content to extract user IDs
+    // Sort by name length (longest first) to match full multi-word names correctly
+    // e.g., "John Doe" should be matched over just "John"
     const mentionedIds: string[] = [];
-    const mentionRegex = /@(\S+(?:\s+\S+)*?)(?:\s|$)/g;
-    let match;
-    while ((match = mentionRegex.exec(newMessage)) !== null) {
-      const name = match[1].trim();
-      if (!name) continue;
-      const foundUser = availableUsers.find(
-        (u) => u.name?.toLowerCase() === name.toLowerCase()
-      );
-      if (foundUser?._id && !mentionedIds.includes(foundUser._id)) {
-        mentionedIds.push(foundUser._id);
+    let contentForMentionParsing = newMessage;
+    const sortedUsers = [...availableUsers].sort(
+      (a, b) => (b.name?.length || 0) - (a.name?.length || 0)
+    );
+
+    for (const u of sortedUsers) {
+      if (!u.name || !u._id) continue;
+      const escapedName = u.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Match @Name preceded by start-of-string or whitespace,
+      // followed by whitespace, punctuation, or end-of-string
+      const pattern = new RegExp(`(?:^|\\s)@${escapedName}(?=\\s|$|[.,!?;:])`, 'i');
+      const match = contentForMentionParsing.match(pattern);
+      if (match) {
+        mentionedIds.push(u._id);
+        // Remove matched mention so it's not matched again by a shorter name
+        contentForMentionParsing = contentForMentionParsing.replace(match[0], ' ');
       }
     }
 

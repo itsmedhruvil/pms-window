@@ -340,18 +340,47 @@ function AlertRow({
             {/* Departments */}
             <div>
               <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1.5">
-                Affected Departments
+                Acknowledgements
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {alert.affectedDepartments.map((dept) => (
-                  <span
-                    key={dept}
-                    className="text-[10px] font-mono px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-600 uppercase tracking-wide"
-                  >
-                    {getDepartmentLabel(dept)}
-                  </span>
-                ))}
+                {alert.affectedDepartments.map((dept) => {
+                  const deptAcknowledged = Array.isArray(alert.acknowledgedBy)
+                    ? alert.acknowledgedBy.some((ack) => {
+                        if (typeof ack === 'object' && ack !== null && 'department' in ack) {
+                          return (ack as { department: string }).department === dept;
+                        }
+                        return false;
+                      })
+                    : false;
+                  return (
+                    <span
+                      key={dept}
+                      className={cn(
+                        'text-[10px] font-mono px-2 py-0.5 uppercase tracking-wide',
+                        deptAcknowledged
+                          ? 'bg-gray-800 text-white'
+                          : 'bg-gray-100 border border-gray-200 text-gray-600'
+                      )}
+                    >
+                      {deptAcknowledged ? '✓ ' : ''}{getDepartmentLabel(dept)}
+                    </span>
+                  );
+                })}
               </div>
+              {Array.isArray(alert.acknowledgedBy) && alert.acknowledgedBy.length > 0 && (
+                <div className="mt-1.5 text-[10px] text-gray-400">
+                  Acknowledged by: {alert.acknowledgedBy
+                    .map((a) => {
+                      if (typeof a === 'object' && a !== null && 'name' in a) {
+                        const user = a as unknown as { name: string; department: string };
+                        return `${user.name} (${(user.department || '').replace('_', ' ')})`;
+                      }
+                      return '';
+                    })
+                    .filter(Boolean)
+                    .join(', ')}
+                </div>
+              )}
             </div>
 
             {/* Actions row */}

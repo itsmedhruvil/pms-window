@@ -166,9 +166,9 @@ function AlertCard({
                     key={dept}
                     className={cn(
                       'text-[10px] font-mono px-1.5 py-0.5 uppercase tracking-wide',
-                      deptAcknowledged
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-600'
+              deptAcknowledged
+                ? 'bg-gray-800 text-white'
+                : 'bg-gray-100 text-gray-600'
                     )}
                   >
                     {deptAcknowledged ? '✓ ' : ''}{dept.replace('_', ' ')}

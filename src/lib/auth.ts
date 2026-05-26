@@ -191,16 +191,16 @@ export async function getCurrentUser(): Promise<IUserDocument | null> {
 
     // Always sync role and department to Clerk's publicMetadata so the
     // client-side useUser() hook reads the correct values.
+    // Reuse the already-fetched clerkUserData to avoid a redundant API call.
     try {
-      const client = await clerkClient();
-      const clerkUserData2 = await client.users.getUser(clerkUserId);
-      const currentMeta = clerkUserData2.publicMetadata || {};
+      const currentMeta = clerkUserData.publicMetadata || {};
 
       if (
         currentMeta.role !== user.role ||
         currentMeta.department !== user.department
       ) {
         console.log(`[Auth] Syncing Clerk metadata for ${user.email}: role=${user.role}, dept=${user.department}`);
+        const client = await clerkClient();
         await client.users.updateUser(clerkUserId, {
           publicMetadata: {
             ...currentMeta,
