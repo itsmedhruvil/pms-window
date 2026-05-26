@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, ChevronRight, ChevronLeft, Check } from 'lucide-react';
+import { AlertCircle, ChevronRight, ChevronLeft, Check, X, FileText, Upload } from 'lucide-react';
 import { cn, apiFetch } from '@/lib/utils';
 import { ProjectPriority } from '@/types';
 import type { ITemplateGroup } from '@/types';
@@ -14,6 +14,16 @@ const PRIORITIES = [
   { value: ProjectPriority.URGENT, label: 'Urgent', desc: 'Immediate attention required' },
 ];
 
+const PRODUCT_TYPE_OPTIONS = ['Glass', 'Door', 'Railing'];
+
+interface PdfFile {
+  id: string;
+  name: string;
+  url: string;
+  size: number;
+  uploadedAt: string;
+}
+
 interface FormData {
   clientName: string;
   projectTitle: string;
@@ -24,6 +34,12 @@ interface FormData {
   contactPhone: string;
   totalWindows: number;
   templateGroupId?: string;
+  productTypes: string[];
+  tags: string[];
+  windowDesigns: Array<{
+    design: string;
+    pdf?: PdfFile;
+  }>;
 }
 
 interface CreateProjectFormProps {
@@ -47,7 +63,12 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
     contactPhone: '',
     totalWindows: 0,
     templateGroupId: undefined,
+    productTypes: [],
+    tags: [],
+    windowDesigns: [],
   });
+
+  const [tagInput, setTagInput] = useState('');
 
   const [templateGroups, setTemplateGroups] = useState<ITemplateGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
@@ -77,7 +98,6 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
 
   // ── Step validation ──────────────────────────
   const step1Valid =
-    form.clientName.trim().length >= 2 &&
     form.projectTitle.trim().length >= 3 &&
     deadlineIsFuture &&
     form.address.trim().length >= 5 &&
@@ -101,6 +121,81 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
     }
   };
 
+  const toggleProductType = (type: string) => {
+    setForm({
+      ...form,
+      productTypes: form.productTypes.includes(type)
+        ? form.productTypes.filter((t) => t !== type)
+        : [...form.productTypes, type],
+    });
+  };
+
+  const addTag = () => {
+    const trimmed = tagInput.trim();
+    if (trimmed && !form.tags.includes(trimmed)) {
+      setForm({ ...form, tags: [...form.tags, trimmed] });
+    }
+    setTagInput('');
+  };
+
+  const removeTag = (tag: string) => {
+    setForm({ ...form, tags: form.tags.filter((t) => t !== tag) });
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTag();
+    }
+  };
+
+  // Window design upload
+  const handleDesignPdfUpload = async (index: number, file: File) => {
+    if (file.type !== 'application/pdf') return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+    const uploadData = await uploadRes.json();
+
+    if (!uploadData.success) return;
+
+    const pdfFile: PdfFile = {
+      id: `${Date.now()}-${index}`,
+      name: uploadData.data.name,
+      url: uploadData.data.url,
+      size: uploadData.data.size,
+      uploadedAt: new Date().toISOString(),
+    };
+
+    const newDesigns = [...form.windowDesigns];
+    newDesigns[index] = { ...newDesigns[index], pdf: pdfFile };
+    setForm({ ...form, windowDesigns: newDesigns });
+  };
+
+  const removeDesignPdf = (index: number) => {
+    const newDesigns = [...form.windowDesigns];
+    delete newDesigns[index].pdf;
+    setForm({ ...form, windowDesigns: newDesigns });
+  };
+
+  // Generate window design rows based on totalWindows
+  const windowDesignCount = Math.min(form.totalWindows, 20); // Limit to 20 rows in form
+  const windowDesigns = Array.from({ length: windowDesignCount }, (_, i) => ({
+    index: i,
+    label: `Design ${i + 1}`,
+    data: form.windowDesigns[i] || { design: '' },
+  }));
+
+  const updateWindowDesign = (index: number, design: string) => {
+    const newDesigns = [...form.windowDesigns];
+    if (!newDesigns[index]) {
+      newDesigns[index] = { design: '' };
+    }
+    newDesigns[index] = { ...newDesigns[index], design };
+    setForm({ ...form, windowDesigns: newDesigns });
+  };
+
   const selectedGroup = templateGroups.find((g) => g._id === form.templateGroupId);
 
   // ── Submit ────────────────────────────────────
@@ -109,22 +204,51 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
     setError(null);
 
     const body: Record<string, unknown> = {
-      clientName: form.clientName,
       projectTitle: form.projectTitle,
       priority: form.priority,
       deadline: form.deadline,
       address: form.address,
-      contactPhone: form.contactPhone,
       totalWindows: form.totalWindows,
+      productTypes: form.productTypes,
+      tags: form.tags,
     };
 
-    // If a template group is selected, pass it along (window specifications will be populated from excel later)
+    if (form.clientName.trim()) {
+      body.clientName = form.clientName.trim();
+    }
+
+    if (form.contactPhone.trim()) {
+      body.contactPhone = form.contactPhone.trim();
+    }
+
     if (form.description.trim()) {
       body.description = form.description.trim();
     }
 
     if (form.templateGroupId) {
       body.selectedTemplateGroupId = form.templateGroupId;
+    }
+
+    // Build window specifications from designs
+    const specs = form.windowDesigns
+      .filter((wd) => wd.design.trim())
+      .map((wd) => {
+        const designCount = Math.ceil(form.totalWindows / windowDesignCount);
+        const spec: Record<string, unknown> = {
+          width: 0,
+          height: 0,
+          design: wd.design.trim(),
+          glassType: '',
+          quantity: designCount,
+        };
+        if (wd.pdf) {
+          spec.designPdf = wd.pdf;
+        }
+        return spec;
+      });
+
+    if (specs.length > 0) {
+      body.windowSpecifications = specs;
     }
 
     const result = await apiFetch<{ _id: string; projectTitle: string }>('/api/projects', {
@@ -199,7 +323,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
         <div className="space-y-5">
           <SectionHeader title="Project Information" />
 
-          <Field label="Client Name" required>
+          <Field label="Person Name (Optional)">
             <input
               type="text"
               value={form.clientName}
@@ -207,6 +331,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               placeholder="e.g. Sharma Residencies Pvt Ltd"
               className={inputClass}
             />
+            <p className="mt-1 text-[10px] font-mono text-gray-400">Client/person name (optional)</p>
           </Field>
 
           <Field label="Project Title" required>
@@ -249,7 +374,6 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             />
           </Field>
 
-          {/* New Number of Windows field */}
           <Field label="Number of Windows" required>
             <input
               type="number"
@@ -259,10 +383,71 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               placeholder="e.g. 100"
               className={inputClass}
             />
-            <p className="mt-1 text-[10px] font-mono text-gray-400">
-              Window specifications (sizes, designs, glass types) can be uploaded later via Excel in the project detail view.
-            </p>
           </Field>
+
+          {/* Window Designs Section */}
+          {form.totalWindows > 0 && (
+            <div className="border border-gray-200 p-4 bg-gray-50">
+              <SectionHeader title="Window Designs (Optional)" />
+              <p className="text-[10px] font-mono text-gray-400 mt-1 mb-3">
+                Optionally specify up to {windowDesignCount} design names and upload PDF drawings.
+              </p>
+              <div className="space-y-3">
+                {windowDesigns.map(({ index, label, data }) => (
+                  <div key={index} className="flex items-start gap-2">
+                    <input
+                      type="text"
+                      value={data.design}
+                      onChange={(e) => updateWindowDesign(index, e.target.value)}
+                      placeholder={`${label} name`}
+                      className="flex-1 px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                    />
+                    <div className="flex-shrink-0">
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        id={`design-pdf-${index}`}
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleDesignPdfUpload(index, file);
+                          e.target.value = '';
+                        }}
+                      />
+                      {data.pdf ? (
+                        <div className="flex items-center gap-1">
+                          <a
+                            href={data.pdf.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 px-2 py-1.5 text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100"
+                          >
+                            <FileText className="w-3 h-3" />
+                            PDF
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => removeDesignPdf(index)}
+                            className="p-1 text-gray-400 hover:text-red-500"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label
+                          htmlFor={`design-pdf-${index}`}
+                          className="flex items-center gap-1 px-2 py-1.5 text-[10px] font-mono text-gray-500 border border-dashed border-gray-300 rounded cursor-pointer hover:border-gray-500"
+                        >
+                          <Upload className="w-3 h-3" />
+                          PDF
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <Field label="Deadline" required>
             <input
@@ -308,6 +493,68 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             </div>
           </Field>
 
+          {/* Product Types - Multi Select */}
+          <Field label="Product Types">
+            <div className="flex flex-wrap gap-2">
+              {PRODUCT_TYPE_OPTIONS.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => toggleProductType(type)}
+                  className={cn(
+                    'px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-wide border transition-colors rounded',
+                    form.productTypes.includes(type)
+                      ? 'bg-black text-white border-black'
+                      : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                  )}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+            {form.productTypes.length > 0 && (
+              <p className="mt-1 text-[10px] font-mono text-gray-400">
+                Selected: {form.productTypes.join(', ')}
+              </p>
+            )}
+          </Field>
+
+          {/* Tags */}
+          <Field label="Tags">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleTagKeyDown}
+                placeholder="Type a tag and press Enter"
+                className="flex-1 px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+              />
+              <button
+                type="button"
+                onClick={addTag}
+                className="px-3 py-2 text-xs font-mono font-bold uppercase border border-gray-200 text-gray-600 hover:border-black hover:text-black transition-colors"
+              >
+                Add
+              </button>
+            </div>
+            {form.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {form.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono bg-gray-100 text-gray-700 rounded"
+                  >
+                    {tag}
+                    <button type="button" onClick={() => removeTag(tag)} className="text-gray-400 hover:text-red-500">
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </Field>
+
           {/* Task Template Group */}
           <div className="border border-gray-200 p-4 bg-blue-50">
             <div className="flex items-center justify-between mb-2">
@@ -317,7 +564,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               {loadingGroups && <span className="text-[10px] text-gray-400 font-mono">Loading...</span>}
             </div>
             <p className="text-xs text-gray-600 font-mono mb-3">
-              Select a template group to automatically generate department tasks. Tasks will be allocated directly to departments after project creation.
+              Select a template group to automatically generate department tasks.
             </p>
             <select
               value={form.templateGroupId || ''}
@@ -346,10 +593,14 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
         <div className="space-y-5">
           <SectionHeader title="Order Summary" />
 
-          <ReviewBlock label="Client">{form.clientName}</ReviewBlock>
+          {form.clientName && (
+            <ReviewBlock label="Person">{form.clientName}</ReviewBlock>
+          )}
           <ReviewBlock label="Project">{form.projectTitle}</ReviewBlock>
           {form.description && (
-            <ReviewBlock label="Description">{form.description}</ReviewBlock>
+            <ReviewBlock label="Description">
+              <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{form.description}</p>
+            </ReviewBlock>
           )}
           <ReviewBlock label="Address">{form.address}</ReviewBlock>
           {form.contactPhone && (
@@ -358,6 +609,27 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
           <ReviewBlock label="Total Windows">
             <span className="font-bold">{form.totalWindows}</span>
           </ReviewBlock>
+
+          {/* Window Designs Review */}
+          {form.windowDesigns.filter((wd) => wd.design.trim()).length > 0 && (
+            <ReviewBlock label="Window Designs">
+              <div className="space-y-1">
+                {form.windowDesigns
+                  .filter((wd) => wd.design.trim())
+                  .map((wd, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <span className="font-medium">{wd.design}</span>
+                      {wd.pdf && (
+                        <a href={wd.pdf.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-[10px]">
+                          (PDF)
+                        </a>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </ReviewBlock>
+          )}
+
           <ReviewBlock label="Priority">
             <span className={cn(
               'font-mono font-bold uppercase text-xs',
@@ -366,16 +638,40 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               {form.priority}
             </span>
           </ReviewBlock>
+
           <ReviewBlock label="Deadline">
             {new Date(form.deadline).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}
           </ReviewBlock>
+
+          {form.productTypes.length > 0 && (
+            <ReviewBlock label="Products">
+              <div className="flex flex-wrap gap-1">
+                {form.productTypes.map((pt) => (
+                  <span key={pt} className="px-2 py-0.5 text-[10px] font-mono bg-gray-100 text-gray-700 rounded">
+                    {pt}
+                  </span>
+                ))}
+              </div>
+            </ReviewBlock>
+          )}
+
+          {form.tags.length > 0 && (
+            <ReviewBlock label="Tags">
+              <div className="flex flex-wrap gap-1">
+                {form.tags.map((tag) => (
+                  <span key={tag} className="px-2 py-0.5 text-[10px] font-mono bg-gray-100 text-gray-700 rounded">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </ReviewBlock>
+          )}
 
           {selectedGroup && (
             <div className="border border-gray-200 bg-gray-50 p-4">
               <p className="text-xs text-gray-600 font-mono">
                 <span className="font-bold text-gray-900">After creation:</span> {' '}
                 tasks from &ldquo;{selectedGroup.name}&rdquo; template group will be generated across departments.
-                Window specifications can be uploaded via Excel in the project details.
               </p>
             </div>
           )}
@@ -385,17 +681,9 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               <p className="text-xs text-gray-600 font-mono">
                 <span className="font-bold text-gray-900">After creation:</span> {' '}
                 active task templates will be copied department-wise into this project.
-                Window specifications can be uploaded via Excel in the project details.
               </p>
             </div>
           )}
-
-          <div className="border border-gray-200 bg-amber-50 p-4">
-            <p className="text-xs text-gray-700 font-mono">
-              <span className="font-bold">Note:</span> Window specifications (sizes, designs, glass types) will be uploaded
-              via an Excel file after project creation. Navigate to the project detail page to upload.
-            </p>
-          </div>
         </div>
       )}
 

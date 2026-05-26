@@ -148,13 +148,48 @@ function AlertCard({
             </div>
           </div>
 
-          {/* Affected departments */}
-          <div className="flex flex-wrap gap-1">
-            {alert.affectedDepartments.map((dept) => (
-              <span key={dept} className="text-[10px] font-mono px-1.5 py-0.5 bg-gray-100 text-gray-600 uppercase tracking-wide">
-                {dept.replace('_', ' ')}
-              </span>
-            ))}
+          {/* Affected departments + acknowledgement status */}
+          <div>
+            <span className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-wider mb-1 block">Acknowledgements</span>
+            <div className="flex flex-wrap gap-1">
+              {alert.affectedDepartments.map((dept) => {
+                const deptAcknowledged = Array.isArray(alert.acknowledgedBy)
+                  ? alert.acknowledgedBy.some((ack) => {
+                      if (typeof ack === 'object' && ack !== null && 'department' in ack) {
+                        return (ack as { department: string }).department === dept;
+                      }
+                      return false;
+                    })
+                  : false;
+                return (
+                  <span
+                    key={dept}
+                    className={cn(
+                      'text-[10px] font-mono px-1.5 py-0.5 uppercase tracking-wide',
+                      deptAcknowledged
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-600'
+                    )}
+                  >
+                    {deptAcknowledged ? '✓ ' : ''}{dept.replace('_', ' ')}
+                  </span>
+                );
+              })}
+            </div>
+            {Array.isArray(alert.acknowledgedBy) && alert.acknowledgedBy.length > 0 && (
+              <div className="mt-1 text-[10px] text-gray-400">
+                Acknowledged by: {alert.acknowledgedBy
+                  .map((a) => {
+                    if (typeof a === 'object' && a !== null && 'name' in a) {
+                      const user = a as unknown as { name: string; department: string };
+                      return `${user.name} (${(user.department || '').replace('_', ' ')})`;
+                    }
+                    return '';
+                  })
+                  .filter(Boolean)
+                  .join(', ')}
+              </div>
+            )}
           </div>
 
           {/* Actions */}

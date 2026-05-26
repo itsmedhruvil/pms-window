@@ -50,6 +50,14 @@ export const UpdateUserSchema = z.object({
 // PROJECT SCHEMAS
 // ============================================================
 
+const DesignPdfSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  url: z.string(),
+  size: z.number(),
+  uploadedAt: z.string().optional(),
+}).optional();
+
 export const WindowSpecSchema = z.object({
   width: z.number().positive('Width must be positive'),
   height: z.number().positive('Height must be positive'),
@@ -58,10 +66,11 @@ export const WindowSpecSchema = z.object({
   quantity: z.number().int().positive('Quantity must be positive'),
   notes: z.string().optional(),
   templateGroupId: z.string().optional(),
+  designPdf: DesignPdfSchema,
 });
 
 export const CreateProjectSchema = z.object({
-  clientName: z.string().min(2, 'Client name must be at least 2 characters'),
+  clientName: z.string().min(1, 'Client name is required').optional().or(z.literal('')),
   projectTitle: z.string().min(3, 'Project title must be at least 3 characters'),
   description: z.string().optional(),
   totalWindows: z.number().int().positive('Total windows must be positive'),
@@ -70,6 +79,8 @@ export const CreateProjectSchema = z.object({
   priority: ProjectPrioritySchema,
   address: z.string().min(5, 'Address must be at least 5 characters'),
   contactPhone: z.string().optional(),
+  productTypes: z.array(z.string()).optional().default([]),
+  tags: z.array(z.string()).optional().default([]),
   deadline: z.string()
     .refine((str) => {
       const date = new Date(str);
@@ -83,8 +94,9 @@ export const CreateProjectSchema = z.object({
 });
 
 export const UpdateProjectSchema = z.object({
-  clientName: z.string().min(2).optional(),
+  clientName: z.string().min(1).optional(),
   projectTitle: z.string().min(3).optional(),
+  description: z.string().optional(),
   totalWindows: z.number().int().positive().optional(),
   address: z.string().min(5).optional(),
   contactPhone: z.string().optional(),
@@ -109,6 +121,9 @@ export const UpdateProjectSchema = z.object({
     .transform((str) => new Date(str))
     .optional(),
   status: z.nativeEnum(ProjectStatus).optional(),
+  productTypes: z.array(z.string()).optional(),
+  tags: z.array(z.string()).optional(),
+  budget: z.number().min(0).optional(),
 });
 
 // ============================================================

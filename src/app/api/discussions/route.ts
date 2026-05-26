@@ -4,6 +4,7 @@ import DiscussionModel from '@/models/Discussion';
 import NotificationModel from '@/models/Notification';
 import { withAuth } from '@/lib/auth';
 import { UserRole } from '@/types';
+import { notifyAdmins } from '@/lib/notifications';
 
 // GET /api/discussions
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
@@ -15,12 +16,9 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
   const query: Record<string, unknown> = {};
   if (projectId) query.projectId = projectId;
 
-  // Only show discussions where user is mentioned or is the starter
+  // Only show discussions where user is in the mentions array (includes starter)
   if (user.role === UserRole.DEPARTMENT_USER) {
-    query.$or = [
-      { startedBy: user._id },
-      { mentions: user._id },
-    ];
+    query.mentions = user._id;
   }
 
   const discussions = await DiscussionModel.find(query)
@@ -40,7 +38,7 @@ export const POST = withAuth(
     await connectDB();
 
     const body = await req.json();
-    const { projectId, title, description, mentions } = body;
+    const { projectId, title, description } = body;
 
     if (!projectId || !title) {
       return NextResponse.json(
@@ -49,37 +47,37 @@ export const POST = withAuth(
       );
     }
 
+    // Starter is automatically added to mentions (access list)
     const discussion = await DiscussionModel.create({
       projectId,
       title,
       description: description || '',
       startedBy: user._id,
-      mentions: mentions || [],
+      mentions: [user._id], // starter has access
     });
-
-    // Create notifications for mentioned users
-    if (mentions && mentions.length > 0) {
-      const notificationPromises = mentions
-        .filter((mentionId: string) => mentionId !== user._id.toString())
-        .map((mentionId: string) =>
-          NotificationModel.create({
-            userId: mentionId,
-            type: 'discussion_mention',
-            title: `You were mentioned in: ${title}`,
-            message: `${user.name} started a discussion and mentioned you: ${title}${description ? ` - ${description.slice(0, 100)}` : ''}`,
-            link: `/discussions`,
-            relatedId: discussion._id,
-            relatedModel: 'Discussion',
-          })
-        );
-      await Promise.all(notificationPromises);
-    }
 
     const populated = await DiscussionModel.findById(discussion._id)
       .populate('startedBy', 'name email department')
       .populate('projectId', 'projectTitle clientName')
       .populate('mentions', 'name email department')
       .lean();
+
+    // Fire-and-forget: notify admins about the new discussion
+    if (populated) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const projectInfo = populated.projectId && typeof populated.projectId === 'object'
+        ? (populated.projectId as any).projectTitle || 'Project'
+        : 'Project';
+
+      notifyAdmins({
+        type: 'discussion_created',
+        title: 'New Discussion Created',
+        message: `"${populated.title}" started in project "${projectInfo}".`,
+        link: `/discussions?id=${populated._id}`,
+        relatedId: populated._id.toString(),
+        relatedModel: 'Discussion',
+      }).catch(() => {});
+    }
 
     return NextResponse.json({ success: true, data: populated }, { status: 201 });
   },

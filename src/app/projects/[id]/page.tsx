@@ -40,6 +40,7 @@ export default async function ProjectDetailPage(props: { params: Promise<{ id: s
         alerts={visibleAlerts as IAlert[]}
         isAdmin={isAdmin}
         currentUserDepartment={user.department}
+        currentUserRole={user.role}
       />
     </AppLayout>
   );

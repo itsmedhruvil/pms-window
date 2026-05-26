@@ -45,9 +45,22 @@ async function patchHandler(
 
     alert.acknowledgedBy.push(user._id);
 
-    // Check if all affected depts have acknowledged
-    // (simplified: if acknowledgedBy has at least one user)
-    if (alert.status === AlertStatus.ACTIVE) {
+    // Check if ALL affected departments have at least one acknowledgment
+    const acknowledgedUserIds = alert.acknowledgedBy;
+    const UserModel = (await import('@/models/User')).default;
+    const acknowledgedUsers = await UserModel.find({
+      _id: { $in: acknowledgedUserIds },
+    }).select('department').lean();
+
+    const departmentsAcknowledged = new Set(
+      acknowledgedUsers.map((u: { department: string }) => u.department)
+    );
+
+    const allDepartmentsAcknowledged = alert.affectedDepartments.every((dept) =>
+      departmentsAcknowledged.has(dept)
+    );
+
+    if (allDepartmentsAcknowledged && alert.status === AlertStatus.ACTIVE) {
       alert.status = AlertStatus.ACKNOWLEDGED;
     }
 
@@ -70,7 +83,7 @@ async function patchHandler(
     // Ensure alert has been acknowledged before allowing resolution
     if (alert.status === AlertStatus.ACTIVE) {
       return NextResponse.json(
-        { success: false, error: 'Alert must be acknowledged before resolving' },
+        { success: false, error: 'Alert must be acknowledged by all affected departments before resolving' },
         { status: 400 }
       );
     }

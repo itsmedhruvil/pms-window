@@ -169,6 +169,77 @@ export async function generateFromSelectedTemplateGroup(
 /**
  * Old behavior: generate tasks from active TaskTemplates
  */
+/**
+ * Get the total windows count for a project to use in task multiplication
+ */
+async function getProjectTotalWindows(projectId: Types.ObjectId): Promise<number> {
+  const project = await ProjectModel.findById(projectId).select('totalWindows').lean();
+  return project?.totalWindows || 1;
+}
+
+/**
+ * Generate window-multiplied tasks for Operations (dispatch) and Site (installation, QC).
+ * Creates one dispatch task per window for Operations,
+ * and one installation + one QC task per window for Site.
+ */
+async function generateWindowMultipliedTasks(
+  projectId: Types.ObjectId,
+  totalWindows: number,
+  sequenceStart: number
+): Promise<{ tasks: any[]; nextSequence: number }> {
+  const tasks: any[] = [];
+  let seq = sequenceStart;
+
+  // Operations: 1 Dispatch task per window
+  for (let w = 0; w < totalWindows; w++) {
+    tasks.push({
+      _id: new Types.ObjectId(),
+      projectId,
+      department: 'operations' as Department,
+      title: `Dispatch Window ${w + 1}`,
+      description: `Dispatch window #${w + 1} of ${totalWindows} to client site.`,
+      status: TaskStatus.TODO,
+      frequency: 'project' as const,
+      dependencyTaskId: null,
+      isLocked: false,
+      sequence: seq++,
+    });
+  }
+
+  // Site: 2 tasks per window (Installation + QC)
+  for (let w = 0; w < totalWindows; w++) {
+    // Installation
+    tasks.push({
+      _id: new Types.ObjectId(),
+      projectId,
+      department: 'site' as Department,
+      title: `Install Window ${w + 1}`,
+      description: `Install window #${w + 1} of ${totalWindows} at client site.`,
+      status: TaskStatus.TODO,
+      frequency: 'project' as const,
+      dependencyTaskId: null,
+      isLocked: false,
+      sequence: seq++,
+    });
+
+    // QC
+    tasks.push({
+      _id: new Types.ObjectId(),
+      projectId,
+      department: 'site' as Department,
+      title: `QC Window ${w + 1}`,
+      description: `Quality check for installed window #${w + 1} of ${totalWindows}.`,
+      status: TaskStatus.TODO,
+      frequency: 'project' as const,
+      dependencyTaskId: null,
+      isLocked: false,
+      sequence: seq++,
+    });
+  }
+
+  return { tasks, nextSequence: seq };
+}
+
 async function generateFromTaskTemplates(
   projectId: Types.ObjectId,
   createdByUserId: Types.ObjectId
@@ -210,11 +281,21 @@ async function generateFromTaskTemplates(
     previousDeptLastTaskId = previousTaskIdInDept;
   }
 
+  // Add window-multiplied tasks for Operations (dispatch) and Site (installation, QC)
+  const totalWindows = await getProjectTotalWindows(projectId);
+  const { tasks: windowTasks, nextSequence } = await generateWindowMultipliedTasks(
+    projectId,
+    totalWindows,
+    globalSequence
+  );
+  tasks.push(...windowTasks);
+  globalSequence = nextSequence;
+
   await TaskModel.insertMany(tasks);
 
   await CommentModel.create({
     taskId: tasks[0]._id,
-    content: `Project workflow initialized. ${tasks.length} tasks created across ${departments.length} departments.`,
+    content: `Project workflow initialized. ${tasks.length} tasks created across ${departments.length} departments (including ${totalWindows} window-based dispatch/installation/QC tasks).`,
     author: createdByUserId,
     isSystemLog: true,
   });
@@ -287,11 +368,21 @@ async function generateFromTemplateGroups(
     return generateFromTaskTemplates(projectId, createdByUserId);
   }
 
+  // Add window-multiplied tasks for Operations (dispatch) and Site (installation, QC)
+  const totalWindows = await getProjectTotalWindows(projectId);
+  const { tasks: windowTasks, nextSequence } = await generateWindowMultipliedTasks(
+    projectId,
+    totalWindows,
+    globalSequence
+  );
+  tasks.push(...windowTasks);
+  globalSequence = nextSequence;
+
   await TaskModel.insertMany(tasks);
 
   await CommentModel.create({
     taskId: tasks[0]._id,
-    content: `Project workflow initialized from template groups. ${tasks.length} tasks created for ${windowSpecifications.filter((ws) => ws.templateGroupId).length} window types.`,
+    content: `Project workflow initialized from template groups. ${tasks.length} tasks created for ${windowSpecifications.filter((ws) => ws.templateGroupId).length} window types (including ${totalWindows} window-based dispatch/installation/QC tasks).`,
     author: createdByUserId,
     isSystemLog: true,
   });

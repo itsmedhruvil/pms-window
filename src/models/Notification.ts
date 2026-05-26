@@ -8,7 +8,9 @@ export type NotificationType =
   | 'task_assigned'
   | 'alert_created'
   | 'alert_acknowledged'
-  | 'alert_resolved';
+  | 'alert_resolved'
+  | 'project_created'
+  | 'discussion_created';
 
 export interface INotificationDocument extends Document {
   userId: mongoose.Types.ObjectId;
@@ -43,6 +45,8 @@ const NotificationSchema = new Schema<INotificationDocument>(
         'alert_created',
         'alert_acknowledged',
         'alert_resolved',
+        'project_created',
+        'discussion_created',
       ],
     },
     title: {

@@ -87,10 +87,17 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
     isSystemLog: false,
   });
 
-  // If this is a reply to a discussion, notify the discussion participants
+  // If this is a reply to a discussion, add @mentioned users to the discussion access list + notify
   if (parsed.data.discussionId) {
     const discussion = await DiscussionModel.findById(parsed.data.discussionId).lean();
     if (discussion) {
+      // Add any newly @mentioned users to the discussion's mentions (access list)
+      if (mentionIds.length > 0) {
+        await DiscussionModel.findByIdAndUpdate(parsed.data.discussionId, {
+          $addToSet: { mentions: { $each: mentionIds } },
+        });
+      }
+
       const participants = new Set<string>();
       participants.add(discussion.startedBy.toString());
       
@@ -106,7 +113,7 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
           type: 'discussion_reply',
           title: 'New reply in discussion',
           message: `${user.name} replied: ${parsed.data.content.slice(0, 100)}${parsed.data.content.length > 100 ? '...' : ''}`,
-          link: `/discussions?discussionId=${discussion._id}`,
+          link: `/discussions`,
           relatedId: discussion._id,
           relatedModel: 'Discussion',
         })

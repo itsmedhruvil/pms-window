@@ -73,6 +73,14 @@ export enum AlertSeverity {
 // CORE TYPES
 // ============================================================
 
+export interface PdfAttachment {
+  id: string;
+  name: string;
+  url: string;
+  size: number;
+  uploadedAt: Date;
+}
+
 export interface WindowSpec {
   width: number;
   height: number;
@@ -81,6 +89,7 @@ export interface WindowSpec {
   quantity: number;
   notes?: string;
   templateGroupId?: string;
+  designPdf?: PdfAttachment;
 }
 
 export interface IUser {
@@ -101,13 +110,7 @@ export interface IProject {
   clientName: string;
   projectTitle: string;
   description?: string;
-  pdfAttachments?: Array<{
-    id: string;
-    name: string;
-    url: string;
-    size: number;
-    uploadedAt: Date;
-  }>;
+  pdfAttachments?: PdfAttachment[];
   totalWindows: number;
   windowSpecifications: WindowSpec[];
   selectedTemplateGroupId?: string;
@@ -123,6 +126,8 @@ export interface IProject {
   address: string;
   contactPhone: string;
   budget: number;
+  productTypes: string[];
+  tags: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -218,7 +223,9 @@ export type NotificationType =
   | 'task_assigned'
   | 'alert_created'
   | 'alert_acknowledged'
-  | 'alert_resolved';
+  | 'alert_resolved'
+  | 'project_created'
+  | 'discussion_created';
 
 export interface ICommentAttachment {
   id: string;

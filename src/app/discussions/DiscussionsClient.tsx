@@ -127,15 +127,21 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
   // New thread form
   const [showNewForm, setShowNewForm] = useState(false);
   const [projects, setProjects] = useState<IProject[]>([]);
-  const [availableUsers, setAvailableUsers] = useState<Partial<IUser>[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [newThread, setNewThread] = useState({
     projectId: '',
     title: '',
     description: '',
-    mentionIds: [] as string[],
   });
   const [creating, setCreating] = useState(false);
+
+  // @mention state for chat
+  const [availableUsers, setAvailableUsers] = useState<Partial<IUser>[]>([]);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionStartIndex, setMentionStartIndex] = useState(-1);
+  const [activeDiscussionId, setActiveDiscussionId] = useState<string | null>(null);
+  const chatInputRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
   const fetchDiscussions = useCallback(async () => {
     setLoading(true);
@@ -169,8 +175,9 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
   }, []);
 
   const toggleExpand = (id: string) => {
-    if (expandedId === id) { setExpandedId(null); return; }
+    if (expandedId === id) { setExpandedId(null); setActiveDiscussionId(null); return; }
     setExpandedId(id);
+    setActiveDiscussionId(id);
     if (!comments[id]) fetchComments(id);
   };
 
@@ -201,17 +208,71 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
 
   const removeFile = (id: string) => setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
 
+  // ── @mention detection in chat ──────────────────────────────────
+  const handleChatInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>, discussionId: string) => {
+    const val = e.target.value;
+    setNewMessage(val);
+
+    // Detect @mention - find the last '@' that's not inside a word boundary
+    const atIndex = val.lastIndexOf('@');
+    if (atIndex !== -1) {
+      // Check if there's a space between the last word boundary before @ and the @
+      const beforeAt = val.slice(0, atIndex);
+      const lastChar = beforeAt.trim().slice(-1);
+      // Only trigger if @ is at start or preceded by space/newline
+      if (atIndex === 0 || lastChar === '' || lastChar === '\n' || beforeAt.endsWith(' ')) {
+        const query = val.slice(atIndex + 1);
+        if (!query.includes(' ')) {
+          setMentionQuery(query);
+          setShowMentionDropdown(true);
+          setMentionStartIndex(atIndex);
+          return;
+        }
+      }
+    }
+    setShowMentionDropdown(false);
+  };
+
+  const insertMention = (user: Partial<IUser>) => {
+    if (!user._id || !user.name) return;
+    const before = newMessage.slice(0, mentionStartIndex);
+    const after = newMessage.slice(mentionStartIndex + 1 + mentionQuery.length);
+    const newContent = `${before}@${user.name} ${after}`;
+    setNewMessage(newContent);
+    setShowMentionDropdown(false);
+    chatInputRefs.current[activeDiscussionId || '']?.focus();
+  };
+
+  const filteredUsers = availableUsers.filter((u) =>
+    u.name?.toLowerCase().includes(mentionQuery.toLowerCase())
+  );
+
   const handleSend = async (discussionId: string) => {
     if (!newMessage.trim() && uploadedFiles.length === 0) return;
     setSending(true);
     setError(null);
+
+    // Parse @mentions from content to extract user IDs
+    const mentionedIds: string[] = [];
+    const mentionRegex = /@(\S+(?:\s+\S+)*?)(?:\s|$)/g;
+    let match;
+    while ((match = mentionRegex.exec(newMessage)) !== null) {
+      const name = match[1].trim();
+      if (!name) continue;
+      const foundUser = availableUsers.find(
+        (u) => u.name?.toLowerCase() === name.toLowerCase()
+      );
+      if (foundUser?._id && !mentionedIds.includes(foundUser._id)) {
+        mentionedIds.push(foundUser._id);
+      }
+    }
 
     const result = await apiFetch<IComment>('/api/comments', {
       method: 'POST',
       body: JSON.stringify({
         discussionId,
         content: newMessage.trim(),
-        mentions: [],
+        mentions: mentionedIds,
         attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined,
       }),
     });
@@ -223,21 +284,14 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
       }));
       setNewMessage('');
       setUploadedFiles([]);
+      setShowMentionDropdown(false);
+      // Refresh discussion to get updated mentions (newly added users)
+      fetchDiscussions();
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     } else {
       setError(result.error || 'Failed to send message');
     }
     setSending(false);
-  };
-
-  const toggleMentionUser = (user: Partial<IUser>) => {
-    if (!user._id) return;
-    setNewThread((prev) => ({
-      ...prev,
-      mentionIds: prev.mentionIds.includes(user._id!)
-        ? prev.mentionIds.filter((id) => id !== user._id)
-        : [...prev.mentionIds, user._id!],
-    }));
   };
 
   const handleCreate = async () => {
@@ -254,14 +308,14 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
         projectId: newThread.projectId,
         title: newThread.title.trim(),
         description: newThread.description.trim(),
-        mentions: newThread.mentionIds,
       }),
     });
 
     if (result.success && result.data) {
       setDiscussions((prev) => [result.data!, ...prev]);
       setExpandedId(result.data._id);
-      setNewThread({ projectId: '', title: '', description: '', mentionIds: [] });
+      setActiveDiscussionId(result.data._id);
+      setNewThread({ projectId: '', title: '', description: '' });
       setShowNewForm(false);
       fetchComments(result.data._id);
     } else {
@@ -277,7 +331,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
           <div>
             <h1 className="text-xl font-black text-gray-900">Discussions</h1>
             <p className="text-xs font-mono text-gray-500 mt-1">
-              Chat threads for project discussions. Mention <strong>@users</strong> to notify them.
+              Chat threads for project discussions. Use <strong>@name</strong> to mention and add users to a thread.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -361,30 +415,6 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                 />
               </div>
 
-              {/* Mention users */}
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
-                  Mention Users (they get notified + can see history)
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {availableUsers.map((u) => (
-                    <button
-                      key={u._id}
-                      type="button"
-                      onClick={() => toggleMentionUser(u)}
-                      className={cn(
-                        'px-2.5 py-1 text-[10px] font-mono border transition-colors',
-                        newThread.mentionIds.includes(u._id!)
-                          ? 'border-black bg-black text-white'
-                          : 'border-gray-200 text-gray-600 hover:border-gray-400'
-                      )}
-                    >
-                      {u.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Submit */}
               <div className="flex justify-end pt-2">
                 <button
@@ -417,6 +447,9 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
               const msgs = comments[discussion._id] || [];
               const startedBy = typeof discussion.startedBy === 'object' ? discussion.startedBy as Partial<IUser> : null;
               const project = typeof discussion.projectId === 'object' ? discussion.projectId as Partial<IProject> : null;
+              const mentionUsers = Array.isArray(discussion.mentions)
+                ? discussion.mentions.map((m: any) => typeof m === 'object' ? m as Partial<IUser> : null).filter(Boolean)
+                : [];
 
               return (
                 <div key={discussion._id} className="border border-gray-200">
@@ -444,10 +477,10 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                         {project?.projectTitle && (
                           <span className="truncate max-w-[200px] font-medium text-gray-600">📁 {project.projectTitle}</span>
                         )}
-                        {discussion.mentions.length > 0 && (
+                        {mentionUsers.length > 0 && (
                           <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-sm flex items-center gap-1">
                             <User className="w-2.5 h-2.5" />
-                            {discussion.mentions.map((m: any) => (m as Partial<IUser>)?.name).filter(Boolean).join(', ')}
+                            {mentionUsers.map((m) => (m as Partial<IUser>)?.name).filter(Boolean).join(', ')}
                           </span>
                         )}
                       </div>
@@ -458,7 +491,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                   {/* Expanded chat */}
                   {isExpanded && (
                     <div className="border-t border-gray-100">
-                      {/* Messages */}
+                      {/* Messages - show all previous messages for all participants */}
                       <div className="max-h-[500px] overflow-y-auto p-4 space-y-4">
                         {msgs.length === 0 ? (
                           <p className="text-[10px] font-mono text-gray-400 text-center py-6">No messages yet. Say something!</p>
@@ -505,8 +538,8 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                         <div ref={bottomRef} />
                       </div>
 
-                      {/* Input */}
-                      <div className="border-t border-gray-200 p-3 bg-white">
+                      {/* Input with @mention dropdown */}
+                      <div className="border-t border-gray-200 p-3 bg-white relative">
                         {uploadedFiles.length > 0 && (
                           <div className="flex flex-wrap gap-2 mb-2">
                             {uploadedFiles.map((f) => (
@@ -518,12 +551,30 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                             ))}
                           </div>
                         )}
+
+                        {/* @mention dropdown */}
+                        {showMentionDropdown && filteredUsers.length > 0 && (
+                          <div className="absolute bottom-full left-3 right-3 mb-1 bg-white border border-gray-200 shadow-lg z-10 max-h-32 overflow-y-auto">
+                            {filteredUsers.map((user) => (
+                              <button
+                                key={user._id}
+                                onClick={() => insertMention(user)}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 border-b border-gray-100 last:border-0 transition-colors"
+                              >
+                                <span className="font-medium text-gray-900">{user.name}</span>
+                                <span className="text-gray-400 font-mono text-[10px] uppercase ml-auto">{user.department}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
                         <div className="flex gap-2 items-end">
                           <div className="flex-1 relative">
                             <textarea
-                              value={newMessage}
-                              onChange={(e) => setNewMessage(e.target.value)}
-                              placeholder="Type a message..."
+                              ref={(el) => { chatInputRefs.current[discussion._id] = el; }}
+                              value={expandedId === discussion._id ? newMessage : ''}
+                              onChange={(e) => handleChatInputChange(e, discussion._id)}
+                              placeholder="Type a message... Use @name to mention and add users"
                               rows={2}
                               className="w-full text-xs resize-none border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors placeholder:text-gray-400 font-mono"
                               onKeyDown={(e) => { if (e.key === 'Enter' && e.metaKey) handleSend(discussion._id); }}
@@ -555,7 +606,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                             </button>
                           </div>
                         </div>
-                        <p className="text-[9px] text-gray-400 mt-1 font-mono">⌘+Enter to send · Attach files with paperclip</p>
+                        <p className="text-[9px] text-gray-400 mt-1 font-mono">⌘+Enter to send · @name to mention users · Attach files with paperclip</p>
                       </div>
                     </div>
                   )}
