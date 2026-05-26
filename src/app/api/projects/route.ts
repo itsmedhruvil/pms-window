@@ -84,23 +84,6 @@ export const POST = withAuth(
 
     const projectData = parsed.data;
 
-    // Validate total windows matches specs only when specs are provided
-    if (projectData.windowSpecifications && projectData.windowSpecifications.length > 0) {
-      const specTotal = projectData.windowSpecifications.reduce(
-        (sum, spec) => sum + spec.quantity,
-        0
-      );
-      if (specTotal !== projectData.totalWindows) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Total windows (${projectData.totalWindows}) must match sum of specifications (${specTotal})`,
-          },
-          { status: 400 }
-        );
-      }
-    }
-
     const session = await mongoose.startSession();
     session.startTransaction();
 

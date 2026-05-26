@@ -59,10 +59,10 @@ const DesignPdfSchema = z.object({
 }).optional();
 
 export const WindowSpecSchema = z.object({
-  width: z.number().positive('Width must be positive'),
-  height: z.number().positive('Height must be positive'),
+  width: z.number().min(0).optional().default(0),
+  height: z.number().min(0).optional().default(0),
   design: z.string().min(1, 'Design is required'),
-  glassType: z.string().min(1, 'Glass type is required'),
+  glassType: z.string().optional().default(''),
   quantity: z.number().int().positive('Quantity must be positive'),
   notes: z.string().optional(),
   templateGroupId: z.string().optional(),

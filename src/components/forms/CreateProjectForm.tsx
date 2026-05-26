@@ -231,7 +231,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
 
     // Build window specifications from designs
     const specs = form.windowDesigns
-      .filter((wd) => wd.design.trim())
+      .filter((wd) => wd.design?.trim())
       .map((wd) => {
         const designCount = Math.ceil(form.totalWindows / windowDesignCount);
         const spec: Record<string, unknown> = {
@@ -611,11 +611,11 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
           </ReviewBlock>
 
           {/* Window Designs Review */}
-          {form.windowDesigns.filter((wd) => wd.design.trim()).length > 0 && (
+          {form.windowDesigns.filter((wd) => wd.design?.trim()).length > 0 && (
             <ReviewBlock label="Window Designs">
               <div className="space-y-1">
                 {form.windowDesigns
-                  .filter((wd) => wd.design.trim())
+                  .filter((wd) => wd.design?.trim())
                   .map((wd, i) => (
                     <div key={i} className="flex items-center gap-2 text-xs">
                       <span className="font-medium">{wd.design}</span>

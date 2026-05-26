@@ -115,7 +115,20 @@ export async function getCurrentUser(): Promise<IUserDocument | null> {
       return null;
     }
 
-    const clerkUserData = await client.users.getUser(clerkUserId);
+    let clerkUserData;
+    try {
+      clerkUserData = await client.users.getUser(clerkUserId);
+    } catch (clerkErr) {
+      console.error(`[Auth] Clerk API fetch failed for ${clerkUserId}, falling back to DB user:`, clerkErr);
+
+      // Try to find the user from the MongoDB record using clerkId
+      const dbUser = await UserModel.findOne({ clerkId: clerkUserId }).lean();
+      if (dbUser) return dbUser as unknown as IUserDocument;
+
+      // No DB fallback — user can't be resolved
+      return null;
+    }
+
     const primaryEmail =
       clerkUserData.emailAddresses.find(
         (email) => email.id === clerkUserData.primaryEmailAddressId,
