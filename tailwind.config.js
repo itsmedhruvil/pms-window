@@ -31,6 +31,7 @@ module.exports = {
         'pulse-slow': 'pulse 3s ease-in-out infinite',
         'fade-in': 'fadeIn 0.2s ease-out',
         'slide-in-right': 'slideInRight 0.25s ease-out',
+        'slide-up': 'slideUp 0.3s ease-out',
       },
       keyframes: {
         fadeIn: {
@@ -40,6 +41,10 @@ module.exports = {
         slideInRight: {
           from: { transform: 'translateX(100%)' },
           to: { transform: 'translateX(0)' },
+        },
+        slideUp: {
+          from: { opacity: '0', transform: 'translateY(20px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
         },
       },
       borderRadius: {
