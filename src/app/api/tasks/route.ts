@@ -66,6 +66,7 @@ export const POST = withAuth(async (req: NextRequest) => {
 
   const taskData = {
     ...parsed.data,
+    startDate: parsed.data.startDate || undefined,
     dueDate: parsed.data.dueDate || undefined,
   };
 

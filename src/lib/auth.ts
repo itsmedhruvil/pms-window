@@ -36,19 +36,8 @@ export function withAuth<TContext = RouteHandlerContext>(
           { status: 401 },
         );
       }
-      const userId = user.clerkId!;
 
-      await connectDB();
-      const dbUser = await UserModel.findOne({ clerkId: userId });
-
-      if (!dbUser) {
-        return NextResponse.json(
-          { success: false, error: "User not found in system" },
-          { status: 403 },
-        );
-      }
-
-      if (!dbUser.isActive) {
+      if (!user.isActive) {
         return NextResponse.json(
           { success: false, error: "Account is deactivated" },
           { status: 403 },
@@ -64,7 +53,8 @@ export function withAuth<TContext = RouteHandlerContext>(
         }
       }
 
-      return handler(req, context, { clerkId: userId, user });
+      const clerkId = user.clerkId!;
+      return handler(req, context, { clerkId, user });
     } catch (error) {
       console.error("[Auth Middleware Error]", error);
       return NextResponse.json(

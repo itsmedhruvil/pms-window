@@ -33,7 +33,9 @@ export interface IProjectDocument extends Document {
   excelSheetName?: string;
   excelRows?: Array<Record<string, string | number | boolean | null>>;
   priority: ProjectPriority;
+  startDate?: Date;
   deadline: Date;
+  endDate?: Date;
   status: ProjectStatus;
   createdBy: mongoose.Types.ObjectId;
   assignedUsers: mongoose.Types.ObjectId[];
@@ -85,7 +87,9 @@ const ProjectSchema = new Schema<IProjectDocument>(
     excelSheetName: { type: String, trim: true },
     excelRows: [{ type: Schema.Types.Mixed }],
     priority: { type: String, enum: Object.values(ProjectPriority), required: true, default: ProjectPriority.NECESSARY },
+    startDate: { type: Date, default: null },
     deadline: { type: Date, required: true },
+    endDate: { type: Date, default: null },
     status: { type: String, enum: Object.values(ProjectStatus), required: true, default: ProjectStatus.NEW },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     assignedUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],

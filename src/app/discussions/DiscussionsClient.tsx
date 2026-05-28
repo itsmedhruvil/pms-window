@@ -361,7 +361,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
         </div>
       </div>
 
-      <div className="mx-auto max-w-screen-xl space-y-6 p-4 sm:p-6">
+      <div className="space-y-6 p-4 sm:p-6">
         {error && (
           <div className="border border-red-300 bg-red-50 px-4 py-3 text-xs font-mono text-red-700">{error}</div>
         )}

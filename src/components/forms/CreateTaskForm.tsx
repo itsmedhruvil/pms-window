@@ -19,6 +19,7 @@ interface FormData {
   description: string;
   projectId: string;
   department: Department;
+  startDate: string;
   dueDate: string;
 }
 
@@ -32,6 +33,7 @@ export function CreateTaskForm({ onSuccess, onCancel, department, task }: Create
     description: task?.description || '',
     projectId: typeof task?.projectId === 'string' ? task.projectId : task?.projectId?._id || '',
     department: department || task?.department || departments[0]?.name || Department.PRODUCTION,
+    startDate: task?.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '',
     dueDate: task?.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
   });
 
@@ -159,15 +161,27 @@ export function CreateTaskForm({ onSuccess, onCancel, department, task }: Create
           </label>
         </div>
 
-        <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
-          Due Date
-          <input
-            type="date"
-            value={form.dueDate}
-            onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-            className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
-          />
-        </label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+            Start Date
+            <input
+              type="date"
+              value={form.startDate}
+              onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+              className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+            />
+          </label>
+
+          <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+            Due Date
+            <input
+              type="date"
+              value={form.dueDate}
+              onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+              className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+            />
+          </label>
+        </div>
       </div>
 
       <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-200">
@@ -187,7 +201,7 @@ export function CreateTaskForm({ onSuccess, onCancel, department, task }: Create
             'bg-black text-white hover:bg-gray-800'
           )}
         >
-          {loading ? 'Creating…' : 'Create Task'}
+          {loading ? 'Creating\u2026' : 'Create Task'}
         </button>
       </div>
     </div>

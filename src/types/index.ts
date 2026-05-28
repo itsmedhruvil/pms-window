@@ -117,7 +117,9 @@ export interface IProject {
   excelSheetName?: string;
   excelRows?: Array<Record<string, string | number | boolean | null>>;
   priority: ProjectPriority;
+  startDate?: Date;
   deadline: Date;
+  endDate?: Date;
   status: ProjectStatus;
   createdBy: string | IUser;
   assignedUsers: string[] | IUser[];

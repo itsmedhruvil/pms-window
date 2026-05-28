@@ -29,7 +29,9 @@ interface FormData {
   projectTitle: string;
   description: string;
   priority: ProjectPriority;
+  startDate: string;
   deadline: string;
+  endDate: string;
   address: string;
   contactPhone: string;
   totalWindows: number;
@@ -58,7 +60,9 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
     projectTitle: '',
     description: '',
     priority: ProjectPriority.NECESSARY,
+    startDate: '',
     deadline: '',
+    endDate: '',
     address: '',
     contactPhone: '',
     totalWindows: 0,
@@ -69,6 +73,42 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
   });
 
   const [tagInput, setTagInput] = useState('');
+
+  // ── Inline field-level alerts ──────────────────────
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const markTouched = (field: string) => setTouched((prev) => ({ ...prev, [field]: true }));
+
+  const fieldErrors: Record<string, string | null> = {};
+  if (touched['projectTitle']) {
+    if (!form.projectTitle.trim()) {
+      fieldErrors['projectTitle'] = 'Project title is required.';
+    } else if (form.projectTitle.trim().length < 3) {
+      fieldErrors['projectTitle'] = 'Project title must be at least 3 characters.';
+    }
+  }
+  if (touched['address']) {
+    if (!form.address.trim()) {
+      fieldErrors['address'] = 'Address is required.';
+    } else if (form.address.trim().length < 5) {
+      fieldErrors['address'] = 'Address must be at least 5 characters.';
+    }
+  }
+  if (touched['totalWindows']) {
+    if (form.totalWindows <= 0) {
+      fieldErrors['totalWindows'] = 'Number of windows must be greater than 0.';
+    }
+  }
+  if (touched['deadline']) {
+    if (!form.deadline) {
+      fieldErrors['deadline'] = 'Deadline is required.';
+    }
+  }
+  if (touched['contactPhone'] && form.contactPhone.trim()) {
+    const phoneClean = form.contactPhone.trim().replace(/[\s\-\(\)]/g, '');
+    if (!/^\+?\d{7,15}$/.test(phoneClean)) {
+      fieldErrors['contactPhone'] = 'Enter a valid phone number (7–15 digits, optional + prefix).';
+    }
+  }
 
   const [templateGroups, setTemplateGroups] = useState<ITemplateGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
@@ -225,6 +265,14 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
       body.description = form.description.trim();
     }
 
+    if (form.startDate.trim()) {
+      body.startDate = form.startDate.trim();
+    }
+
+    if (form.endDate.trim()) {
+      body.endDate = form.endDate.trim();
+    }
+
     if (form.templateGroupId) {
       body.selectedTemplateGroupId = form.templateGroupId;
     }
@@ -274,7 +322,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div>
       {/* Step indicator */}
       <div className="flex items-center gap-0 mb-8">
         {[
@@ -338,10 +386,17 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             <input
               type="text"
               value={form.projectTitle}
-              onChange={(e) => setForm({ ...form, projectTitle: e.target.value })}
+              onChange={(e) => { setForm({ ...form, projectTitle: e.target.value }); markTouched('projectTitle'); }}
+              onBlur={() => markTouched('projectTitle')}
               placeholder="e.g. 4BHK Villa — Block C Windows"
               className={inputClass}
             />
+            {fieldErrors['projectTitle'] && (
+              <p className="mt-1 text-[10px] font-mono text-red-600 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                {fieldErrors['projectTitle']}
+              </p>
+            )}
           </Field>
 
           <Field label="Project Description">
@@ -358,20 +413,34 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             <input
               type="text"
               value={form.address}
-              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              onChange={(e) => { setForm({ ...form, address: e.target.value }); markTouched('address'); }}
+              onBlur={() => markTouched('address')}
               placeholder="e.g. 123 Main St, City"
               className={inputClass}
             />
+            {fieldErrors['address'] && (
+              <p className="mt-1 text-[10px] font-mono text-red-600 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                {fieldErrors['address']}
+              </p>
+            )}
           </Field>
 
           <Field label="Contact Phone">
             <input
               type="tel"
               value={form.contactPhone}
-              onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
+              onChange={(e) => { setForm({ ...form, contactPhone: e.target.value }); markTouched('contactPhone'); }}
+              onBlur={() => markTouched('contactPhone')}
               placeholder="e.g. +919876543210 (optional)"
               className={inputClass}
             />
+            {fieldErrors['contactPhone'] && (
+              <p className="mt-1 text-[10px] font-mono text-red-600 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                {fieldErrors['contactPhone']}
+              </p>
+            )}
           </Field>
 
           <Field label="Number of Windows" required>
@@ -379,10 +448,17 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               type="number"
               value={form.totalWindows || ''}
               min={1}
-              onChange={(e) => setForm({ ...form, totalWindows: Number(e.target.value) })}
+              onChange={(e) => { setForm({ ...form, totalWindows: Number(e.target.value) }); markTouched('totalWindows'); }}
+              onBlur={() => markTouched('totalWindows')}
               placeholder="e.g. 100"
               className={inputClass}
             />
+            {fieldErrors['totalWindows'] && (
+              <p className="mt-1 text-[10px] font-mono text-red-600 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                {fieldErrors['totalWindows']}
+              </p>
+            )}
           </Field>
 
           {/* Window Designs Section */}
@@ -449,20 +525,45 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             </div>
           )}
 
+          <Field label="Start Date">
+            <input
+              type="date"
+              value={form.startDate}
+              onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+              className={inputClass}
+            />
+          </Field>
+
           <Field label="Deadline" required>
             <input
               type="date"
               value={form.deadline}
               min={minDeadline}
-              onChange={(e) => handleDateChange(e.target.value)}
+              onChange={(e) => { handleDateChange(e.target.value); markTouched('deadline'); }}
+              onBlur={() => markTouched('deadline')}
               className={inputClass}
             />
+            {fieldErrors['deadline'] && (
+              <p className="mt-1 text-[10px] font-mono text-red-600 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                {fieldErrors['deadline']}
+              </p>
+            )}
             {dateError && (
               <p className="mt-1 text-[10px] font-mono text-red-600 flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" />
                 {dateError}
               </p>
             )}
+          </Field>
+
+          <Field label="End Date">
+            <input
+              type="date"
+              value={form.endDate}
+              onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+              className={inputClass}
+            />
           </Field>
 
           <Field label="Priority" required>

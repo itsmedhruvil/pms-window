@@ -6,29 +6,43 @@ import { UserRole } from '@/types';
 
 // GET /api/notifications
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
-  await connectDB();
-
   const limit = Math.min(Number(req.nextUrl.searchParams.get('limit')) || 20, 50);
   const unreadOnly = req.nextUrl.searchParams.get('unreadOnly') === 'true';
 
-  const query: Record<string, unknown> = { userId: user._id };
-  if (unreadOnly) query.isRead = false;
+  // Use a single aggregation pipeline to fetch notifications and unread count
+  // in one round-trip instead of two separate queries
+  const matchStage: Record<string, unknown> = { userId: user._id };
+  if (unreadOnly) matchStage.isRead = false;
 
-  const notifications = await NotificationModel.find(query)
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .lean();
-
-  const unreadCount = await NotificationModel.countDocuments({
-    userId: user._id,
-    isRead: false,
-  });
+  const [result] = await NotificationModel.aggregate([
+    { $match: matchStage },
+    {
+      $facet: {
+        items: [
+          { $sort: { createdAt: -1 } },
+          { $limit: limit },
+        ],
+        unreadCount: [
+          { $match: { isRead: false } },
+          { $count: 'count' },
+        ],
+      },
+    },
+    {
+      $project: {
+        items: 1,
+        unreadCount: {
+          $ifNull: [{ $arrayElemAt: ['$unreadCount.count', 0] }, 0],
+        },
+      },
+    },
+  ]);
 
   return NextResponse.json({
     success: true,
     data: {
-      items: notifications,
-      unreadCount,
+      items: result?.items || [],
+      unreadCount: result?.unreadCount ?? 0,
     },
   });
 });

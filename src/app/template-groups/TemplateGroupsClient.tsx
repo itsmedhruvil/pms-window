@@ -606,7 +606,7 @@ export function TemplateGroupsClient() {
         </div>
       </div>
 
-      <div className="p-6 max-w-screen-xl mx-auto space-y-6">
+      <div className="p-6 space-y-6">
         {error && (
           <div className="border border-red-300 bg-red-50 px-4 py-3 text-xs font-mono text-red-700">
             {error}

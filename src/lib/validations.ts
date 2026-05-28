@@ -81,6 +81,7 @@ export const CreateProjectSchema = z.object({
   contactPhone: z.string().optional(),
   productTypes: z.array(z.string()).optional().default([]),
   tags: z.array(z.string()).optional().default([]),
+  startDate: z.string().optional(),
   deadline: z.string()
     .refine((str) => {
       const date = new Date(str);
@@ -91,6 +92,7 @@ export const CreateProjectSchema = z.object({
       return date >= tomorrow;
     }, { message: 'Deadline must be a future date — please select a date from tomorrow onwards' })
     .transform((str) => new Date(str)),
+  endDate: z.string().optional(),
 });
 
 export const UpdateProjectSchema = z.object({
@@ -116,7 +118,15 @@ export const UpdateProjectSchema = z.object({
     }))
     .optional(),
   priority: ProjectPrioritySchema.optional(),
+  startDate: z
+    .string()
+    .transform((str) => new Date(str))
+    .optional(),
   deadline: z
+    .string()
+    .transform((str) => new Date(str))
+    .optional(),
+  endDate: z
     .string()
     .transform((str) => new Date(str))
     .optional(),
@@ -136,6 +146,7 @@ export const CreateTaskSchema = z.object({
   projectId: z.string().optional(),
   department: DepartmentSchema,
   frequency: z.nativeEnum(TaskFrequency).optional(),
+  startDate: z.string().optional(),
   dueDate: z.string().optional(),
 });
 

@@ -144,7 +144,7 @@ export function AccessSummaryClient({
   const currentRoleLabel = ROLE_LABELS[currentRole];
 
   return (
-    <div className="p-6 max-w-screen-xl mx-auto">
+    <div className="p-6">
       {/* Header */}
       <div className="mb-8 pb-5 border-b border-gray-200">
         <h1 className="text-xl font-black text-gray-900">Access Summary</h1>

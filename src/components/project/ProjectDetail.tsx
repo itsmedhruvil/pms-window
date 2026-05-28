@@ -60,7 +60,9 @@ export function ProjectDetail({
     address: initialProject.address || '',
     contactPhone: initialProject.contactPhone || '',
     totalWindows: initialProject.totalWindows,
+    startDate: initialProject.startDate ? new Date(initialProject.startDate).toISOString().split('T')[0] : '',
     deadline: initialProject.deadline ? new Date(initialProject.deadline).toISOString().split('T')[0] : '',
+    endDate: initialProject.endDate ? new Date(initialProject.endDate).toISOString().split('T')[0] : '',
     priority: normalizeProjectPriority(initialProject.priority),
   });
   const [saving, setSaving] = useState(false);
@@ -303,7 +305,9 @@ export function ProjectDetail({
         address: editForm.address,
         contactPhone: editForm.contactPhone,
         totalWindows: editForm.totalWindows,
+        startDate: editForm.startDate,
         deadline: editForm.deadline,
+        endDate: editForm.endDate,
         priority: editForm.priority,
       }),
     });
@@ -325,7 +329,9 @@ export function ProjectDetail({
       address: project.address || '',
       contactPhone: project.contactPhone || '',
       totalWindows: project.totalWindows,
+      startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
       deadline: project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : '',
+      endDate: project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '',
       priority: normalizeProjectPriority(project.priority),
     });
     setEditError(null);
@@ -457,7 +463,7 @@ export function ProjectDetail({
       </div>
 
       {/* Main content */}
-      <div className="p-8 max-w-7xl mx-auto space-y-8">
+      <div className="p-8 space-y-8">
         {/* Project Info Section */}
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
@@ -495,6 +501,14 @@ export function ProjectDetail({
             <div>
               <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">Budget</p>
               <p className="text-xs text-gray-900">{project.budget ? `₹${project.budget.toLocaleString()}` : '—'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">Start Date</p>
+              <p className="text-xs text-gray-900">{project.startDate ? formatDate(project.startDate) : '—'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">End Date</p>
+              <p className="text-xs text-gray-900">{project.endDate ? formatDate(project.endDate) : '—'}</p>
             </div>
           </div>
 
@@ -893,7 +907,7 @@ export function ProjectDetail({
                         href={`/tasks/${task._id}`}
                         className={cn(
                           'flex items-start gap-2.5 px-4 py-2.5 hover:bg-gray-50 transition-colors group',
-                          task.isLocked && 'opacity-40 pointer-events-none'
+                          task.isLocked && 'opacity-40'
                         )}
                       >
                         {/* Status dot */}
@@ -1047,11 +1061,31 @@ export function ProjectDetail({
             </div>
 
             <div className="space-y-1.5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Start Date</label>
+              <input
+                type="date"
+                value={editForm.startDate}
+                onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
               <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Deadline</label>
               <input
                 type="date"
                 value={editForm.deadline}
                 onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })}
+                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">End Date</label>
+              <input
+                type="date"
+                value={editForm.endDate}
+                onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
                 className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
               />
             </div>

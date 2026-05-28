@@ -23,7 +23,7 @@ export default async function NewProjectPage() {
 
   return (
     <AppLayout activeAlertCount={activeAlertCount}>
-      <div className="p-6 max-w-screen-md mx-auto">
+      <div className="p-6">
         <div className="flex items-center gap-2 mb-6">
           <Link
             href="/projects"

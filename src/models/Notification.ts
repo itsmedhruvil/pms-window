@@ -84,8 +84,10 @@ const NotificationSchema = new Schema<INotificationDocument>(
 );
 
 // Indexes
-NotificationSchema.index({ userId: 1, isRead: 1 });
-NotificationSchema.index({ userId: 1, createdAt: -1 });
+// Compound index matching aggregation filter (userId, isRead) + sort (createdAt)
+// This covers both the items query and the unreadCount in the aggregation pipeline
+NotificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
+// Additional index for date-based queries
 NotificationSchema.index({ createdAt: -1 });
 
 const NotificationModel: Model<INotificationDocument> =

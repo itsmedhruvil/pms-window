@@ -17,7 +17,7 @@ interface ProjectsPageClientProps {
 export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: ProjectsPageClientProps) {
   return (
     <AppLayout activeAlertCount={activeAlertCount}>
-      <div className="p-6 max-w-screen-xl mx-auto">
+      <div className="p-6">
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
           <div>
             <h1 className="text-xl font-black text-gray-900">Projects</h1>
