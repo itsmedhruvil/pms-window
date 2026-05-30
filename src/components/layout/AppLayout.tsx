@@ -105,8 +105,8 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
           <Factory className="w-4 h-4 text-white" />
         </div>
         <div>
-          <p className="text-xs font-black text-gray-900 tracking-tight leading-none">WINDOW</p>
-          <p className="text-[9px] font-mono text-gray-500 tracking-widest uppercase leading-none mt-0.5">ERP System</p>
+          <p className="text-xs font-black text-gray-900 tracking-tight leading-none">UNIQUE ARTS</p>
+          <p className="text-[9px] font-mono text-gray-500 tracking-widest uppercase leading-none mt-0.5">PMS System</p>
         </div>
       </div>
 
@@ -328,7 +328,7 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
           <div className="w-6 h-6 bg-black flex items-center justify-center">
             <Factory className="w-3.5 h-3.5 text-white" />
           </div>
-          <p className="text-xs font-black text-gray-900">WINDOW</p>
+          <p className="text-xs font-black text-gray-900">UNIQUE ARTS</p>
         </div>
         <NotificationPane />
       </div>

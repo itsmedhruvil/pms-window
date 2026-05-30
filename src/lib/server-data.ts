@@ -223,6 +223,15 @@ export async function getDashboardData() {
           { $group: { _id: { department: '$department', status: '$status' }, count: { $sum: 1 } } },
           { $group: { _id: '$_id.department', statuses: { $push: { status: '$_id.status', count: '$count' } }, total: { $sum: '$count' } } },
         ],
+        overdueByDept: [
+          {
+            $match: {
+              dueDate: { $lt: now, $ne: null },
+              status: { $nin: ['done'] },
+            },
+          },
+          { $group: { _id: '$department', count: { $sum: 1 } } },
+        ],
         completionTrend: [
           { $match: { completedAt: { $gte: thirtyDaysAgo }, status: TaskStatus.DONE } },
           { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$completedAt' } }, completed: { $sum: 1 } } },
@@ -325,6 +334,12 @@ export async function getDashboardData() {
     return { date, completed: trendMap[date] || 0, created: 0 };
   });
 
+  // Process overdue tasks by department
+  const overdueByDept: Record<string, number> = {};
+  (dashboardData?.overdueByDept || []).forEach((d: { _id: string; count: number }) => {
+    overdueByDept[d._id] = d.count;
+  });
+
   return {
     metrics: {
       totalActiveProjects,
@@ -339,6 +354,7 @@ export async function getDashboardData() {
       activeAlertCount: activeAlerts.length,
     },
     charts: { tasksByDepartment: tasksByDeptFormatted, completionTrend: trend, avgCompletionByDept },
+    overdueByDept,
     activeAlerts,
   };
 }

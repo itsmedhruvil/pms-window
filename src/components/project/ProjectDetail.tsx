@@ -725,12 +725,15 @@ export function ProjectDetail({
                     </span>
                     <ExcelUpload onUpload={handleExcelUpload} loading={excelLoading} />
                   </div>
-                  <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                    <table className="min-w-full text-left text-xs font-mono">
-                      <thead className="bg-gray-50">
+                  <div className="overflow-x-auto border-2 border-gray-300 rounded-sm">
+                    <table className="min-w-full text-left text-xs font-mono border-collapse">
+                      <thead>
                         <tr>
+                          <th className="w-10 px-2 py-1.5 text-[10px] font-bold text-gray-500 bg-gray-100 border border-gray-300 text-center sticky left-0 z-10">
+                            #
+                          </th>
                           {Object.keys(project.excelRows[0]).map((header) => (
-                            <th key={header} className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">
+                            <th key={header} className="px-3 py-1.5 font-bold text-gray-700 bg-gray-100 border border-gray-300 text-[11px] whitespace-nowrap">
                               {header}
                             </th>
                           ))}
@@ -739,16 +742,26 @@ export function ProjectDetail({
                       <tbody>
                         {project.excelRows.map((row, rowIndex) => (
                           <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                            {Object.keys(project.excelRows![0]).map((header) => (
-                              <td key={`${rowIndex}-${header}`} className="px-3 py-2 text-gray-700">
-                                {row[header] ?? '-'}
-                              </td>
-                            ))}
+                            <td className="px-2 py-1.5 text-[10px] font-bold text-gray-400 bg-gray-50 border border-gray-300 text-center select-none sticky left-0 z-10">
+                              {rowIndex + 1}
+                            </td>
+                            {Object.keys(project.excelRows![0]).map((header) => {
+                              const value = row[header];
+                              const displayValue = value === null || value === undefined ? '' : String(value);
+                              return (
+                                <td key={`${rowIndex}-${header}`} className="px-3 py-1.5 text-gray-700 border border-gray-300 whitespace-nowrap min-w-[100px]">
+                                  {displayValue || <span className="text-gray-300">—</span>}
+                                </td>
+                              );
+                            })}
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
+                  <p className="text-[10px] font-mono text-gray-400 mt-2">
+                    {project.excelRows.length} row{project.excelRows.length === 1 ? '' : 's'} · {Object.keys(project.excelRows[0]).length} column{Object.keys(project.excelRows[0]).length === 1 ? '' : 's'}
+                  </p>
                 </div>
               )}
             </div>

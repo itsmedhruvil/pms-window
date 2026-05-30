@@ -1,11 +1,13 @@
 {
-  "name": "Window ERP",
-  "short_name": "Window ERP",
-  "description": "Production-grade ERP system for window manufacturing operations",
+  "name": "Unique Arts PMS",
+  "short_name": "UA PMS",
+  "description": "Production Management System for Unique Arts — manufacturing operations",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "categories": ["business", "productivity"],
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
@@ -21,13 +23,14 @@
       "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "maskable any"
     },
     {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "maskable any"
     }
-  ]
+  ],
+  "splash_pages": null
 }

@@ -17,7 +17,6 @@ import {
   MessageSquare,
   PlayCircle,
   RotateCcw,
-  Send,
   Upload,
   User,
   X,
@@ -67,6 +66,15 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
   const [doneComment, setDoneComment] = useState('');
   const [submittingDone, setSubmittingDone] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('comments');
+  const [editingDates, setEditingDates] = useState(false);
+  const [editStartDate, setEditStartDate] = useState(
+    task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : ''
+  );
+  const [editDueDate, setEditDueDate] = useState(
+    task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
+  );
+  const [timelineSaving, setTimelineSaving] = useState(false);
+  const [timelineError, setTimelineError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -75,12 +83,13 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
   const assignedUser = getAssignedUser(task);
   const images = task.imageAttachments ?? [];
 
+  const isOverdue = task.dueDate ? new Date(task.dueDate) < new Date() && task.status !== TaskStatus.DONE : false;
+
   const handleMarkDoneWithComment = async () => {
     if (!doneComment.trim()) return;
     setSubmittingDone(true);
     setStatusError(null);
 
-    // First update the task status
     const result = await apiFetch<ITask>(`/api/tasks/${task._id}`, {
       method: 'PATCH',
       body: JSON.stringify({ status: TaskStatus.DONE }),
@@ -88,7 +97,6 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
 
     if (result.success && result.data) {
       setTask(result.data);
-      // Then post the comment
       await apiFetch('/api/comments', {
         method: 'POST',
         body: JSON.stringify({
@@ -123,6 +131,27 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
     } else if (patch.status) {
       setStatusError(typeof result.error === 'string' ? result.error : 'Could not update task status.');
     }
+  };
+
+  const handleSaveTimeline = async () => {
+    if (!editStartDate || !editDueDate) {
+      setTimelineError('Both start date and due date are required.');
+      return;
+    }
+    if (new Date(editDueDate) < new Date(editStartDate)) {
+      setTimelineError('Due date must be after start date.');
+      return;
+    }
+    setTimelineSaving(true);
+    setTimelineError(null);
+
+    await updateTask({
+      startDate: new Date(editStartDate) as unknown as Date,
+      dueDate: new Date(editDueDate) as unknown as Date,
+    });
+
+    setTimelineSaving(false);
+    setEditingDates(false);
   };
 
   const handleImagesSelected = async (files: FileList | null) => {
@@ -213,6 +242,35 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
             )}
           </div>
         </div>
+
+        {/* Timeline prompt — show when task is assigned but has no start/due dates */}
+        {canModify && assignedUser && !task.startDate && !task.dueDate && (
+          <div className="mt-4 border border-amber-300 bg-amber-50 px-4 py-3 flex items-start gap-3">
+            <Calendar className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-amber-800">Timeline Required</p>
+              <p className="text-[11px] text-amber-700 mt-0.5">
+                This task has been assigned to you. Please set a <strong>start date</strong> and <strong>due date</strong> to begin tracking.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditingDates(true)}
+              className="flex-shrink-0 px-3 py-1.5 text-[10px] font-mono font-bold uppercase bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+            >
+              Set Timeline
+            </button>
+          </div>
+        )}
+
+        {/* Overdue indicator */}
+        {isOverdue && (
+          <div className="mt-3 flex items-center gap-2 text-xs font-mono text-red-600">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span className="font-bold">OVERDUE</span>
+            <span>— Task was due on {formatDate(task.dueDate!)}</span>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6 p-6">
@@ -377,8 +435,44 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                 </Link>
               )}
               <DetailRow icon={User} label="Assigned To" value={assignedUser?.name ?? 'Unassigned'} />
-              {task.dueDate && <DetailRow icon={Calendar} label="Due Date" value={formatDate(task.dueDate)} />}
-              {task.startDate && <DetailRow icon={PlayCircle} label="Started At" value={formatDateTime(task.startDate)} />}
+
+              {/* Editable timeline section */}
+              <div className="border-t border-gray-100 pt-3 mt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
+                    Timeline
+                  </p>
+                  {canModify && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditStartDate(task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '');
+                        setEditDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '');
+                        setTimelineError(null);
+                        setEditingDates(true);
+                      }}
+                      className="text-[10px] font-mono text-blue-600 hover:text-blue-800 underline"
+                    >
+                      {task.startDate || task.dueDate ? 'Edit' : 'Set'}
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[11px] text-gray-700 font-mono">
+                    <Calendar className="w-3 h-3 inline mr-1 text-gray-400" />
+                    Start: {task.startDate ? formatDate(task.startDate) : <span className="text-gray-400 italic">Not set</span>}
+                  </p>
+                  <p className={cn(
+                    'text-[11px] font-mono',
+                    isOverdue ? 'text-red-600 font-bold' : 'text-gray-700'
+                  )}>
+                    <Calendar className="w-3 h-3 inline mr-1 text-gray-400" />
+                    Due: {task.dueDate ? formatDate(task.dueDate) : <span className="text-gray-400 italic">Not set</span>}
+                    {isOverdue && <span className="ml-2 text-red-600">(OVERDUE)</span>}
+                  </p>
+                </div>
+              </div>
+
               {task.completedAt && <DetailRow icon={CheckCircle2} label="Completed At" value={formatDateTime(task.completedAt)} />}
               <DetailRow icon={Calendar} label="Created At" value={formatDateTime(task.createdAt)} />
               {task.isLocked && (
@@ -397,6 +491,90 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
           </section>
         </aside>
       </div>
+
+      {/* Timeline editing modal */}
+      <Modal open={editingDates} onClose={() => { if (!timelineSaving) setEditingDates(false); }} size="sm">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-900">
+              Set Task Timeline
+            </h2>
+            {!timelineSaving && (
+              <button
+                type="button"
+                onClick={() => { setEditingDates(false); setTimelineError(null); }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] font-mono text-gray-500 mb-4">
+            Set the start date and expected due date for this task.
+          </p>
+
+          {timelineError && (
+            <div className="flex items-center gap-2 p-2 mb-4 border border-red-300 bg-red-50">
+              <AlertTriangle className="w-3 h-3 text-red-600 flex-shrink-0" />
+              <p className="text-[10px] font-mono text-red-700">{timelineError}</p>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-1.5">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={editStartDate}
+                onChange={(e) => setEditStartDate(e.target.value)}
+                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-1.5">
+                Due Date
+              </label>
+              <input
+                type="date"
+                value={editDueDate}
+                onChange={(e) => setEditDueDate(e.target.value)}
+                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={() => { setEditingDates(false); setTimelineError(null); }}
+              disabled={timelineSaving}
+              className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 hover:text-black disabled:opacity-40 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveTimeline}
+              disabled={timelineSaving}
+              className="flex items-center gap-2 px-4 py-2 text-[10px] font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 disabled:opacity-40 transition-colors"
+            >
+              {timelineSaving ? (
+                <>
+                  <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Calendar className="w-3.5 h-3.5" />
+                  Save Timeline
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Done with comment modal */}
       <Modal open={doneModalOpen} onClose={() => { if (!submittingDone) setDoneModalOpen(false); }} size="sm">

@@ -33,7 +33,15 @@ interface DashboardMetricsData {
   };
 }
 
-export function DashboardMetrics({ data }: { data: DashboardMetricsData }) {
+export function DashboardMetrics({
+  data,
+  overdueByDept = {},
+  currentDepartment,
+}: {
+  data: DashboardMetricsData;
+  overdueByDept?: Record<string, number>;
+  currentDepartment?: string;
+}) {
   const { metrics, charts } = data;
 
   const maxTrendCompleted = useMemo(() =>
@@ -134,6 +142,41 @@ export function DashboardMetrics({ data }: { data: DashboardMetricsData }) {
           <span className="text-[10px] font-mono text-red-700">
             Bottleneck: <strong>{getDepartmentLabel(metrics.bottleneckDepartment)}</strong> — lowest completion rate
           </span>
+        </div>
+      )}
+
+      {/* Overdue tasks by department */}
+      {Object.keys(overdueByDept).length > 0 && (
+        <div className="border border-red-200 bg-red-50/30 p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock className="w-4 h-4 text-red-500" />
+            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-red-700">
+              {currentDepartment ? 'Overdue Tasks' : 'Overdue Tasks by Department'}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(overdueByDept)
+              .filter(([, count]) => count > 0)
+              .sort(([, a], [, b]) => b - a)
+              .map(([dept, count]) => {
+                const isCurrent = currentDepartment && currentDepartment === dept;
+                return (
+                  <div
+                    key={dept}
+                    className={cn(
+                      'px-3 py-1.5 border flex items-center gap-2 text-[11px] font-mono',
+                      isCurrent ? 'border-red-400 bg-red-100' : 'border-red-200 bg-white'
+                    )}
+                  >
+                    <span className={isCurrent ? 'font-bold text-red-800' : 'text-gray-700'}>
+                      {getDepartmentLabel(dept)}
+                    </span>
+                    <span className="text-red-600 font-bold">{count}</span>
+                    <span className="text-[9px] text-red-500">overdue</span>
+                  </div>
+                );
+              })}
+          </div>
         </div>
       )}
 

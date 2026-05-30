@@ -36,6 +36,21 @@ export const GET = withAuth(async (_req: NextRequest) => {
             },
           },
         ],
+        // Overdue tasks per department
+        overdueByDept: [
+          {
+            $match: {
+              dueDate: { $lt: now, $ne: null },
+              status: { $nin: ['done'] },
+            },
+          },
+          {
+            $group: {
+              _id: '$department',
+              count: { $sum: 1 },
+            },
+          },
+        ],
         // Completion trend for last 30 days
         completionTrend: [
           {
@@ -115,6 +130,12 @@ export const GET = withAuth(async (_req: NextRequest) => {
     (projectStatusMap[ProjectStatus.NEW] || 0) +
     (projectStatusMap[ProjectStatus.IN_PRODUCTION] || 0) +
     (projectStatusMap[ProjectStatus.ON_HOLD] || 0);
+
+  // Process overdue tasks by department
+  const overdueByDept: Record<string, number> = {};
+  (dashboardData?.overdueByDept || []).forEach((d: { _id: string; count: number }) => {
+    overdueByDept[d._id] = d.count;
+  });
 
   // Process task completion rates
   const taskCompletionRate: Record<string, number> = {};
@@ -205,6 +226,7 @@ export const GET = withAuth(async (_req: NextRequest) => {
         completionTrend: trend,
         avgCompletionByDept,
       },
+      overdueByDept,
       activeAlerts,
     },
   });

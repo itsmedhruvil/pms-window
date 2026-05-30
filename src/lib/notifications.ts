@@ -4,6 +4,7 @@ import UserModel from '@/models/User';
 import TaskModel from '@/models/Task';
 import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 import { UserRole, Department } from '@/types';
+import { sendPushToUser, sendPushToUsers, buildPushPayload } from '@/lib/push-notifications';
 import type { INotificationDocument, NotificationType } from '@/models/Notification';
 
 interface CreateNotificationParams {
@@ -43,6 +44,18 @@ export async function createNotification(
       // Non-critical
     }
 
+    // Send push notification (best-effort)
+    try {
+      const pushPayload = buildPushPayload(
+        params.title,
+        params.message,
+        params.link
+      );
+      await sendPushToUser(params.userId, pushPayload);
+    } catch {
+      // Non-critical
+    }
+
     return notification;
   } catch (error) {
     console.error('[createNotification Error]', error);
@@ -61,11 +74,24 @@ export async function notifyAdmins(params: Omit<CreateNotificationParams, 'userI
       isActive: true,
     }).select('_id').lean();
 
-    for (const admin of admins) {
+      for (const admin of admins) {
       await createNotification({
         ...params,
         userId: admin._id.toString(),
       }).catch(() => {});
+    }
+
+    // Also send push notifications to all admins
+    try {
+      const adminIds = admins.map((a) => a._id.toString());
+      const pushPayload = buildPushPayload(
+        params.title,
+        params.message,
+        params.link
+      );
+      await sendPushToUsers(adminIds, pushPayload);
+    } catch {
+      // Non-critical
     }
   } catch (error) {
     console.error('[notifyAdmins Error]', error);
@@ -92,6 +118,19 @@ export async function notifyDepartment(
         userId: user._id.toString(),
       }).catch(() => {});
     }
+
+    // Also send push notifications to all department users
+    try {
+      const userIds = users.map((u) => u._id.toString());
+      const pushPayload = buildPushPayload(
+        params.title,
+        params.message,
+        params.link
+      );
+      await sendPushToUsers(userIds, pushPayload);
+    } catch {
+      // Non-critical
+    }
   } catch (error) {
     console.error('[notifyDepartment Error]', error);
   }
@@ -109,6 +148,18 @@ export async function notifyUsers(
       ...params,
       userId: uid,
     }).catch(() => {});
+  }
+
+  // Also send push notifications to all specified users
+  try {
+    const pushPayload = buildPushPayload(
+      params.title,
+      params.message,
+      params.link
+    );
+    await sendPushToUsers(userIds, pushPayload);
+  } catch {
+    // Non-critical
   }
 }
 
