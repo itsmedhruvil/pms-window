@@ -9,6 +9,7 @@ export default function PwaRegister() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [pushSupported, setPushSupported] = useState<boolean | null>(null);
   const [subscribing, setSubscribing] = useState(false);
+  const [swRegistered, setSwRegistered] = useState(false);
 
   const checkExistingSubscription = useCallback(async () => {
     try {
@@ -16,6 +17,7 @@ export default function PwaRegister() {
       const subscription = await registration.pushManager.getSubscription();
       return !!subscription;
     } catch {
+      return false;
     }
   }, []);
 
@@ -79,8 +81,56 @@ export default function PwaRegister() {
     localStorage.setItem('pwa-install-dismissed', 'true');
   }, []);
 
+  // Register service worker as early as possible
   useEffect(() => {
-    // Check if already installed (standalone mode)
+    if (!('serviceWorker' in navigator)) {
+      console.warn('[PWA] Service Worker not supported');
+      return;
+    }
+
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    const registerSW = async () => {
+      try {
+        const registration = await navigator.serviceWorker.register('/sw.js');
+        if (cancelled) return;
+        console.log('[PWA] Service Worker registered successfully');
+        setSwRegistered(true);
+
+        // Auto-subscribe to push if permission is already granted
+        const isPushSupported =
+          'PushManager' in window && 'Notification' in window;
+        if (isPushSupported && Notification.permission === 'granted') {
+          await subscribeToPush();
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('[PWA] Service Worker registration failed:', err);
+          // Retry after a delay
+          setTimeout(registerSW, 5000);
+        }
+      }
+    };
+
+    registerSW();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Set up PWA event listeners and check state after SW is registered
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    // Check if already installed
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsInstalled(true);
       return;
@@ -98,26 +148,10 @@ export default function PwaRegister() {
       'Notification' in window;
     setPushSupported(isPushSupported);
 
-    // Register service worker
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', async () => {
-        try {
-          const registration = await navigator.serviceWorker.register('/sw.js');
-          console.log('[PWA] Service Worker registered');
-
-          // Auto-subscribe to push if permission is already granted
-          if (isPushSupported && Notification.permission === 'granted') {
-            await subscribeToPush();
-          }
-        } catch (err) {
-          console.warn('[PWA] Service Worker registration failed:', err);
-        }
-      });
-    }
-
     // Listen for install prompt
     const handler = (e: Event) => {
       e.preventDefault();
+      console.log('[PWA] beforeinstallprompt fired');
       setDeferredPrompt(e);
       setShowInstallBanner(true);
     };
@@ -125,17 +159,37 @@ export default function PwaRegister() {
     window.addEventListener('beforeinstallprompt', handler);
 
     // Listen for installed app
-    window.addEventListener('appinstalled', () => {
+    const installedHandler = () => {
+      console.log('[PWA] App installed');
       setIsInstalled(true);
       setShowInstallBanner(false);
       setDeferredPrompt(null);
-    });
+    };
+    window.addEventListener('appinstalled', installedHandler);
+
+    // Listen for display mode changes (user can add to home screen manually)
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const displayModeHandler = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        setIsInstalled(true);
+        setShowInstallBanner(false);
+      }
+    };
+    mediaQuery.addEventListener('change', displayModeHandler);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', installedHandler);
+      mediaQuery.removeEventListener('change', displayModeHandler);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [swRegistered]);
+
+  // Detect if user is on mobile
+  const isMobile = typeof window !== 'undefined' && (
+    /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    ('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0 && window.innerWidth < 768)
+  );
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
@@ -223,16 +277,21 @@ export default function PwaRegister() {
           />
         </div>
         <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-gray-900">Install Unique Arts PMS</h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Install this app on your device for quick access and offline support.
+          <h3 className="text-sm font-semibold text-gray-900">
+            {isMobile ? 'Add to Home Screen' : 'Install Unique Arts PMS'}
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {isMobile
+              ? 'Add this app to your home screen for quick access and offline support.'
+              : 'Install this app on your device for quick access and offline support.'
+            }
           </p>
           <div className="flex gap-2 mt-3">
             <button
               onClick={handleInstall}
               className="px-4 py-1.5 text-xs font-semibold bg-black text-white rounded-md hover:bg-gray-800 transition-colors"
             >
-              Install
+              {isMobile ? 'Add' : 'Install'}
             </button>
             <button
               onClick={hideBanner}

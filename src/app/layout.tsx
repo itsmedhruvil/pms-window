@@ -10,10 +10,17 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: 'Unique Arts PMS',
-    statusBarStyle: 'black',
+    statusBarStyle: 'black-translucent',
     startupImage: [
       '/icons/icon-512x512.png',
     ],
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'application-name': 'Unique Arts PMS',
+    'apple-mobile-web-app-title': 'UA PMS',
+    'msapplication-tap-highlight': 'no',
   },
 };
 
@@ -23,6 +30,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -34,7 +42,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-192x192.png" />
         <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-192x192.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
-        <meta name="mobile-web-app-capable" content="yes" />
         {/* iOS Splash Screen for iPhone SE / 5 / 6 / 7 / 8 */}
         <link href="/icons/icon-512x512.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" />
         {/* iOS Splash Screen for iPhone 6 / 7 / 8 Plus */}
