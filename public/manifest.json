@@ -12,6 +12,7 @@
   "categories": ["business", "productivity"],
   "lang": "en-US",
   "dir": "ltr",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
@@ -36,6 +37,5 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ],
-  "splash_pages": null
+  ]
 }

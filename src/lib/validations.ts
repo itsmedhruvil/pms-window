@@ -196,7 +196,7 @@ export const TaskStatusTransitionSchema = z.object({
 // ============================================================
 
 export const CreateAlertSchema = z.object({
-  projectId: z.string().min(1, 'Project ID required'),
+  projectId: z.string().optional(),
   taskId: z.string().optional(),
   type: z.nativeEnum(AlertType),
   message: z.string().min(10, 'Alert message must be at least 10 characters'),
@@ -204,7 +204,10 @@ export const CreateAlertSchema = z.object({
     .array(DepartmentSchema)
     .min(1, 'At least one affected department required'),
   severity: z.nativeEnum(AlertSeverity),
-});
+}).refine(
+  (data) => data.projectId || data.taskId,
+  { message: 'Either projectId or taskId is required' }
+);
 
 export const UpdateAlertSchema = z.object({
   status: z.nativeEnum(AlertStatus).optional(),

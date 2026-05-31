@@ -995,14 +995,8 @@ export function ProjectDetail({
       </Modal>
 
       {/* Edit Project modal */}
-      <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)} size="md">
+      <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)} size="md" title="Edit Project">
         <div className="p-6 max-h-[80vh] overflow-y-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-sm font-black uppercase tracking-widest text-gray-900">Edit Project</h2>
-            <button onClick={() => setEditModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
 
           {editError && (
             <div className="flex items-center gap-2 p-3 mb-4 border border-red-300 bg-red-50">

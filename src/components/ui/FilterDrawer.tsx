@@ -46,7 +46,7 @@ export function FilterDrawer({ open, onClose, title = 'Filters', children }: Fil
       <div
         ref={drawerRef}
         className={cn(
-          'fixed top-0 right-0 h-full w-72 max-w-[85vw] bg-white border-l border-gray-200 shadow-2xl z-50 transform transition-transform duration-200 lg:hidden',
+          'fixed top-0 right-0 h-full w-72 max-w-[85vw] bg-white border-l border-gray-200 shadow-2xl z-[60] transform transition-transform duration-200 lg:hidden',
           open ? 'translate-x-0' : 'translate-x-full'
         )}
       >
@@ -62,7 +62,7 @@ export function FilterDrawer({ open, onClose, title = 'Filters', children }: Fil
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="p-4 overflow-y-auto h-[calc(100%-48px)]">
+        <div className="p-4 overflow-y-auto h-full pb-16">
           {children}
         </div>
       </div>

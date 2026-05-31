@@ -3,6 +3,23 @@
 import { useEffect, useState, useCallback } from 'react';
 import { apiFetch } from '@/lib/utils';
 
+function isIOS(): boolean {
+  if (typeof window === 'undefined') return false;
+  // iPad on iPadOS 13+ identifies as MacIntel but has touch points
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
+function isStandalone(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as any).standalone === true
+  );
+}
+
 export default function PwaRegister() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
@@ -10,6 +27,8 @@ export default function PwaRegister() {
   const [pushSupported, setPushSupported] = useState<boolean | null>(null);
   const [subscribing, setSubscribing] = useState(false);
   const [swRegistered, setSwRegistered] = useState(false);
+
+  const deviceIOS = isIOS();
 
   const checkExistingSubscription = useCallback(async () => {
     try {
@@ -81,15 +100,15 @@ export default function PwaRegister() {
     localStorage.setItem('pwa-install-dismissed', 'true');
   }, []);
 
-  // Register service worker as early as possible
+  // Register service worker
   useEffect(() => {
     if (!('serviceWorker' in navigator)) {
       console.warn('[PWA] Service Worker not supported');
       return;
     }
 
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    // Check if already installed (also handles iOS standalone detection)
+    if (isStandalone()) {
       setIsInstalled(true);
       return;
     }
@@ -112,7 +131,6 @@ export default function PwaRegister() {
       } catch (err) {
         if (!cancelled) {
           console.warn('[PWA] Service Worker registration failed:', err);
-          // Retry after a delay
           setTimeout(registerSW, 5000);
         }
       }
@@ -131,7 +149,7 @@ export default function PwaRegister() {
     if (!('serviceWorker' in navigator)) return;
 
     // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    if (isStandalone()) {
       setIsInstalled(true);
       return;
     }
@@ -148,7 +166,18 @@ export default function PwaRegister() {
       'Notification' in window;
     setPushSupported(isPushSupported);
 
-    // Listen for install prompt
+    // On iOS, beforeinstallprompt is not supported — show banner after SW registers
+    if (deviceIOS) {
+      // Delay slightly to let SW register and let the page settle
+      const timer = setTimeout(() => {
+        if (!isStandalone() && localStorage.getItem('pwa-install-dismissed') !== 'true') {
+          setShowInstallBanner(true);
+        }
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+
+    // On Android/desktop, listen for beforeinstallprompt
     const handler = (e: Event) => {
       e.preventDefault();
       console.log('[PWA] beforeinstallprompt fired');
@@ -158,7 +187,6 @@ export default function PwaRegister() {
 
     window.addEventListener('beforeinstallprompt', handler);
 
-    // Listen for installed app
     const installedHandler = () => {
       console.log('[PWA] App installed');
       setIsInstalled(true);
@@ -167,7 +195,6 @@ export default function PwaRegister() {
     };
     window.addEventListener('appinstalled', installedHandler);
 
-    // Listen for display mode changes (user can add to home screen manually)
     const mediaQuery = window.matchMedia('(display-mode: standalone)');
     const displayModeHandler = (e: MediaQueryListEvent) => {
       if (e.matches) {
@@ -183,13 +210,7 @@ export default function PwaRegister() {
       mediaQuery.removeEventListener('change', displayModeHandler);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [swRegistered]);
-
-  // Detect if user is on mobile
-  const isMobile = typeof window !== 'undefined' && (
-    /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-    ('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0 && window.innerWidth < 768)
-  );
+  }, [swRegistered, deviceIOS]);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
@@ -212,8 +233,8 @@ export default function PwaRegister() {
     }
   };
 
+  // If already installed, show notification enable prompt if needed
   if (isInstalled && pushSupported && Notification.permission === 'default') {
-    // Show a small prompt to enable notifications for installed PWA
     return (
       <div className="fixed bottom-4 left-4 right-4 z-50 max-w-md mx-auto bg-white rounded-lg shadow-2xl border border-gray-200 p-4 animate-slide-up">
         <div className="flex items-start gap-3">
@@ -266,6 +287,53 @@ export default function PwaRegister() {
 
   if (isInstalled || !showInstallBanner) return null;
 
+  // iOS-specific install banner — no beforeinstallprompt available, show instructions
+  if (deviceIOS) {
+    return (
+      <div className="fixed bottom-4 left-4 right-4 z-50 max-w-md mx-auto bg-white rounded-lg shadow-2xl border border-gray-200 p-4 animate-slide-up">
+        <div className="flex items-start gap-3">
+          <div className="w-12 h-12 rounded-lg overflow-hidden bg-black flex-shrink-0 flex items-center justify-center">
+            <img
+              src="/icons/icon-192x192.png"
+              alt="Unique Arts PMS"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-gray-900">Add to Home Screen</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Tap the share button <span className="inline-block align-middle">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline">
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                  <polyline points="16 6 12 2 8 6" />
+                  <line x1="12" y1="2" x2="12" y2="15" />
+                </svg>
+              </span> in Safari, then scroll down and tap <strong>Add to Home Screen</strong>.
+            </p>
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={hideBanner}
+                className="px-4 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+          <button
+            onClick={hideBanner}
+            className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+            aria-label="Close"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 max-w-md mx-auto bg-white rounded-lg shadow-2xl border border-gray-200 p-4 animate-slide-up">
       <div className="flex items-start gap-3">
@@ -278,20 +346,17 @@ export default function PwaRegister() {
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold text-gray-900">
-            {isMobile ? 'Add to Home Screen' : 'Install Unique Arts PMS'}
+            Install Unique Arts PMS
           </h3>
           <p className="text-xs text-gray-500 mt-0.5">
-            {isMobile
-              ? 'Add this app to your home screen for quick access and offline support.'
-              : 'Install this app on your device for quick access and offline support.'
-            }
+            Install this app on your device for quick access and offline support.
           </p>
           <div className="flex gap-2 mt-3">
             <button
               onClick={handleInstall}
               className="px-4 py-1.5 text-xs font-semibold bg-black text-white rounded-md hover:bg-gray-800 transition-colors"
             >
-              {isMobile ? 'Add' : 'Install'}
+              Install
             </button>
             <button
               onClick={hideBanner}

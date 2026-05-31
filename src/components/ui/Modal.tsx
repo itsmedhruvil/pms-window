@@ -43,7 +43,7 @@ export function Modal({ open, onClose, title, children, size = 'md', className }
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
@@ -54,7 +54,7 @@ export function Modal({ open, onClose, title, children, size = 'md', className }
       {/* Panel */}
       <div
         className={cn(
-          'relative bg-white w-full shadow-2xl animate-fade-in',
+          'relative bg-white w-full shadow-2xl animate-fade-in max-h-[85vh] overflow-y-auto',
           sizes[size],
           className
         )}
@@ -70,17 +70,7 @@ export function Modal({ open, onClose, title, children, size = 'md', className }
             </button>
           </div>
         )}
-        <div className={cn(!title && 'relative')}>
-          {!title && (
-            <button
-              onClick={onClose}
-              className="absolute top-3 right-3 text-gray-400 hover:text-black z-10 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-          {children}
-        </div>
+        {children}
       </div>
     </div>
   );

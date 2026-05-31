@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, FolderPlus, ClipboardList, X } from 'lucide-react';
+import { Plus, FolderPlus, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CreateProjectForm } from '@/components/forms/CreateProjectForm';
 import { CreateTaskForm } from '@/components/forms/CreateTaskForm';
@@ -42,13 +42,6 @@ export function GlobalCreateButton() {
               <p className="text-xs font-mono uppercase text-gray-500">Global create</p>
               <h2 className="text-2xl font-black text-gray-900">Create project or task</h2>
             </div>
-            <button
-              type="button"
-              onClick={closeAll}
-              className="text-gray-500 hover:text-gray-900"
-            >
-              <X className="w-5 h-5" />
-            </button>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
