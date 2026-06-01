@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from 'next';
+import type React from 'react';
 import ClerkAppProvider from '@/components/ClerkAppProvider';
 import { SWRProvider } from '@/components/SWRProvider';
 import './globals.css';
-import PwaRegister from '@/components/PwaRegister';
+import OneSignalProvider from '@/components/OneSignalProvider';
 
 export const metadata: Metadata = {
   title: 'Unique Arts PMS — Production Management System',
@@ -33,6 +34,8 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
+const onesignalAppId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '';
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -42,17 +45,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-192x192.png" />
         <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-192x192.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
-        {/* iOS Splash Screen for iPhone SE / 5 / 6 / 7 / 8 */}
         <link href="/icons/icon-512x512.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" />
-        {/* iOS Splash Screen for iPhone 6 / 7 / 8 Plus */}
         <link href="/icons/icon-512x512.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)" rel="apple-touch-startup-image" />
-        {/* iOS Splash Screen for iPhone X */}
         <link href="/icons/icon-512x512.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" rel="apple-touch-startup-image" />
+        <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer />
+        {onesignalAppId && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: 'window.OneSignalDeferred=window.OneSignalDeferred||[];OneSignalDeferred.push(async function(OneSignal){await OneSignal.init({appId:"' + onesignalAppId + '",safari_web_id:"",notifyButton:{enable:false},allowLocalhostAsSecureOrigin:true});console.log("[OneSignal] SDK initialized");});',
+            }}
+          />
+        )}
       </head>
       <body className="antialiased">
         <ClerkAppProvider>
           <SWRProvider>
-            <PwaRegister />
+            <OneSignalProvider />
             {children}
           </SWRProvider>
         </ClerkAppProvider>

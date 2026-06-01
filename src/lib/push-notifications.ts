@@ -2,17 +2,22 @@ import webpush from 'web-push';
 import connectDB from '@/lib/db';
 import PushSubscriptionModel from '@/models/PushSubscription';
 
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY!;
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 const VAPID_EMAIL = process.env.VAPID_EMAIL || 'mailto:admin@uniqueartspms.com';
 
-if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+const vapidConfigured = VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY;
+
+if (vapidConfigured) {
+  webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+} else {
   console.warn(
-    '[push-notifications] VAPID keys not configured. Push notifications will be disabled.'
+    '[push-notifications] VAPID keys not configured. VAPID push will be disabled (OneSignal is active).'
   );
 }
 
-webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+// Flag so other code can check before calling VAPID functions
+export const vapidEnabled = vapidConfigured;
 
 export interface PushPayload {
   title: string;
