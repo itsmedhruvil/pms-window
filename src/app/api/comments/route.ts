@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import CommentModel from '@/models/Comment';
 import UserModel from '@/models/User';
-import NotificationModel from '@/models/Notification';
 import DiscussionModel from '@/models/Discussion';
 import { withAuth } from '@/lib/auth';
 import { CreateCommentSchema, PaginationSchema } from '@/lib/validations';
+import { notifyUsers, createNotification } from '@/lib/notifications';
 
 // GET /api/comments?taskId=xxx OR ?alertId=xxx OR ?discussionId=xxx
 export const GET = withAuth(async (req: NextRequest) => {
@@ -87,6 +87,44 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
     isSystemLog: false,
   });
 
+  // If user was @mentioned anywhere (task comment, alert comment, or discussion), notify them
+  if (mentionIds.length > 0) {
+    // Don't notify the author mentioning themselves
+    const uniqueMentionIds = mentionIds.filter((id) => id !== user._id.toString());
+    if (uniqueMentionIds.length > 0) {
+      let mentionContext = '';
+      let mentionLink = '/';
+      let mentionRelatedId = '';
+      let mentionRelatedModel = 'Comment';
+
+      if (parsed.data.discussionId) {
+        mentionContext = 'discussion';
+        mentionLink = '/discussions';
+        mentionRelatedId = parsed.data.discussionId;
+        mentionRelatedModel = 'Discussion';
+      } else if (parsed.data.taskId) {
+        mentionContext = 'task';
+        mentionLink = `/tasks/${parsed.data.taskId}`;
+        mentionRelatedId = parsed.data.taskId;
+        mentionRelatedModel = 'Task';
+      } else if (parsed.data.alertId) {
+        mentionContext = 'alert';
+        mentionLink = `/projects`;
+        mentionRelatedId = parsed.data.alertId;
+        mentionRelatedModel = 'Alert';
+      }
+
+      await notifyUsers(uniqueMentionIds, {
+        type: 'discussion_mention',
+        title: `@${user.name} mentioned you in a ${mentionContext}`,
+        message: `${user.name} mentioned you: ${parsed.data.content.slice(0, 100)}${parsed.data.content.length > 100 ? '...' : ''}`,
+        link: mentionLink,
+        relatedId: mentionRelatedId,
+        relatedModel: mentionRelatedModel,
+      });
+    }
+  }
+
   // If this is a reply to a discussion, add @mentioned users to the discussion access list + notify
   if (parsed.data.discussionId) {
     const discussion = await DiscussionModel.findById(parsed.data.discussionId).lean();
@@ -107,18 +145,18 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
       // Remove the comment author from participants
       participants.delete(user._id.toString());
 
-      const notificationPromises = Array.from(participants).map((participantId) =>
-        NotificationModel.create({
-          userId: participantId,
+      // Send notifications (in-app + push) to all participants
+      await notifyUsers(
+        Array.from(participants),
+        {
           type: 'discussion_reply',
           title: 'New reply in discussion',
           message: `${user.name} replied: ${parsed.data.content.slice(0, 100)}${parsed.data.content.length > 100 ? '...' : ''}`,
           link: `/discussions`,
-          relatedId: discussion._id,
+          relatedId: discussion._id.toString(),
           relatedModel: 'Discussion',
-        })
+        }
       );
-      await Promise.all(notificationPromises);
     }
   }
 

@@ -18,7 +18,7 @@ interface CreateNotificationParams {
 }
 
 /**
- * Create a single notification for a specific user and trigger realtime event.
+ * Create a single notification for a specific user and trigger realtime event + push.
  */
 export async function createNotification(
   params: CreateNotificationParams
@@ -64,6 +64,28 @@ export async function createNotification(
 }
 
 /**
+ * Create a batch of notifications for a list of users with type safety.
+ * More efficient than calling createNotification in a loop.
+ */
+export async function createNotifications(
+  userIds: string[],
+  params: Omit<CreateNotificationParams, 'userId'>
+): Promise<number> {
+  if (userIds.length === 0) return 0;
+
+  let successCount = 0;
+  for (const uid of userIds) {
+    const result = await createNotification({
+      ...params,
+      userId: uid,
+    });
+    if (result) successCount++;
+  }
+
+  return successCount;
+}
+
+/**
  * Create notifications for all admin/super_admin users.
  */
 export async function notifyAdmins(params: Omit<CreateNotificationParams, 'userId'>): Promise<void> {
@@ -74,16 +96,13 @@ export async function notifyAdmins(params: Omit<CreateNotificationParams, 'userI
       isActive: true,
     }).select('_id').lean();
 
-      for (const admin of admins) {
-      await createNotification({
-        ...params,
-        userId: admin._id.toString(),
-      }).catch(() => {});
-    }
+    const adminIds = admins.map((a) => a._id.toString());
+    if (adminIds.length === 0) return;
+
+    await createNotifications(adminIds, params);
 
     // Also send push notifications to all admins
     try {
-      const adminIds = admins.map((a) => a._id.toString());
       const pushPayload = buildPushPayload(
         params.title,
         params.message,
@@ -112,16 +131,13 @@ export async function notifyDepartment(
       isActive: true,
     }).select('_id').lean();
 
-    for (const user of users) {
-      await createNotification({
-        ...params,
-        userId: user._id.toString(),
-      }).catch(() => {});
-    }
+    const userIds = users.map((u) => u._id.toString());
+    if (userIds.length === 0) return;
+
+    await createNotifications(userIds, params);
 
     // Also send push notifications to all department users
     try {
-      const userIds = users.map((u) => u._id.toString());
       const pushPayload = buildPushPayload(
         params.title,
         params.message,
@@ -143,12 +159,9 @@ export async function notifyUsers(
   userIds: string[],
   params: Omit<CreateNotificationParams, 'userId'>
 ): Promise<void> {
-  for (const uid of userIds) {
-    await createNotification({
-      ...params,
-      userId: uid,
-    }).catch(() => {});
-  }
+  if (userIds.length === 0) return;
+
+  await createNotifications(userIds, params);
 
   // Also send push notifications to all specified users
   try {
@@ -160,6 +173,23 @@ export async function notifyUsers(
     await sendPushToUsers(userIds, pushPayload);
   } catch {
     // Non-critical
+  }
+}
+
+/**
+ * Fetch all users belonging to a set of departments (for targeted alert notifications).
+ */
+export async function getUsersInDepartments(departments: string[]): Promise<string[]> {
+  if (departments.length === 0) return [];
+  try {
+    await connectDB();
+    const users = await UserModel.find({
+      department: { $in: departments },
+      isActive: true,
+    }).select('_id').lean();
+    return users.map((u) => u._id.toString());
+  } catch {
+    return [];
   }
 }
 

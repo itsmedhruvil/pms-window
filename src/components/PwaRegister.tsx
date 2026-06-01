@@ -234,7 +234,9 @@ export default function PwaRegister() {
   };
 
   // If already installed, show notification enable prompt if needed
-  if (isInstalled && pushSupported && Notification.permission === 'default') {
+  // Check if the user has dismissed this prompt before
+  const notifDismissed = typeof window !== 'undefined' && localStorage.getItem('pwa-notif-dismissed') === 'true';
+  if (isInstalled && pushSupported && Notification.permission === 'default' && !notifDismissed) {
     return (
       <div className="fixed bottom-4 left-4 right-4 z-50 max-w-md mx-auto bg-white rounded-lg shadow-2xl border border-gray-200 p-4 animate-slide-up">
         <div className="flex items-start gap-3">
@@ -261,6 +263,8 @@ export default function PwaRegister() {
               <button
                 onClick={() => {
                   localStorage.setItem('pwa-notif-dismissed', 'true');
+                  // Force re-render to hide the banner
+                  window.location.reload();
                 }}
                 className="px-4 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors"
               >
@@ -271,6 +275,7 @@ export default function PwaRegister() {
           <button
             onClick={() => {
               localStorage.setItem('pwa-notif-dismissed', 'true');
+              window.location.reload();
             }}
             className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
             aria-label="Close"

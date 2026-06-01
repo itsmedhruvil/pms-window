@@ -4,7 +4,9 @@ import AlertModel from '@/models/Alert';
 import { withAuth } from '@/lib/auth';
 import { AlertStatus, UserRole } from '@/types';
 import { resolveAlertEffects, createSystemLog } from '@/lib/workflow';
+import { notifyAdmins, notifyDepartment, createNotification } from '@/lib/notifications';
 import type { IUserDocument } from '@/models/User';
+import type { Department } from '@/types';
 
 // PATCH /api/alerts/[id] - acknowledge or resolve
 async function patchHandler(
@@ -71,6 +73,15 @@ async function patchHandler(
       content: `Alert acknowledged by ${user.name} (${user.department})`,
       authorId: user._id.toString(),
     });
+
+    // Fire-and-forget: notify admins about acknowledgment
+    notifyAdmins({
+      type: 'alert_acknowledged',
+      title: `✅ Alert Acknowledged by ${user.department}`,
+      message: `"${alert.type?.replace(/_/g, ' ') || 'Alert'}" acknowledged by ${user.name} (${user.department})`,
+      relatedId: alert._id.toString(),
+      relatedModel: 'Alert',
+    }).catch(() => {});
   } else if (action === 'resolve') {
     // Only admins can resolve alerts
     if (user.role === UserRole.DEPARTMENT_USER) {
@@ -113,6 +124,27 @@ async function patchHandler(
       content: `Alert resolved by ${user.name}. Workflow restored.`,
       authorId: user._id.toString(),
     });
+
+    // Fire-and-forget: notify affected departments that alert is resolved
+    if (alert.affectedDepartments && alert.affectedDepartments.length > 0) {
+      for (const dept of alert.affectedDepartments) {
+        notifyDepartment(dept as Department, {
+          type: 'alert_resolved',
+          title: `✅ Alert Resolved`,
+          message: `Alert "${alert.type?.replace(/_/g, ' ') || 'Alert'}" resolved by ${user.name}. Workflow restored.`,
+          relatedId: alert._id.toString(),
+          relatedModel: 'Alert',
+        }).catch(() => {});
+      }
+    } else {
+      notifyAdmins({
+        type: 'alert_resolved',
+        title: `✅ Alert Resolved`,
+        message: `Alert resolved by ${user.name}. Workflow restored.`,
+        relatedId: alert._id.toString(),
+        relatedModel: 'Alert',
+      }).catch(() => {});
+    }
   } else {
     return NextResponse.json(
       { success: false, error: 'Invalid action. Use "acknowledge" or "resolve"' },

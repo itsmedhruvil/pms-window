@@ -5,6 +5,8 @@ import { withAuth } from '@/lib/auth';
 import { CreateAlertSchema } from '@/lib/validations';
 import { AlertStatus, UserRole } from '@/types';
 import { applyAlertEffects, createSystemLog } from '@/lib/workflow';
+import { notifyAdmins, notifyDepartment, createNotification } from '@/lib/notifications';
+import type { Department } from '@/types';
 
 // GET /api/alerts
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
@@ -79,6 +81,42 @@ export const POST = withAuth(
       .populate('raisedBy', 'name email department')
       .populate('projectId', 'projectTitle clientName')
       .lean();
+
+    // Fire-and-forget: notify affected departments + admins about the alert
+    if (populated) {
+      const projectId = populated.projectId?.toString() || '';
+
+      const projectTitle =
+        populated.projectId && typeof populated.projectId === 'object' && 'projectTitle' in populated.projectId
+          ? (populated.projectId as unknown as { projectTitle: string }).projectTitle || 'Project'
+          : 'Project';
+
+      const alertTypeLabel = (populated.type || '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+      const linkUrl = projectId ? `/projects/${projectId}` : '/projects';
+
+      // Notify each affected department
+      for (const dept of parsed.data.affectedDepartments) {
+        notifyDepartment(dept as Department, {
+          type: 'alert_created',
+          title: `⚠️ Alert: ${alertTypeLabel}`,
+          message: `"${alertTypeLabel}" alert raised for project "${projectTitle}": ${populated.message?.slice(0, 150) || 'No details'}`,
+          link: linkUrl,
+          relatedId: populated._id.toString(),
+          relatedModel: 'Alert',
+        }).catch(() => {});
+      }
+
+      // Also notify all admins
+      notifyAdmins({
+        type: 'alert_created',
+        title: `🚨 ${alertTypeLabel} Alert Raised`,
+        message: `Alert in "${projectTitle}": ${populated.message?.slice(0, 150) || 'No details'}`,
+        link: linkUrl,
+        relatedId: populated._id.toString(),
+        relatedModel: 'Alert',
+      }).catch(() => {});
+    }
 
     return NextResponse.json({ success: true, data: populated }, { status: 201 });
   },

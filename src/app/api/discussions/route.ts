@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import DiscussionModel from '@/models/Discussion';
-import NotificationModel from '@/models/Notification';
 import { withAuth } from '@/lib/auth';
 import { UserRole } from '@/types';
-import { notifyAdmins } from '@/lib/notifications';
+import { notifyAdmins, notifyDepartment } from '@/lib/notifications';
+import type { Department } from '@/types';
 
 // GET /api/discussions
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
