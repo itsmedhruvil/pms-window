@@ -114,47 +114,49 @@ export function UsersClient({
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
-        <div>
-          <h1 className="text-xl font-black text-gray-900">Users</h1>
-          <p className="text-xs text-gray-500 font-mono mt-0.5">
-            {users.length} team member{users.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isSuperAdmin && (
+      <div className="mb-6 pb-4 border-b border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-black text-gray-900">Users</h1>
+            <p className="text-xs text-gray-500 font-mono mt-0.5">
+              {users.length} team member{users.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {isSuperAdmin && (
+              <button
+                type="button"
+                onClick={syncFromClerk}
+                disabled={syncing}
+                className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide border border-gray-300 text-gray-700 hover:border-gray-500 hover:text-black transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing...' : 'Sync from Clerk'}
+              </button>
+            )}
             <button
               type="button"
-              onClick={syncFromClerk}
-              disabled={syncing}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide border border-gray-300 text-gray-700 hover:border-gray-500 hover:text-black transition-colors disabled:opacity-50"
+              onClick={() => setUserModalOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 transition-colors"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync from Clerk'}
+              <Plus className="w-3.5 h-3.5" />
+              New User
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setUserModalOpen(true)}
-            className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            New User
-          </button>
-
-          <div className="flex gap-2">
-            {departments.map(({ name: dept, label }) => {
-              const count = users.filter((u) => u.department === dept).length;
-              return (
-                <div key={dept} className="text-center px-3 py-1.5 border border-gray-200">
-                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-wide">
-                    {label.split(' ')[0]}
-                  </p>
-                  <p className="text-sm font-black text-gray-900">{count}</p>
-                </div>
-              );
-            })}
           </div>
+        </div>
+        {/* Department counts - stacked as a responsive grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:flex lg:flex-wrap gap-2 mt-4">
+          {departments.map(({ name: dept, label }) => {
+            const count = users.filter((u) => u.department === dept).length;
+            return (
+              <div key={dept} className="text-center px-3 py-2 border border-gray-200">
+                <p className="text-[10px] font-mono text-gray-400 uppercase tracking-wide truncate">
+                  {label}
+                </p>
+                <p className="text-sm font-black text-gray-900">{count}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
 

@@ -20,6 +20,44 @@ export interface OneSignalPayload {
     url?: string;
   }>;
   data?: Record<string, unknown>;
+  // iOS / Android / Web action buttons
+  buttons?: Array<{
+    id: string;
+    text: string;
+    icon?: string;
+  }>;
+  // Force notification to open at the correct URL
+  launch_url?: string;
+}
+
+/**
+ * Build a consistent notification payload for OneSignal.
+ * Ensures clicking a notification always opens the correct URL in the PWA.
+ */
+function buildNotificationPayload(
+  userIds: string[],
+  title: string,
+  body: string,
+  link?: string
+): OneSignalPayload {
+  const targetUrl = link || '/';
+
+  return {
+    app_id: ONESIGNAL_APP_ID,
+    include_external_user_ids: userIds,
+    headings: { en: title },
+    contents: { en: body },
+    url: targetUrl,
+    icon: '/icons/icon-192x192.png',
+    web_url: targetUrl,
+    launch_url: targetUrl,
+    isAnyWeb: true,
+    data: {
+      url: targetUrl,
+      click_action: targetUrl,
+      route: targetUrl,
+    },
+  };
 }
 
 /**
@@ -37,20 +75,7 @@ export async function sendPushToOneSignalUser(
       return false;
     }
 
-    const payload: OneSignalPayload = {
-      app_id: ONESIGNAL_APP_ID,
-      include_external_user_ids: [userId],
-      headings: { en: title },
-      contents: { en: body },
-      url: link || undefined,
-      icon: '/icons/icon-192x192.png',
-      web_url: link || undefined,
-      isAnyWeb: true,
-      data: {
-        url: link || '/',
-        click_action: link || '/',
-      },
-    };
+    const payload = buildNotificationPayload([userId], title, body, link);
 
     const response = await fetch(ONESIGNAL_API_URL, {
       method: 'POST',
@@ -93,20 +118,7 @@ export async function sendPushToOneSignalUsers(
 
     if (userIds.length === 0) return false;
 
-    const payload: OneSignalPayload = {
-      app_id: ONESIGNAL_APP_ID,
-      include_external_user_ids: userIds,
-      headings: { en: title },
-      contents: { en: body },
-      url: link || undefined,
-      icon: '/icons/icon-192x192.png',
-      web_url: link || undefined,
-      isAnyWeb: true,
-      data: {
-        url: link || '/',
-        click_action: link || '/',
-      },
-    };
+    const payload = buildNotificationPayload(userIds, title, body, link);
 
     const response = await fetch(ONESIGNAL_API_URL, {
       method: 'POST',

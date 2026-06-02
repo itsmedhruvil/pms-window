@@ -13,6 +13,7 @@ import {
   Plus,
   MessageCircle,
   Menu,
+  Bell,
   Building2,
 } from 'lucide-react';
 import { cn, getDepartmentLabel } from '@/lib/utils';
@@ -21,6 +22,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { IAlert } from '@/types';
 import { useDepartments } from '@/hooks/useDepartments';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface NavItem {
   href: string;
@@ -212,18 +214,6 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
             <span>Users</span>
           </Link>
           <Link
-            href="/access"
-            className={cn(
-              'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',
-              pathname === '/access'
-                ? 'bg-black text-white'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-            )}
-          >
-            <Users className="w-4 h-4 flex-shrink-0" />
-            <span>Access Summary</span>
-          </Link>
-          <Link
             href="/departments"
             className={cn(
               'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',
@@ -315,27 +305,48 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
       </aside>
 
       {/* Mobile header bar */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 z-20 flex items-center px-4 gap-3">
-        <button
-          type="button"
-          onClick={() => setSidebarOpen(true)}
-          className="p-2 -ml-2 text-gray-600 hover:text-black"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-        <div className="flex items-center gap-2 flex-1">
-          <div className="w-6 h-6 bg-black flex items-center justify-center">
-            <Factory className="w-3.5 h-3.5 text-white" />
-          </div>
-          <p className="text-xs font-black text-gray-900">UNIQUE ARTS</p>
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white/95 backdrop-blur-sm border-b border-gray-200 z-20 flex items-center justify-between px-3 safe-area-top">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 text-gray-600 hover:text-black active:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <Link href="/dashboard" className="flex items-center gap-2 ml-1">
+            <div className="w-7 h-7 bg-black flex items-center justify-center rounded-sm">
+              <Factory className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex flex-col leading-none">
+              <p className="text-[11px] font-black text-gray-900 tracking-tight">UNIQUE ARTS</p>
+              <p className="text-[8px] font-mono text-gray-400 tracking-widest uppercase">PMS</p>
+            </div>
+          </Link>
         </div>
-      </div>
+        <div className="flex items-center gap-0.5">
+          {/* In-app notification bell dropdown (mobile) — includes both in-app + alert badge */}
+          <NotificationBell serverActiveAlertCount={liveActiveAlertCount} />
+          <UserButton />
+        </div>
+      </header>
 
       {/* Main content — isolated from Sidebar Clerk re-renders */}
       <main className="min-w-0 flex-1 overflow-auto pt-14 lg:pt-0">
         {/* Desktop top bar */}
-        <div className="hidden lg:flex items-center justify-end px-6 h-12 border-b border-gray-200 bg-white sticky top-0 z-10">
-          <div />
+        <div className="hidden lg:flex items-center justify-between px-6 h-12 border-b border-gray-200 bg-white sticky top-0 z-10">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-black flex items-center justify-center rounded-sm">
+              <Factory className="w-3.5 h-3.5 text-white" />
+            </div>
+            <p className="text-[11px] font-black text-gray-900 tracking-tight">UNIQUE ARTS</p>
+            <p className="text-[8px] font-mono text-gray-400 tracking-widest uppercase ml-1">PMS</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* In-app notification bell dropdown (desktop) — includes both in-app + alert badge */}
+            <NotificationBell serverActiveAlertCount={liveActiveAlertCount} />
+          </div>
         </div>
         {children}
       </main>

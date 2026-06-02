@@ -534,17 +534,20 @@ export async function applyAlertEffects(alertId: string): Promise<void> {
   const alert = await AlertModel.findById(alertId).populate('projectId');
   if (!alert) return;
 
-  // Put project on hold
-  await ProjectModel.findByIdAndUpdate(alert.projectId, {
-    status: ProjectStatus.ON_HOLD,
-    $addToSet: { activeAlertIds: alert._id },
-  });
+  // For project-level alerts: put project on hold
+  if (alert.projectId) {
+    await ProjectModel.findByIdAndUpdate(alert.projectId, {
+      status: ProjectStatus.ON_HOLD,
+      $addToSet: { activeAlertIds: alert._id },
+    });
+  }
 
+  // Block the specific task if this alert is tied to one
   if (alert.taskId) {
     await TaskModel.findByIdAndUpdate(alert.taskId, {
       status: TaskStatus.BLOCKED,
     });
-  } else {
+  } else if (alert.projectId) {
     // Global/project alert: block tasks in affected departments
     await TaskModel.updateMany(
       {
@@ -555,8 +558,7 @@ export async function applyAlertEffects(alertId: string): Promise<void> {
       { $set: { status: TaskStatus.BLOCKED } }
     );
   }
-
-  // Realtime events removed
+  // For internal task alerts with no projectId, only the task itself gets blocked (handled above)
 }
 
 /**
@@ -565,6 +567,16 @@ export async function applyAlertEffects(alertId: string): Promise<void> {
 export async function resolveAlertEffects(alertId: string): Promise<void> {
   const alert = await AlertModel.findById(alertId);
   if (!alert) return;
+
+  // For internal task alerts (no projectId), just unblock the task and return
+  if (!alert.projectId) {
+    if (alert.taskId) {
+      await TaskModel.findByIdAndUpdate(alert.taskId, {
+        status: TaskStatus.TODO,
+      });
+    }
+    return;
+  }
 
   // Remove from project's active alerts
   await ProjectModel.findByIdAndUpdate(alert.projectId, {

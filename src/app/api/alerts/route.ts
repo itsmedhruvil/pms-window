@@ -83,14 +83,20 @@ export const POST = withAuth(
 
     // Fire-and-forget: push notification via OneSignal to affected departments + admins
     if (populated) {
-      const projectTitle =
-        populated.projectId && typeof populated.projectId === 'object' && 'projectTitle' in populated.projectId
-          ? (populated.projectId as unknown as { projectTitle: string }).projectTitle || 'Project'
-          : 'Project';
+      const hasProject =
+        populated.projectId &&
+        typeof populated.projectId === 'object' &&
+        'projectTitle' in populated.projectId;
+
+      const projectTitle = hasProject
+        ? (populated.projectId as unknown as { projectTitle: string }).projectTitle || 'Project'
+        : 'Internal Task';
 
       const alertTypeLabel = (populated.type || '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
 
-      const linkUrl = projectTitle ? `/projects/${populated.projectId?._id || populated.projectId}` : '/projects';
+      const linkUrl = hasProject
+        ? `/projects/${populated.projectId?._id || populated.projectId}`
+        : '/internal-tasks';
 
       // Get all users in affected departments + admins
       const UserModel = (await import('@/models/User')).default;
@@ -114,7 +120,9 @@ export const POST = withAuth(
         sendPushToOneSignalUsers(
           allUserIds,
           `🚨 ${alertTypeLabel} Alert Raised`,
-          `Alert in "${projectTitle}": ${populated.message?.slice(0, 150) || 'No details'}`,
+          hasProject
+            ? `Alert in "${projectTitle}": ${populated.message?.slice(0, 150) || 'No details'}`
+            : `Alert on internal task: ${populated.message?.slice(0, 150) || 'No details'}`,
           linkUrl
         ).catch(() => {});
       }

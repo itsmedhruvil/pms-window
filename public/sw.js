@@ -50,63 +50,33 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Push event - received push notification from server
-self.addEventListener('push', (event) => {
-  if (!event.data) return;
-
-  try {
-    const payload = event.data.json();
-    const title = payload.title || 'Unique Arts PMS';
-    const options = {
-      body: payload.body || '',
-      icon: payload.icon || '/icons/icon-192x192.png',
-      badge: payload.badge || '/icons/icon-192x192.png',
-      tag: payload.tag || 'default',
-      vibrate: payload.vibrate || [200, 100, 200],
-      data: payload.data || {},
-      actions: payload.actions || [
-        {
-          action: 'open',
-          title: 'Open',
-        },
-      ],
-      // Required for Chrome to show notification
-      requireInteraction: true,
-      // Silent flag removed so user sees it
-      silent: false,
-    };
-
-    event.waitUntil(
-      self.registration.showNotification(title, options)
-    );
-  } catch (err) {
-    console.error('[SW Push] Error showing notification:', err);
-  }
-});
-
-// Notification click event - user tapped on a notification
+// Notification click event - handle non-OneSignal notifications
+// OneSignal SDK handles its own notification clicks via OneSignalSDKWorker.js
+// This is a fallback for any custom notifications
 self.addEventListener('notificationclick', (event) => {
+  // If this notification has OneSignal data, let OneSignal handle it
+  if (event.notation?.data?.['OneSignal']) {
+    return;
+  }
+
   event.notification.close();
 
   const url = event.notification.data?.url || '/';
-  const action = event.action;
 
-  if (action === 'open' || !action) {
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-        // If we already have a window, focus it and navigate
-        for (const client of windowClients) {
-          if (client.url.startsWith(self.location.origin) && 'focus' in client) {
-            client.focus();
-            client.navigate(url);
-            return;
-          }
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // If we already have a window, focus it and navigate
+      for (const client of windowClients) {
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          client.focus();
+          client.navigate(url);
+          return;
         }
-        // Otherwise open a new window
-        if (clients.openWindow) {
-          return clients.openWindow(url);
-        }
-      })
-    );
-  }
+      }
+      // Otherwise open a new window
+      if (clients.openWindow) {
+        return clients.openWindow(url);
+      }
+    })
+  );
 });

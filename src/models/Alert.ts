@@ -22,7 +22,8 @@ const AlertSchema = new Schema<IAlertDocument>(
     projectId: {
       type: Schema.Types.ObjectId,
       ref: 'Project',
-      required: true,
+      required: false,
+      default: null,
       index: true,
     },
     taskId: {

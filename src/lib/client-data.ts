@@ -7,11 +7,15 @@
  * Import this instead of raw fetch/apiFetch for recurrent data needs.
  * Data is cached globally, deduplicated across components, and
  * auto-refreshes on focus/reconnect.
+ *
+ * Also includes in-app notification dispatching after successful mutations.
  */
 
 import useSWR, { SWRConfiguration, mutate as swrMutate } from 'swr';
 import useSWRMutation from 'swr/mutation';
 import { apiFetch } from '@/lib/utils';
+import { dispatchNotification } from '@/hooks/useInAppNotifications';
+import { NotificationType } from '@/types/notifications';
 
 // ── Generic fetcher ──────────────────────────────────────────────────────────
 
@@ -89,7 +93,7 @@ export function useUsers(params?: Record<string, string>) {
   return useSWR(KEYS.usersList + (query ? `?${query}` : ''), fetcher, defaultConfig);
 }
 
-// ── Mutations (POST/PATCH/DELETE with cache invalidation) ────────────────────
+// ── Mutations (POST/PATCH/DELETE with cache invalidation & notifications) ───
 
 export function useCreateProject() {
   return useSWRMutation(
@@ -123,7 +127,134 @@ export function useCreateTask() {
       if (!res.success) throw new Error(typeof res.error === 'string' ? res.error : 'Failed to create');
       return res.data;
     },
-    { onSuccess: () => { invalidateTasks(); } }
+    { onSuccess: (data: any) => {
+      invalidateTasks();
+      // In-app notification for task creation
+      if (data) {
+        dispatchNotification({
+          type: NotificationType.TASK_STATUS_CHANGED,
+          title: '📋 New Task Created',
+          body: `Task "${data.title || 'New Task'}" has been created.`,
+          link: data._id ? `/tasks/${data._id}` : '/tasks',
+          metadata: { taskId: data._id },
+        });
+      }
+    }}
+  );
+}
+
+export function useCreateAlert() {
+  return useSWRMutation(
+    KEYS.alerts(),
+    async (url: string, { arg }: { arg: Record<string, unknown> }) => {
+      const res = await apiFetch(url, { method: 'POST', body: JSON.stringify(arg) });
+      if (!res.success) throw new Error(typeof res.error === 'string' ? res.error : 'Failed to create');
+      return res.data;
+    },
+    { onSuccess: (data: any) => {
+      // In-app notification for alert creation
+      if (data) {
+        const alertTypeLabel = (data.type || '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+        const projectTitle = data.projectId && typeof data.projectId === 'object' && 'projectTitle' in data.projectId
+          ? (data.projectId as any).projectTitle || 'Project'
+          : 'Project';
+
+        dispatchNotification({
+          type: NotificationType.ALERT_CREATED,
+          title: `🚨 ${alertTypeLabel} Alert Raised`,
+          body: `Alert in "${projectTitle}": ${data.message?.slice(0, 150) || 'No details'}`,
+          link: '/alerts',
+          metadata: { alertId: data._id, projectId: typeof data.projectId === 'object' ? data.projectId?._id : data.projectId },
+        });
+      }
+    }}
+  );
+}
+
+export function useUpdateAlert() {
+  return useSWRMutation(
+    KEYS.alerts(),
+    async (url: string, { arg }: { arg: Record<string, unknown> }) => {
+      // arg should contain { id, action }
+      const { id, ...patchData } = arg as { id: string; [key: string]: unknown };
+      const res = await apiFetch(`/api/alerts/${id}`, { method: 'PATCH', body: JSON.stringify(patchData) });
+      if (!res.success) throw new Error(typeof res.error === 'string' ? res.error : 'Failed to update alert');
+      return res.data;
+    },
+    { onSuccess: (data: any, key: string, config: any) => {
+      const arg = config?.arg as Record<string, unknown>;
+      const action = arg?.action as string;
+      // In-app notification for alert acknowledge/resolve
+      if (data) {
+        const notificationType = action === 'acknowledge' ? NotificationType.ALERT_ACKNOWLEDGED : NotificationType.ALERT_RESOLVED;
+        const title = action === 'acknowledge' ? '✅ Alert Acknowledged' : '✅ Alert Resolved';
+        const alertTypeLabel = (data.type || '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+        dispatchNotification({
+          type: notificationType,
+          title: `${title}: ${alertTypeLabel}`,
+          body: `Alert "${data.type?.replace(/_/g, ' ') || 'Alert'}" was ${action}ed.`,
+          link: '/alerts',
+          metadata: { alertId: data._id },
+        });
+      }
+    }}
+  );
+}
+
+export function useCreateComment() {
+  return useSWRMutation(
+    '/api/comments',
+    async (url: string, { arg }: { arg: Record<string, unknown> }) => {
+      const res = await apiFetch(url, { method: 'POST', body: JSON.stringify(arg) });
+      if (!res.success) throw new Error(typeof res.error === 'string' ? res.error : 'Failed to create comment');
+      return res.data;
+    },
+    { onSuccess: (data: any, key: string, config: any) => {
+      const arg = config?.arg as Record<string, unknown>;
+      // If comment has mentions, show notification
+      if (data?.mentions && data.mentions.length > 0) {
+        dispatchNotification({
+          type: NotificationType.COMMENT_MENTION,
+          title: `💬 ${data.author?.name || 'Someone'} mentioned you`,
+          body: `${data.content?.slice(0, 100) || ''}${(data.content?.length || 0) > 100 ? '...' : ''}`,
+          link: data.taskId ? `/tasks/${data.taskId}` : data.discussionId ? '/discussions' : '/',
+          metadata: {
+            taskId: data.taskId,
+            alertId: data.alertId,
+            discussionId: data.discussionId,
+          },
+        });
+      }
+    }}
+  );
+}
+
+export function useUpdateTaskStatus() {
+  return useSWRMutation(
+    KEYS.tasks(),
+    async (url: string, { arg }: { arg: { taskId: string; status: string; [key: string]: unknown } }) => {
+      const { taskId, ...patchData } = arg;
+      const res = await apiFetch(`/api/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify(patchData) });
+      if (!res.success) throw new Error(typeof res.error === 'string' ? res.error : 'Failed to update task');
+      return res.data;
+    },
+    { onSuccess: (data: any) => {
+      if (data) {
+        const projectTitle = data.projectId && typeof data.projectId === 'object' && 'projectTitle' in data.projectId
+          ? (data.projectId as any).projectTitle || 'Project'
+          : 'Project';
+        const status = data.status || 'updated';
+
+        dispatchNotification({
+          type: NotificationType.TASK_STATUS_CHANGED,
+          title: `📋 Task Status Changed: ${data.title || 'Task'}`,
+          body: `"${data.title || 'Task'}" in "${projectTitle}" changed to "${status}".`,
+          link: data._id ? `/tasks/${data._id}` : '/tasks',
+          metadata: { taskId: data._id },
+        });
+      }
+    }}
   );
 }
 
@@ -140,6 +271,14 @@ export function invalidateProjects() {
 export function invalidateTasks() {
   void swrMutate(
     (key: unknown) => typeof key === 'string' && key.startsWith('/api/tasks'),
+    undefined,
+    { revalidate: true }
+  );
+}
+
+export function invalidateAlerts() {
+  void swrMutate(
+    (key: unknown) => typeof key === 'string' && key.startsWith('/api/alerts'),
     undefined,
     { revalidate: true }
   );
