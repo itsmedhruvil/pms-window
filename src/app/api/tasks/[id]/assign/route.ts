@@ -5,7 +5,6 @@ import TaskModel from '@/models/Task';
 import UserModel from '@/models/User';
 import { withAuth, canModifyTask } from '@/lib/auth';
 import { createSystemLog } from '@/lib/workflow';
-import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 
 const AssignSchema = z.object({
   userId: z.string().nullable(), // null = unassign
@@ -83,13 +82,6 @@ export const POST = withAuth(async (req: NextRequest, ctx, { user }) => {
     .populate('assignedUser', 'name email department avatar')
     .lean();
 
-  if (task.projectId) {
-    await triggerEvent(
-      CHANNELS.project(task.projectId.toString()),
-      EVENTS.TASK_UPDATED,
-      updated
-    );
-  }
-
+  // Realtime events removed
   return NextResponse.json({ success: true, data: updated });
 });

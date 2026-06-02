@@ -41,7 +41,6 @@ const KEYS = {
   alerts: (params?: string) => params ? `/api/alerts?${params}` : '/api/alerts',
   departments: '/api/departments',
   dashboard: '/api/dashboard',
-  notifications: '/api/notifications?limit=10',
   usersList: '/api/users',
 };
 
@@ -81,13 +80,6 @@ export function useDashboard() {
   return useSWR(KEYS.dashboard, fetcher, {
     ...defaultConfig,
     revalidateOnFocus: true,
-    refreshInterval: 30000, // Poll every 30s
-  });
-}
-
-export function useNotifications() {
-  return useSWR(KEYS.notifications, fetcher, {
-    ...defaultConfig,
     refreshInterval: 30000, // Poll every 30s
   });
 }

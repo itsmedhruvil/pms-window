@@ -7,7 +7,7 @@ import { generateProjectTasks, generateFromSelectedTemplateGroup } from '@/lib/w
 import { ProjectStatus, UserRole } from '@/types';
 import mongoose from 'mongoose';
 import { createSystemLog } from '@/lib/workflow';
-import { notifyAdmins, notifyDepartment } from '@/lib/notifications';
+import { sendPushToOneSignalUsers } from '@/lib/onesignal';
 
 // GET /api/projects - List projects with filters
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
@@ -136,32 +136,19 @@ export const POST = withAuth(
         .populate('createdBy', 'name email department')
         .lean();
 
-      // Fire-and-forget notifications - notify all admins about the new project
+      // Fire-and-forget: push notification via OneSignal to all active users
       if (populated) {
-        notifyAdmins({
-          type: 'project_created',
-          title: 'New Project Created',
-          message: `"${populated.projectTitle}" was created for client "${populated.clientName}".`,
-          link: `/projects/${populated._id}`,
-          relatedId: populated._id.toString(),
-          relatedModel: 'Project',
-        }).catch(() => {});
-
-        // Notify all departments that have users
-        import('@/models/User').then(({ default: UserModel }) => {
-          UserModel.distinct('department', { isActive: true }).then((departments: string[]) => {
-            for (const dept of departments) {
-              notifyDepartment(dept as any, {
-                type: 'project_created',
-                title: 'New Project Created',
-                message: `"${populated.projectTitle}" was created for "${populated.clientName}". Check your tasks.`,
-                link: `/projects/${populated._id}`,
-                relatedId: populated._id.toString(),
-                relatedModel: 'Project',
-              }).catch(() => {});
-            }
-          });
-        });
+        const UserModel = (await import('@/models/User')).default;
+        const allUsers = await UserModel.find({ isActive: true }).select('_id').lean();
+        const allUserIds = allUsers.map((u) => u._id.toString());
+        if (allUserIds.length > 0) {
+          sendPushToOneSignalUsers(
+            allUserIds,
+            `New Project: ${populated.projectTitle}`,
+            `"${populated.projectTitle}" was created for client "${populated.clientName}". Check your tasks.`,
+            `/projects/${populated._id}`
+          ).catch(() => {});
+        }
       }
 
       return NextResponse.json({ success: true, data: populated }, { status: 201 });

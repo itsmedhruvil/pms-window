@@ -1,12 +1,10 @@
- import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import AlertModel from '@/models/Alert';
 import { withAuth } from '@/lib/auth';
 import { AlertStatus, UserRole } from '@/types';
 import { resolveAlertEffects, createSystemLog } from '@/lib/workflow';
-import { notifyAdmins, notifyDepartment, createNotification } from '@/lib/notifications';
 import type { IUserDocument } from '@/models/User';
-import type { Department } from '@/types';
 
 // PATCH /api/alerts/[id] - acknowledge or resolve
 async function patchHandler(
@@ -74,14 +72,22 @@ async function patchHandler(
       authorId: user._id.toString(),
     });
 
-    // Fire-and-forget: notify admins about acknowledgment
-    notifyAdmins({
-      type: 'alert_acknowledged',
-      title: `✅ Alert Acknowledged by ${user.department}`,
-      message: `"${alert.type?.replace(/_/g, ' ') || 'Alert'}" acknowledged by ${user.name} (${user.department})`,
-      relatedId: alert._id.toString(),
-      relatedModel: 'Alert',
-    }).catch(() => {});
+    // Fire-and-forget: push notification via OneSignal to admins about acknowledgment
+    const UserModelForNotif = (await import('@/models/User')).default;
+    const adminUsers = await UserModelForNotif.find({
+      role: { $in: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+      isActive: true,
+    }).select('_id').lean();
+    const adminIds = adminUsers.map((a) => a._id.toString());
+    if (adminIds.length > 0) {
+      const { sendPushToOneSignalUsers } = await import('@/lib/onesignal');
+      sendPushToOneSignalUsers(
+        adminIds,
+        `✅ Alert Acknowledged by ${user.department}`,
+        `"${alert.type?.replace(/_/g, ' ') || 'Alert'}" acknowledged by ${user.name} (${user.department})`,
+        undefined
+      ).catch(() => {});
+    }
   } else if (action === 'resolve') {
     // Only admins can resolve alerts
     if (user.role === UserRole.DEPARTMENT_USER) {
@@ -125,25 +131,21 @@ async function patchHandler(
       authorId: user._id.toString(),
     });
 
-    // Fire-and-forget: notify affected departments that alert is resolved
-    if (alert.affectedDepartments && alert.affectedDepartments.length > 0) {
-      for (const dept of alert.affectedDepartments) {
-        notifyDepartment(dept as Department, {
-          type: 'alert_resolved',
-          title: `✅ Alert Resolved`,
-          message: `Alert "${alert.type?.replace(/_/g, ' ') || 'Alert'}" resolved by ${user.name}. Workflow restored.`,
-          relatedId: alert._id.toString(),
-          relatedModel: 'Alert',
-        }).catch(() => {});
-      }
-    } else {
-      notifyAdmins({
-        type: 'alert_resolved',
-        title: `✅ Alert Resolved`,
-        message: `Alert resolved by ${user.name}. Workflow restored.`,
-        relatedId: alert._id.toString(),
-        relatedModel: 'Alert',
-      }).catch(() => {});
+    // Fire-and-forget: push notification via OneSignal to affected departments about resolution
+    const UserModelForResolveNotif = (await import('@/models/User')).default;
+    const affectedDeptUsers = await UserModelForResolveNotif.find({
+      department: { $in: alert.affectedDepartments },
+      isActive: true,
+    }).select('_id').lean();
+    const resolveUserIds = affectedDeptUsers.map((u) => u._id.toString());
+    if (resolveUserIds.length > 0) {
+      const { sendPushToOneSignalUsers } = await import('@/lib/onesignal');
+      sendPushToOneSignalUsers(
+        resolveUserIds,
+        `✅ Alert Resolved`,
+        `Alert "${alert.type?.replace(/_/g, ' ') || 'Alert'}" resolved by ${user.name}. Workflow restored.`,
+        undefined
+      ).catch(() => {});
     }
   } else {
     return NextResponse.json(

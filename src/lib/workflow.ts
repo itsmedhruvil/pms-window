@@ -1,5 +1,4 @@
 import { Types } from 'mongoose';
-import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 import TaskModel from '@/models/Task';
 import TaskTemplateModel from '@/models/TaskTemplate';
 import ProjectModel from '@/models/Project';
@@ -418,24 +417,7 @@ export async function unlockDependentTasks(completedTaskId: string): Promise<voi
 
   await TaskModel.bulkWrite(bulkOps);
 
-  // Fire and forget realtime events
-  const events = dependentTasks
-    .filter((t) => t.projectId)
-    .map((task) =>
-      triggerEvent(
-        CHANNELS.project(task.projectId!.toString()),
-        EVENTS.TASK_UPDATED,
-        {
-          taskId: task._id,
-          status: task.status === TaskStatus.BLOCKED ? TaskStatus.TODO : task.status,
-          isLocked: false,
-        }
-      )
-    );
-
-  if (events.length > 0) {
-    void Promise.all(events).catch((err) => console.error('Failed to trigger unlock events:', err));
-  }
+  // Realtime events removed
 }
 
 /**
@@ -541,11 +523,7 @@ export async function updateProjectCompletion(projectId: string): Promise<void> 
     { $set: updateFields }
   );
 
-  await triggerEvent(CHANNELS.project(projectId), EVENTS.PROJECT_STATUS_CHANGED, {
-    projectId,
-    status: shouldUpdateStatus ? ProjectStatus.COMPLETED : undefined,
-    completionPercentage,
-  });
+  // Realtime events removed
 }
 
 /**
@@ -578,13 +556,7 @@ export async function applyAlertEffects(alertId: string): Promise<void> {
     );
   }
 
-  // Global notification
-  await triggerEvent(CHANNELS.global, EVENTS.ALERT_CREATED, {
-    alertId: alert._id,
-    projectId: alert.projectId,
-    severity: alert.severity,
-    type: alert.type,
-  });
+  // Realtime events removed
 }
 
 /**
@@ -614,10 +586,7 @@ export async function resolveAlertEffects(alertId: string): Promise<void> {
 
   await reconcileBlockedTasksWithAlerts(alert.projectId.toString());
 
-  await triggerEvent(CHANNELS.project(alert.projectId.toString()), EVENTS.ALERT_UPDATED, {
-    alertId: alert._id,
-    status: AlertStatus.RESOLVED,
-  });
+  // Realtime events removed
 }
 
 /**

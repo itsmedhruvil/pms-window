@@ -21,7 +21,6 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { IAlert } from '@/types';
 import { useDepartments } from '@/hooks/useDepartments';
-import { NotificationPane } from '@/components/notifications/NotificationPane';
 
 interface NavItem {
   href: string;
@@ -330,14 +329,13 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
           </div>
           <p className="text-xs font-black text-gray-900">UNIQUE ARTS</p>
         </div>
-        <NotificationPane />
       </div>
 
       {/* Main content — isolated from Sidebar Clerk re-renders */}
       <main className="min-w-0 flex-1 overflow-auto pt-14 lg:pt-0">
-        {/* Desktop top bar with notifications */}
+        {/* Desktop top bar */}
         <div className="hidden lg:flex items-center justify-end px-6 h-12 border-b border-gray-200 bg-white sticky top-0 z-10">
-          <NotificationPane />
+          <div />
         </div>
         {children}
       </main>

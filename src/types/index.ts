@@ -203,32 +203,6 @@ export interface IDiscussion {
   updatedAt: Date;
 }
 
-export interface INotification {
-  _id: string;
-  userId: string | IUser;
-  type: NotificationType;
-  title: string;
-  message: string;
-  link?: string;
-  relatedId?: string;
-  relatedModel?: string;
-  isRead: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export type NotificationType =
-  | 'discussion_mention'
-  | 'discussion_reply'
-  | 'task_due_soon'
-  | 'task_overdue'
-  | 'task_assigned'
-  | 'alert_created'
-  | 'alert_acknowledged'
-  | 'alert_resolved'
-  | 'project_created'
-  | 'discussion_created';
-
 export interface ICommentAttachment {
   id: string;
   name: string;
@@ -282,7 +256,6 @@ export interface DashboardMetrics {
   avgTaskCompletionTime: number;
   alertFrequency: Record<AlertType, number>;
   bottleneckDepartment: Department | null;
-  unreadNotificationCount: number;
 }
 
 export interface TaskTrend {
@@ -301,7 +274,7 @@ export type RealtimeEvent =
   | { type: 'task_updated'; payload: ITask }
   | { type: 'project_status_changed'; payload: { projectId: string; status: ProjectStatus } }
   | { type: 'discussion_created'; payload: IDiscussion }
-  | { type: 'notification_created'; payload: INotification };
+  ;
 
 // ============================================================
 // WORKFLOW CONSTANTS

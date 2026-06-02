@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import TaskModel from '@/models/Task';
 import { withAuth } from '@/lib/auth';
-import { triggerEvent, CHANNELS, EVENTS } from '@/lib/pusher';
 import { UserRole, TaskStatus } from '@/types';
 
 export const POST = withAuth(
@@ -31,7 +30,6 @@ export const POST = withAuth(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const bulkOps: any[] = [];
     const projectUpdates = new Set<string>();
-    const eventsToTrigger: Array<{ channel: string; event: string; data: Record<string, unknown> }> = [];
 
     for (const update of updates) {
       const { taskId, status, completedAt } = update;
@@ -63,16 +61,6 @@ export const POST = withAuth(
 
       if (existingTask.projectId) {
         projectUpdates.add(existingTask.projectId.toString());
-        eventsToTrigger.push({
-          channel: CHANNELS.project(existingTask.projectId.toString()),
-          event: EVENTS.TASK_UPDATED,
-          data: {
-            taskId: existingTask._id.toString(),
-            projectId: existingTask.projectId.toString(),
-            status,
-            completedAt: setFields.completedAt || existingTask.completedAt,
-          },
-        });
       }
     }
 
@@ -81,16 +69,7 @@ export const POST = withAuth(
       await TaskModel.bulkWrite(bulkOps);
     }
 
-    // Trigger realtime events (fire and forget - don't block response)
-    if (eventsToTrigger.length > 0) {
-      for (const { channel, event, data } of eventsToTrigger) {
-        try {
-          triggerEvent(channel, event, data);
-        } catch (err) {
-          console.error('Failed to trigger event:', err);
-        }
-      }
-    }
+    // Realtime events removed
 
     // Update project completions (fire and forget)
     if (projectUpdates.size > 0) {

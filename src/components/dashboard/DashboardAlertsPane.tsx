@@ -1,41 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertTriangle, Bell, BellRing, CheckCheck, Loader2, Clock, MessageCircle, User } from 'lucide-react';
+import { AlertTriangle, Bell, Loader2, MessageCircle } from 'lucide-react';
 import { cn, timeAgo } from '@/lib/utils';
-import type { IAlert, INotification, IUser, IProject } from '@/types';
-import { useNotifications, invalidateProjects } from '@/lib/client-data';
+import type { IAlert, IUser, IProject } from '@/types';
 import { useAlerts } from '@/lib/client-data';
 
 export function DashboardAlertsPane() {
   // SWR handles caching, deduplication, and 30s poll interval automatically
-  const { data: notifData, error: notifError, isLoading: notifLoading, mutate: refreshNotifs } = useNotifications();
   const { data: alertData, error: alertError, isLoading: alertLoading, mutate: refreshAlerts } = useAlerts({ status: 'active', limit: '5' });
 
-  const notifications = (notifData as unknown as { items: INotification[]; unreadCount: number })?.items || [];
-  const unreadCount = (notifData as unknown as { items: INotification[]; unreadCount: number })?.unreadCount || 0;
   const activeAlerts = Array.isArray(alertData) ? (alertData as IAlert[]) : (alertData as { items: IAlert[] })?.items || [];
 
-  const loading = notifLoading && alertLoading;
-  const error = notifError || alertError;
-
-  const markAllRead = async () => {
-    const { apiFetch } = await import('@/lib/utils');
-    await apiFetch('/api/notifications', {
-      method: 'PATCH',
-      body: JSON.stringify({ markAllRead: true }),
-    });
-    refreshNotifs();
-  };
-
-  const markRead = async (id: string) => {
-    const { apiFetch } = await import('@/lib/utils');
-    await apiFetch('/api/notifications', {
-      method: 'PATCH',
-      body: JSON.stringify({ notificationIds: [id] }),
-    });
-    refreshNotifs();
-  };
+  const loading = alertLoading;
+  const error = alertError;
 
   const getAlertSeverityColor = (severity?: string) => {
     switch (severity) {
@@ -51,30 +29,20 @@ export function DashboardAlertsPane() {
       <div className="px-4 py-3 border-b border-gray-200 bg-gray-50/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4 text-gray-500" />
+            <AlertTriangle className="w-4 h-4 text-red-500" />
             <span className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500">
-              Alerts & Updates
+              Active Alerts
             </span>
-            {unreadCount > 0 && (
+            {activeAlerts.length > 0 && (
               <span className="text-[10px] font-bold px-1.5 py-0.5 bg-red-100 text-red-700 rounded-full">
-                {unreadCount}
+                {activeAlerts.length}
               </span>
             )}
           </div>
           <div className="flex items-center gap-1">
-            {unreadCount > 0 && (
-              <button
-                type="button"
-                onClick={markAllRead}
-                className="flex items-center gap-1 text-[9px] font-mono text-blue-600 hover:text-blue-800 px-1.5 py-0.5"
-              >
-                <CheckCheck className="w-2.5 h-2.5" />
-                Mark all read
-              </button>
-            )}
             <button
               type="button"
-              onClick={() => { refreshNotifs(); refreshAlerts(); }}
+              onClick={() => refreshAlerts()}
               className="text-[9px] font-mono text-gray-400 hover:text-gray-700 px-1.5 py-0.5"
               title="Refresh"
             >
@@ -93,7 +61,7 @@ export function DashboardAlertsPane() {
           <p className="text-[10px] font-mono text-gray-400">Failed to load</p>
           <button
             type="button"
-            onClick={() => { refreshNotifs(); refreshAlerts(); }}
+            onClick={() => refreshAlerts()}
             className="mt-2 text-[9px] font-mono text-blue-600 hover:text-blue-800"
           >
             Retry
@@ -102,13 +70,8 @@ export function DashboardAlertsPane() {
       ) : (
         <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
           {/* Active alerts section */}
-          {activeAlerts.length > 0 && (
+          {activeAlerts.length > 0 ? (
             <div>
-              <div className="px-4 py-2 bg-red-50/50 border-b border-red-100">
-                <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-red-600">
-                  Active Alerts ({activeAlerts.length})
-                </span>
-              </div>
               {activeAlerts.map((alert: IAlert) => {
                 const project = typeof alert.projectId === 'object' ? alert.projectId as Partial<IProject> : null;
                 const raisedBy = typeof alert.raisedBy === 'object' ? alert.raisedBy as Partial<IUser> : null;
@@ -147,75 +110,10 @@ export function DashboardAlertsPane() {
                 );
               })}
             </div>
-          )}
-
-          {/* Notifications section */}
-          {notifications.length > 0 && (
-            <div>
-              <div className="px-4 py-2 bg-gray-50/50 border-b border-gray-100">
-                <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-gray-500">
-                  Recent Notifications {unreadCount > 0 && `(${unreadCount} unread)`}
-                </span>
-              </div>
-              {notifications.map((notification: INotification) => (
-                <div
-                  key={notification._id}
-                  className={cn(
-                    'relative flex items-start gap-3 px-4 py-2.5 transition-colors',
-                    !notification.isRead ? 'bg-blue-50/40' : 'hover:bg-gray-50'
-                  )}
-                >
-                  {!notification.isRead && (
-                    <div className="absolute left-2 top-3 w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
-                  )}
-                  <div className="flex-shrink-0 mt-0.5 ml-2">
-                    <NotificationIcon type={notification.type} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    {notification.link ? (
-                      <Link
-                        href={notification.link}
-                        onClick={() => { if (!notification.isRead) markRead(notification._id); }}
-                        className="block"
-                      >
-                        <p className="text-[10px] font-bold text-gray-900 truncate">
-                          {notification.title}
-                        </p>
-                        <p className="text-[9px] text-gray-600 mt-0.5 line-clamp-2">
-                          {notification.message}
-                        </p>
-                      </Link>
-                    ) : (
-                      <>
-                        <p className="text-[10px] font-bold text-gray-900 truncate">
-                          {notification.title}
-                        </p>
-                        <p className="text-[9px] text-gray-600 mt-0.5 line-clamp-2">
-                          {notification.message}
-                        </p>
-                      </>
-                    )}
-                    <p className="text-[8px] text-gray-400 font-mono mt-1">{timeAgo(notification.createdAt)}</p>
-                  </div>
-                  {!notification.isRead && (
-                    <button
-                      type="button"
-                      onClick={() => markRead(notification._id)}
-                      className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 mt-0.5"
-                      title="Mark as read"
-                    >
-                      <CheckCheck className="w-2.5 h-2.5" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {activeAlerts.length === 0 && notifications.length === 0 && (
+          ) : (
             <div className="px-4 py-8 text-center">
               <Bell className="w-6 h-6 text-gray-300 mx-auto mb-2" />
-              <p className="text-[10px] font-mono text-gray-400">No alerts or notifications</p>
+              <p className="text-[10px] font-mono text-gray-400">No active alerts</p>
               <p className="text-[9px] font-mono text-gray-400 mt-0.5">Everything is looking good!</p>
             </div>
           )}
@@ -241,23 +139,4 @@ export function DashboardAlertsPane() {
       </div>
     </div>
   );
-}
-
-function NotificationIcon({ type }: { type: string }) {
-  switch (type) {
-    case 'discussion_mention':
-    case 'discussion_reply':
-      return <MessageCircle className="w-3 h-3 text-blue-500" />;
-    case 'task_due_soon':
-    case 'task_overdue':
-      return <Clock className="w-3 h-3 text-red-500" />;
-    case 'task_assigned':
-      return <User className="w-3 h-3 text-gray-600" />;
-    case 'alert_created':
-    case 'alert_acknowledged':
-    case 'alert_resolved':
-      return <AlertTriangle className="w-3 h-3 text-orange-500" />;
-    default:
-      return <BellRing className="w-3 h-3 text-gray-500" />;
-  }
 }

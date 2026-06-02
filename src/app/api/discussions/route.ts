@@ -3,8 +3,7 @@ import connectDB from '@/lib/db';
 import DiscussionModel from '@/models/Discussion';
 import { withAuth } from '@/lib/auth';
 import { UserRole } from '@/types';
-import { notifyAdmins, notifyDepartment } from '@/lib/notifications';
-import type { Department } from '@/types';
+import { sendPushToOneSignalUsers } from '@/lib/onesignal';
 
 // GET /api/discussions
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
@@ -62,21 +61,25 @@ export const POST = withAuth(
       .populate('mentions', 'name email department')
       .lean();
 
-    // Fire-and-forget: notify admins about the new discussion
+    // Fire-and-forget: push notification via OneSignal to admins
     if (populated) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const projectInfo = populated.projectId && typeof populated.projectId === 'object'
-        ? (populated.projectId as any).projectTitle || 'Project'
-        : 'Project';
-
-      notifyAdmins({
-        type: 'discussion_created',
-        title: 'New Discussion Created',
-        message: `"${populated.title}" started in project "${projectInfo}".`,
-        link: `/discussions?id=${populated._id}`,
-        relatedId: populated._id.toString(),
-        relatedModel: 'Discussion',
-      }).catch(() => {});
+      const UserModel = (await import('@/models/User')).default;
+      const admins = await UserModel.find({
+        role: { $in: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+        isActive: true,
+      }).select('_id').lean();
+      const adminIds = admins.map((a) => a._id.toString());
+      if (adminIds.length > 0) {
+        const projectInfo = populated.projectId && typeof populated.projectId === 'object'
+          ? (populated.projectId as any).projectTitle || 'Project'
+          : 'Project';
+        sendPushToOneSignalUsers(
+          adminIds,
+          `New Discussion: ${populated.title}`,
+          `${user.name} started a discussion in project "${projectInfo}".`,
+          `/discussions`
+        ).catch(() => {});
+      }
     }
 
     return NextResponse.json({ success: true, data: populated }, { status: 201 });

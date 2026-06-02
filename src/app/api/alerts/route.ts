@@ -5,8 +5,7 @@ import { withAuth } from '@/lib/auth';
 import { CreateAlertSchema } from '@/lib/validations';
 import { AlertStatus, UserRole } from '@/types';
 import { applyAlertEffects, createSystemLog } from '@/lib/workflow';
-import { notifyAdmins, notifyDepartment, createNotification } from '@/lib/notifications';
-import type { Department } from '@/types';
+import { sendPushToOneSignalUsers } from '@/lib/onesignal';
 
 // GET /api/alerts
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
@@ -82,10 +81,8 @@ export const POST = withAuth(
       .populate('projectId', 'projectTitle clientName')
       .lean();
 
-    // Fire-and-forget: notify affected departments + admins about the alert
+    // Fire-and-forget: push notification via OneSignal to affected departments + admins
     if (populated) {
-      const projectId = populated.projectId?.toString() || '';
-
       const projectTitle =
         populated.projectId && typeof populated.projectId === 'object' && 'projectTitle' in populated.projectId
           ? (populated.projectId as unknown as { projectTitle: string }).projectTitle || 'Project'
@@ -93,29 +90,34 @@ export const POST = withAuth(
 
       const alertTypeLabel = (populated.type || '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
 
-      const linkUrl = projectId ? `/projects/${projectId}` : '/projects';
+      const linkUrl = projectTitle ? `/projects/${populated.projectId?._id || populated.projectId}` : '/projects';
 
-      // Notify each affected department
-      for (const dept of parsed.data.affectedDepartments) {
-        notifyDepartment(dept as Department, {
-          type: 'alert_created',
-          title: `⚠️ Alert: ${alertTypeLabel}`,
-          message: `"${alertTypeLabel}" alert raised for project "${projectTitle}": ${populated.message?.slice(0, 150) || 'No details'}`,
-          link: linkUrl,
-          relatedId: populated._id.toString(),
-          relatedModel: 'Alert',
-        }).catch(() => {});
+      // Get all users in affected departments + admins
+      const UserModel = (await import('@/models/User')).default;
+      const deptUsers = await UserModel.find({
+        department: { $in: parsed.data.affectedDepartments },
+        isActive: true,
+      }).select('_id').lean();
+      const admins = await UserModel.find({
+        role: { $in: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+        isActive: true,
+      }).select('_id').lean();
+
+      const allUserIds = [
+        ...new Set([
+          ...deptUsers.map((u) => u._id.toString()),
+          ...admins.map((a) => a._id.toString()),
+        ]),
+      ];
+
+      if (allUserIds.length > 0) {
+        sendPushToOneSignalUsers(
+          allUserIds,
+          `🚨 ${alertTypeLabel} Alert Raised`,
+          `Alert in "${projectTitle}": ${populated.message?.slice(0, 150) || 'No details'}`,
+          linkUrl
+        ).catch(() => {});
       }
-
-      // Also notify all admins
-      notifyAdmins({
-        type: 'alert_created',
-        title: `🚨 ${alertTypeLabel} Alert Raised`,
-        message: `Alert in "${projectTitle}": ${populated.message?.slice(0, 150) || 'No details'}`,
-        link: linkUrl,
-        relatedId: populated._id.toString(),
-        relatedModel: 'Alert',
-      }).catch(() => {});
     }
 
     return NextResponse.json({ success: true, data: populated }, { status: 201 });

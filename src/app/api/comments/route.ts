@@ -5,7 +5,7 @@ import UserModel from '@/models/User';
 import DiscussionModel from '@/models/Discussion';
 import { withAuth } from '@/lib/auth';
 import { CreateCommentSchema, PaginationSchema } from '@/lib/validations';
-import { notifyUsers, createNotification } from '@/lib/notifications';
+import { sendPushToOneSignalUsers } from '@/lib/onesignal';
 
 // GET /api/comments?taskId=xxx OR ?alertId=xxx OR ?discussionId=xxx
 export const GET = withAuth(async (req: NextRequest) => {
@@ -87,45 +87,29 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
     isSystemLog: false,
   });
 
-  // If user was @mentioned anywhere (task comment, alert comment, or discussion), notify them
+  // Fire-and-forget: push notification via OneSignal for @mentions
   if (mentionIds.length > 0) {
-    // Don't notify the author mentioning themselves
     const uniqueMentionIds = mentionIds.filter((id) => id !== user._id.toString());
     if (uniqueMentionIds.length > 0) {
-      let mentionContext = '';
       let mentionLink = '/';
-      let mentionRelatedId = '';
-      let mentionRelatedModel = 'Comment';
-
       if (parsed.data.discussionId) {
-        mentionContext = 'discussion';
         mentionLink = '/discussions';
-        mentionRelatedId = parsed.data.discussionId;
-        mentionRelatedModel = 'Discussion';
       } else if (parsed.data.taskId) {
-        mentionContext = 'task';
         mentionLink = `/tasks/${parsed.data.taskId}`;
-        mentionRelatedId = parsed.data.taskId;
-        mentionRelatedModel = 'Task';
       } else if (parsed.data.alertId) {
-        mentionContext = 'alert';
         mentionLink = `/projects`;
-        mentionRelatedId = parsed.data.alertId;
-        mentionRelatedModel = 'Alert';
       }
 
-      await notifyUsers(uniqueMentionIds, {
-        type: 'discussion_mention',
-        title: `@${user.name} mentioned you in a ${mentionContext}`,
-        message: `${user.name} mentioned you: ${parsed.data.content.slice(0, 100)}${parsed.data.content.length > 100 ? '...' : ''}`,
-        link: mentionLink,
-        relatedId: mentionRelatedId,
-        relatedModel: mentionRelatedModel,
-      });
+      sendPushToOneSignalUsers(
+        uniqueMentionIds,
+        `@${user.name} mentioned you`,
+        `${user.name} mentioned you: ${parsed.data.content.slice(0, 100)}${parsed.data.content.length > 100 ? '...' : ''}`,
+        mentionLink
+      ).catch(() => {});
     }
   }
 
-  // If this is a reply to a discussion, add @mentioned users to the discussion access list + notify
+  // If this is a reply to a discussion, add @mentioned users to the discussion access list + notify participants
   if (parsed.data.discussionId) {
     const discussion = await DiscussionModel.findById(parsed.data.discussionId).lean();
     if (discussion) {
@@ -136,27 +120,21 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
         });
       }
 
+      // Collect participants to notify (starter + mentioned users, minus comment author)
       const participants = new Set<string>();
       participants.add(discussion.startedBy.toString());
-      
-      // Also notify mentioned users
       mentionIds.forEach((id) => participants.add(id));
-
-      // Remove the comment author from participants
       participants.delete(user._id.toString());
 
-      // Send notifications (in-app + push) to all participants
-      await notifyUsers(
-        Array.from(participants),
-        {
-          type: 'discussion_reply',
-          title: 'New reply in discussion',
-          message: `${user.name} replied: ${parsed.data.content.slice(0, 100)}${parsed.data.content.length > 100 ? '...' : ''}`,
-          link: `/discussions`,
-          relatedId: discussion._id.toString(),
-          relatedModel: 'Discussion',
-        }
-      );
+      // Fire-and-forget: push notification via OneSignal to all participants
+      if (participants.size > 0) {
+        sendPushToOneSignalUsers(
+          Array.from(participants),
+          'New reply in discussion',
+          `${user.name} replied: ${parsed.data.content.slice(0, 100)}${parsed.data.content.length > 100 ? '...' : ''}`,
+          `/discussions`
+        ).catch(() => {});
+      }
     }
   }
 

@@ -11,7 +11,7 @@ import {
   updateProjectCompletion,
   createSystemLog,
 } from '@/lib/workflow';
-import { createNotification, notifyAdmins } from '@/lib/notifications';
+import { sendPushToOneSignalUser } from '@/lib/onesignal';
 
 // GET /api/tasks/[id]
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
@@ -119,35 +119,19 @@ export const PATCH = withAuth(async (req: NextRequest, ctx, { user }) => {
       await updateProjectCompletion(task.projectId.toString());
     }
 
-    // Fire-and-forget: notify task assignee and admins about status change
-    const projectTitle = updated.projectId && typeof updated.projectId === 'object' && 'projectTitle' in updated.projectId
-      ? (updated.projectId as unknown as { projectTitle: string }).projectTitle || 'Project'
-      : 'Project';
-
-    // Notify the assigned user about status change
+    // Fire-and-forget: push notification via OneSignal to assigned user about status change
     const statusChangeAssigneeId = extractUserId(updated.assignedUser);
     if (statusChangeAssigneeId) {
-      createNotification({
-        userId: statusChangeAssigneeId,
-        type: 'task_assigned',
-        title: `📋 Task Status Changed: ${updated.title}`,
-        message: `"${updated.title}" in "${projectTitle}" changed from "${oldStatus}" to "${parsed.data.status}" by ${user.name}.`,
-        link: task.projectId ? `/tasks/${id}` : undefined,
-        relatedId: id,
-        relatedModel: 'Task',
-      }).catch(() => {});
-    }
+      const projectTitle = updated.projectId && typeof updated.projectId === 'object' && 'projectTitle' in updated.projectId
+        ? (updated.projectId as unknown as { projectTitle: string }).projectTitle || 'Project'
+        : 'Project';
 
-    // Notify admins about significant status changes
-    if (parsed.data.status === TaskStatus.DONE || parsed.data.status === TaskStatus.IN_PROGRESS) {
-      notifyAdmins({
-        type: 'task_assigned',
-        title: `📋 Task ${parsed.data.status === TaskStatus.DONE ? 'Completed' : 'In Progress'}`,
-        message: `"${updated.title}" in "${projectTitle}" is now "${parsed.data.status}" by ${user.name}.`,
-        link: task.projectId ? `/tasks/${id}` : undefined,
-        relatedId: id,
-        relatedModel: 'Task',
-      }).catch(() => {});
+      sendPushToOneSignalUser(
+        statusChangeAssigneeId,
+        `📋 Task Status Changed: ${updated.title}`,
+        `"${updated.title}" in "${projectTitle}" changed from "${oldStatus}" to "${parsed.data.status}" by ${user.name}.`,
+        task.projectId ? `/tasks/${id}` : undefined
+      ).catch(() => {});
     }
   }
 
@@ -159,26 +143,13 @@ export const PATCH = withAuth(async (req: NextRequest, ctx, { user }) => {
       ? (updated.projectId as unknown as { projectTitle: string }).projectTitle || 'Project'
       : 'Project';
 
-    // Notify the newly assigned user
-    createNotification({
-      userId: newAssignedUserId,
-      type: 'task_assigned',
-      title: `👤 Task Assigned: ${updated.title}`,
-      message: `You have been assigned task "${updated.title}" in project "${projectTitle}".`,
-      link: task.projectId ? `/tasks/${id}` : undefined,
-      relatedId: id,
-      relatedModel: 'Task',
-    }).catch(() => {});
-
-    // Notify admins about the assignment change
-    notifyAdmins({
-      type: 'task_assigned',
-      title: `👤 Task Reassigned`,
-      message: `"${updated.title}" in "${projectTitle}" was assigned to a new user by ${user.name}.`,
-      link: task.projectId ? `/tasks/${id}` : undefined,
-      relatedId: id,
-      relatedModel: 'Task',
-    }).catch(() => {});
+    // Fire-and-forget: push notification via OneSignal to newly assigned user
+    sendPushToOneSignalUser(
+      newAssignedUserId,
+      `👤 Task Assigned: ${updated.title}`,
+      `You have been assigned task "${updated.title}" in project "${projectTitle}".`,
+      task.projectId ? `/tasks/${id}` : undefined
+    ).catch(() => {});
   }
 
   if (parsed.data.imageAttachments) {
