@@ -157,6 +157,7 @@ export const CreateTaskTemplateSchema = z.object({
   sequence: z.number().int().min(0).optional(),
   frequency: z.nativeEnum(TaskFrequency).optional(),
   isActive: z.boolean().optional(),
+  linkedToProduct: z.boolean().optional(),
 });
 
 export const UpdateTaskTemplateSchema = CreateTaskTemplateSchema.partial();

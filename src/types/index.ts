@@ -163,6 +163,7 @@ export interface ITaskTemplate {
   sequence: number;
   frequency: TaskFrequency;
   isActive: boolean;
+  linkedToProduct?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -309,6 +310,7 @@ export interface ITemplateGroup {
     sequence: number;
     frequency: TaskFrequency;
     type?: 'project' | 'internal';
+    linkedToProduct?: boolean;
   }>;
   isActive: boolean;
   createdAt: Date;

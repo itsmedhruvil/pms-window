@@ -505,7 +505,7 @@ function TaskListView({
             <th>Task</th>
             {showDepartmentColumn && <th>Department</th>}
             <th>Status</th>
-            <th>Due Date</th>
+            <th>End Date</th>
             <th>Project</th>
           </tr>
         </thead>

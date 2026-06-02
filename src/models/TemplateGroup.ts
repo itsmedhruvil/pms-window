@@ -8,6 +8,7 @@ interface ITemplateGroupTask {
   sequence: number;
   frequency: TaskFrequency;
   type?: 'project' | 'internal';
+  linkedToProduct?: boolean;
 }
 
 export interface ITemplateGroupDocument extends Document {
@@ -50,6 +51,10 @@ const TemplateGroupTaskSchema = new Schema<ITemplateGroupTask>(
       type: String,
       enum: ['project', 'internal'],
       default: 'project',
+    },
+    linkedToProduct: {
+      type: Boolean,
+      default: false,
     },
   },
   { _id: false }

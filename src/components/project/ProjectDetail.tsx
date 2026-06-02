@@ -199,6 +199,23 @@ export function ProjectDetail({
     }
   };
 
+  // Remove uploaded Excel data
+  const removeExcel = async () => {
+    if (!isAdmin) return;
+    setExcelLoading(true);
+    setExcelError(null);
+    const result = await apiFetch(`/api/projects/${project._id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ excelSheetName: '', excelRows: [] }),
+    });
+    setExcelLoading(false);
+    if (result.success && result.data) {
+      setProject(result.data as IProject);
+    } else {
+      setExcelError(result.error || 'Failed to remove Excel data');
+    }
+  };
+
   // Design PDF upload per window specification
   const handleDesignPdfUpload = async (specIndex: number, file: File) => {
     if (file.type !== 'application/pdf') return;
@@ -723,7 +740,20 @@ export function ProjectDetail({
                     <span className="text-xs font-mono text-gray-500">
                       Sheet: {project.excelSheetName || 'Imported'}
                     </span>
-                    <ExcelUpload onUpload={handleExcelUpload} loading={excelLoading} />
+                    <div className="flex items-center gap-2">
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={removeExcel}
+                          disabled={excelLoading}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors rounded-md"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          Remove
+                        </button>
+                      )}
+                      <ExcelUpload onUpload={handleExcelUpload} loading={excelLoading} />
+                    </div>
                   </div>
                   <div className="overflow-x-auto border-2 border-gray-300 rounded-sm">
                     <table className="min-w-full text-left text-xs font-mono border-collapse">

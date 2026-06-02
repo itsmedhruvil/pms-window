@@ -98,24 +98,45 @@ export async function generateFromSelectedTemplateGroup(
 
   // Create project tasks (linked to this project)
   const departments = await getWorkflowDepartments();
+  const totalWindows = await getProjectTotalWindows(projectId);
 
   for (const dept of departments) {
     const deptTasks = (projectDeptMap.get(dept) || []).sort((a, b) => a.sequence - b.sequence);
     if (deptTasks.length === 0) continue;
 
     for (const taskData of deptTasks) {
-      projectTasks.push({
-        _id: new Types.ObjectId(),
-        projectId,
-        department: dept as Department,
-        title: taskData.title,
-        description: taskData.description,
-        status: TaskStatus.TODO,
-        frequency: (taskData as any).frequency || 'project',
-        dependencyTaskId: null,
-        isLocked: false,
-        sequence: globalSequence++,
-      });
+      const isLinked = (taskData as any).linkedToProduct === true;
+
+      if (isLinked && totalWindows > 1) {
+        // Create one task per product
+        for (let w = 0; w < totalWindows; w++) {
+          projectTasks.push({
+            _id: new Types.ObjectId(),
+            projectId,
+            department: dept as Department,
+            title: `${taskData.title} - Product ${w + 1}`,
+            description: `${taskData.description} (Product ${w + 1} of ${totalWindows})`,
+            status: TaskStatus.TODO,
+            frequency: (taskData as any).frequency || 'project',
+            dependencyTaskId: null,
+            isLocked: false,
+            sequence: globalSequence++,
+          });
+        }
+      } else {
+        projectTasks.push({
+          _id: new Types.ObjectId(),
+          projectId,
+          department: dept as Department,
+          title: taskData.title,
+          description: taskData.description,
+          status: TaskStatus.TODO,
+          frequency: (taskData as any).frequency || 'project',
+          dependencyTaskId: null,
+          isLocked: false,
+          sequence: globalSequence++,
+        });
+      }
     }
   }
 
@@ -249,6 +270,7 @@ async function generateFromTaskTemplates(
   let globalSequence = 0;
   let previousDeptLastTaskId: Types.ObjectId | null = null;
   const departments = await getWorkflowDepartments();
+  const totalWindows = await getProjectTotalWindows(projectId);
 
   for (const dept of departments) {
     const deptTasks = await TaskTemplateModel.find({ department: dept, isActive: true })
@@ -258,30 +280,50 @@ async function generateFromTaskTemplates(
 
     for (let i = 0; i < deptTasks.length; i++) {
       const taskData = deptTasks[i];
-      const taskId = new Types.ObjectId();
+      const isLinked = (taskData as any).linkedToProduct === true;
 
-      tasks.push({
-        _id: taskId,
-        projectId,
-        templateTaskId: taskData._id,
-        department: dept,
-        title: taskData.title,
-        description: taskData.description,
-        status: TaskStatus.TODO,
-        frequency: (taskData as any).frequency || 'project',
-        dependencyTaskId: null,
-        isLocked: false,
-        sequence: globalSequence++,
-      });
-
-      previousTaskIdInDept = taskId;
+      if (isLinked && totalWindows > 1) {
+        // Create one task per product
+        for (let w = 0; w < totalWindows; w++) {
+          const taskId = new Types.ObjectId();
+          tasks.push({
+            _id: taskId,
+            projectId,
+            templateTaskId: taskData._id,
+            department: dept,
+            title: `${taskData.title} - Product ${w + 1}`,
+            description: `${taskData.description} (Product ${w + 1} of ${totalWindows})`,
+            status: TaskStatus.TODO,
+            frequency: (taskData as any).frequency || 'project',
+            dependencyTaskId: null,
+            isLocked: false,
+            sequence: globalSequence++,
+          });
+          previousTaskIdInDept = taskId;
+        }
+      } else {
+        const taskId = new Types.ObjectId();
+        tasks.push({
+          _id: taskId,
+          projectId,
+          templateTaskId: taskData._id,
+          department: dept,
+          title: taskData.title,
+          description: taskData.description,
+          status: TaskStatus.TODO,
+          frequency: (taskData as any).frequency || 'project',
+          dependencyTaskId: null,
+          isLocked: false,
+          sequence: globalSequence++,
+        });
+        previousTaskIdInDept = taskId;
+      }
     }
 
     previousDeptLastTaskId = previousTaskIdInDept;
   }
 
   // Add window-multiplied tasks for Operations (dispatch) and Site (installation, QC)
-  const totalWindows = await getProjectTotalWindows(projectId);
   const { tasks: windowTasks, nextSequence } = await generateWindowMultipliedTasks(
     projectId,
     totalWindows,
@@ -332,6 +374,9 @@ async function generateFromTemplateGroups(
       deptMap.get(task.department)!.push(task);
     }
 
+    // Get total windows for linked-to-product multiplication
+    const totalWindows = await getProjectTotalWindows(projectId);
+
     for (const dept of departments) {
       const deptTasks = (deptMap.get(dept) || []).sort((a, b) => a.sequence - b.sequence);
       if (deptTasks.length === 0) continue;
@@ -340,22 +385,42 @@ async function generateFromTemplateGroups(
 
       for (let i = 0; i < deptTasks.length; i++) {
         const taskData = deptTasks[i];
-        const taskId = new Types.ObjectId();
+        const isLinked = (taskData as any).linkedToProduct === true;
 
-        tasks.push({
-          _id: taskId,
-          projectId,
-          department: dept as any,
-          title: `${taskData.title} — ${spec.design}`,
-          description: taskData.description,
-          status: TaskStatus.TODO,
-          frequency: (taskData as any).frequency || 'project',
-          dependencyTaskId: null,
-          isLocked: false,
-          sequence: globalSequence++,
-        });
-
-        previousTaskIdInDept = taskId;
+        if (isLinked && totalWindows > 1) {
+          // Create one task per product
+          for (let w = 0; w < totalWindows; w++) {
+            const taskId = new Types.ObjectId();
+            tasks.push({
+              _id: taskId,
+              projectId,
+              department: dept as any,
+              title: `${taskData.title} — ${spec.design} (Product ${w + 1})`,
+              description: `${taskData.description} (Product ${w + 1} of ${totalWindows} — ${spec.design})`,
+              status: TaskStatus.TODO,
+              frequency: (taskData as any).frequency || 'project',
+              dependencyTaskId: null,
+              isLocked: false,
+              sequence: globalSequence++,
+            });
+            previousTaskIdInDept = taskId;
+          }
+        } else {
+          const taskId = new Types.ObjectId();
+          tasks.push({
+            _id: taskId,
+            projectId,
+            department: dept as any,
+            title: `${taskData.title} — ${spec.design}`,
+            description: taskData.description,
+            status: TaskStatus.TODO,
+            frequency: (taskData as any).frequency || 'project',
+            dependencyTaskId: null,
+            isLocked: false,
+            sequence: globalSequence++,
+          });
+          previousTaskIdInDept = taskId;
+        }
       }
 
       previousDeptLastTaskId = previousTaskIdInDept;

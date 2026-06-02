@@ -534,7 +534,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
             </div>
             <div>
               <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-1.5">
-                Due Date
+                End Date
               </label>
               <input
                 type="date"

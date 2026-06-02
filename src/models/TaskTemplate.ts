@@ -8,6 +8,7 @@ export interface ITaskTemplateDocument extends Document {
   sequence: number;
   frequency: TaskFrequency;
   isActive: boolean;
+  linkedToProduct: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,6 +47,10 @@ const TaskTemplateSchema = new Schema<ITaskTemplateDocument>(
       type: Boolean,
       default: true,
       index: true,
+    },
+    linkedToProduct: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }
