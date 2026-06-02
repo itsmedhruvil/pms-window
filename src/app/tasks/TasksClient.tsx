@@ -498,7 +498,7 @@ function TaskListView({
 
   return (
     <div className="erp-table-wrap border border-gray-200">
-      <table className="erp-table">
+          <table className="erp-table">
         <thead>
           <tr>
             <th className="w-10"></th>
@@ -507,7 +507,6 @@ function TaskListView({
             <th>Status</th>
             <th>Due Date</th>
             <th>Project</th>
-            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -592,9 +591,6 @@ function TaskListView({
                   ) : (
                     <span className="text-gray-300">—</span>
                   )}
-                </td>
-                <td>
-                  <span className="text-[10px] font-mono text-gray-400">Open →</span>
                 </td>
               </tr>
             );
