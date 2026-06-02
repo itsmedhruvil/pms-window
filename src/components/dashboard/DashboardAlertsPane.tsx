@@ -1,12 +1,48 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertTriangle, Bell, Loader2, MessageCircle } from 'lucide-react';
-import { cn, timeAgo } from '@/lib/utils';
-import type { IAlert, IUser, IProject } from '@/types';
+import { AlertTriangle, Bell, Loader2, MessageCircle, CheckCircle2, Ban, PlayCircle } from 'lucide-react';
+import { cn, timeAgo, getDepartmentLabel, ALERT_TYPE_LABEL } from '@/lib/utils';
+import type { IAlert, IUser, IProject, Department } from '@/types';
+import { AlertType } from '@/types';
 import { useAlerts } from '@/lib/client-data';
 
-export function DashboardAlertsPane() {
+interface DashboardCharts {
+  tasksByDepartment: Array<{
+    department: string;
+    total: number;
+    done: number;
+    inProgress: number;
+    blocked: number;
+    todo: number;
+    completionRate: number;
+  }>;
+  completionTrend: Array<{ date: string; completed: number; created: number }>;
+  avgCompletionByDept: Record<string, number>;
+}
+
+interface DashboardMetricsData {
+  metrics: {
+    totalActiveProjects: number;
+    projectsOnHold: number;
+    projectsCompleted: number;
+    projectsDispatched: number;
+    overdueProjects: number;
+    taskCompletionRate: Record<Department, number>;
+    avgTaskCompletionTime: number;
+    alertFrequency: Record<AlertType, number>;
+    bottleneckDepartment: Department | null;
+    activeAlertCount: number;
+  };
+  charts: DashboardCharts;
+  overdueByDept?: Record<string, number>;
+}
+
+export function DashboardAlertsPane({
+  data,
+}: {
+  data?: DashboardMetricsData | null;
+}) {
   // SWR handles caching, deduplication, and 30s poll interval automatically
   const { data: alertData, error: alertError, isLoading: alertLoading, mutate: refreshAlerts } = useAlerts({ status: 'active', limit: '5' });
 
@@ -22,6 +58,13 @@ export function DashboardAlertsPane() {
       default: return 'border-gray-300 bg-gray-50';
     }
   };
+
+  // Department progress data
+  const sortedDepts = data?.charts?.tasksByDepartment
+    ? [...data.charts.tasksByDepartment].sort(
+        (a, b) => (data.metrics.taskCompletionRate[b.department] || 0) - (data.metrics.taskCompletionRate[a.department] || 0)
+      )
+    : [];
 
   return (
     <div className="border border-gray-200">
@@ -117,6 +160,62 @@ export function DashboardAlertsPane() {
               <p className="text-[9px] font-mono text-gray-400 mt-0.5">Everything is looking good!</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Gap between alerts and dept progress */}
+      <div className="h-3" />
+
+      {/* Department Progress (moved here from DashboardMetrics) */}
+      {data && sortedDepts.length > 0 && (
+        <div className="px-4 py-3">
+          <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
+            Department Progress
+          </h3>
+          <div className="space-y-2">
+            {sortedDepts.map(({ department: dept }) => {
+              const rate = data.metrics.taskCompletionRate[dept] || 0;
+              return (
+                <div key={dept}>
+                  <div className="flex items-center justify-between text-[10px] font-mono mb-0.5">
+                    <span className="text-gray-700 truncate">{getDepartmentLabel(dept)}</span>
+                    <span className={cn('font-bold', rate === 100 ? 'text-green-600' : rate < 30 ? 'text-red-500' : 'text-gray-900')}>
+                      {rate}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 overflow-hidden">
+                    <div
+                      className={cn('h-full transition-all', rate === 100 ? 'bg-green-500' : rate < 30 ? 'bg-red-500' : 'bg-black')}
+                      style={{ width: `${rate}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Alerts by Type (moved here from DashboardMetrics) */}
+      {data && (
+        <div className="px-4 py-3">
+          <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
+            Alerts by Type
+          </h3>
+          <div className="grid grid-cols-2 gap-1.5">
+            {Object.values(AlertType).map((type) => {
+              const count = data.metrics.alertFrequency[type] || 0;
+              return (
+                <div key={type} className={cn(
+                  'p-2 border text-center',
+                  count > 0 ? 'border-red-200 bg-red-50/50' : 'border-gray-100'
+                )}>
+                  <p className="text-[8px] font-mono text-gray-500 uppercase truncate">{ALERT_TYPE_LABEL[type]}</p>
+                  <p className={cn('text-sm font-black font-mono', count > 0 ? 'text-red-600' : 'text-gray-300')}>{count}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

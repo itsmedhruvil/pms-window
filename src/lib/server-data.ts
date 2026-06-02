@@ -213,7 +213,7 @@ export async function getDashboardData() {
   await connectDB();
 
   const now = new Date();
-  const thirtyDaysAgo = subDays(now, 30);
+  const ninetyDaysAgo = subDays(now, 90);
 
   // Use $facet to reduce 3 task aggregations into 1 query
   const [dashboardData] = await TaskModel.aggregate([
@@ -233,7 +233,7 @@ export async function getDashboardData() {
           { $group: { _id: '$department', count: { $sum: 1 } } },
         ],
         completionTrend: [
-          { $match: { completedAt: { $gte: thirtyDaysAgo }, status: TaskStatus.DONE } },
+          { $match: { completedAt: { $gte: ninetyDaysAgo }, status: TaskStatus.DONE } },
           { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$completedAt' } }, completed: { $sum: 1 } } },
           { $sort: { _id: 1 } },
         ],
@@ -326,11 +326,11 @@ export async function getDashboardData() {
   });
   const avgTaskCompletionTime = deptCount > 0 ? Math.round(globalAvgHours / deptCount) : 0;
 
-  // Fill completion trend for last 14 days
+  // Fill completion trend for last 90 days (-89 to 0 offset from today)
   const trendMap: Record<string, number> = {};
   completionTrendData.forEach((t: { _id: string; completed: number }) => { trendMap[t._id] = t.completed; });
-  const trend = Array.from({ length: 14 }, (_, i) => {
-    const date = subDays(now, 13 - i).toISOString().split('T')[0];
+  const trend = Array.from({ length: 90 }, (_, i) => {
+    const date = subDays(now, 89 - i).toISOString().split('T')[0];
     return { date, completed: trendMap[date] || 0, created: 0 };
   });
 

@@ -1,9 +1,9 @@
 'use client';
 
-import { AlertTriangle, TrendingUp, Clock, Layers, Zap, CheckCircle2, Ban, PlayCircle, Calendar as CalendarIcon } from 'lucide-react';
-import { cn, getDepartmentLabel, ALERT_TYPE_LABEL } from '@/lib/utils';
-import { Department, AlertType } from '@/types';
-import { useMemo } from 'react';
+import { AlertTriangle, TrendingUp, Clock, Layers, Zap, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { cn, getDepartmentLabel } from '@/lib/utils';
+import { Department } from '@/types';
+import { useMemo, useState } from 'react';
 
 interface DashboardMetricsData {
   metrics: {
@@ -14,7 +14,6 @@ interface DashboardMetricsData {
     overdueProjects: number;
     taskCompletionRate: Record<Department, number>;
     avgTaskCompletionTime: number;
-    alertFrequency: Record<AlertType, number>;
     bottleneckDepartment: Department | null;
     activeAlertCount: number;
   };
@@ -48,21 +47,38 @@ export function DashboardMetrics({
     Math.max(...charts.completionTrend.map(d => d.completed), 1),
   [charts.completionTrend]);
 
-  const topAlerts = useMemo(() =>
-    Object.entries(metrics.alertFrequency)
-      .filter(([, count]) => count > 0)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3),
-  [metrics.alertFrequency]);
-
   const now = new Date();
-  const currentMonth = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth());
 
-  // Build calendar grid
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
+  const currentMonthLabel = new Date(viewYear, viewMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const goToPrevMonth = () => {
+    if (viewMonth === 0) {
+      setViewYear(y => y - 1);
+      setViewMonth(11);
+    } else {
+      setViewMonth(m => m - 1);
+    }
+  };
+
+  const goToNextMonth = () => {
+    if (viewMonth === 11) {
+      setViewYear(y => y + 1);
+      setViewMonth(0);
+    } else {
+      setViewMonth(m => m + 1);
+    }
+  };
+
+  const goToCurrentMonth = () => {
+    setViewYear(now.getFullYear());
+    setViewMonth(now.getMonth());
+  };
+
+  // Build calendar grid for the viewed month
+  const firstDay = new Date(viewYear, viewMonth, 1);
+  const lastDay = new Date(viewYear, viewMonth + 1, 0);
   const startPad = firstDay.getDay(); // 0=Sun
   const totalDays = lastDay.getDate();
 
@@ -73,28 +89,26 @@ export function DashboardMetrics({
     calendarDays.push({ day: 0, isToday: false });
   }
 
-  // Build trend map
+  // Build a trend map keyed by "YYYY-MM-DD" for quick lookup across months
   const trendMap: Record<string, number> = {};
   charts.completionTrend.forEach(d => {
-    const key = d.date.slice(8); // "YYYY-MM-DD" -> "DD"
-    trendMap[String(Number(key))] = d.completed;
+    trendMap[d.date] = d.completed;
   });
 
+  // Format: YYYY-MM-DD prefix for the viewed month
+  const ymPrefix = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
+
   for (let d = 1; d <= totalDays; d++) {
+    const dateKey = `${ymPrefix}-${String(d).padStart(2, '0')}`;
     calendarDays.push({
       day: d,
-      completed: trendMap[String(d)],
-      isToday: d === now.getDate(),
+      completed: trendMap[dateKey],
+      isToday: viewYear === now.getFullYear() && viewMonth === now.getMonth() && d === now.getDate(),
     });
   }
 
   // Day names
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  // Departments sorted by completion rate
-  const sortedDepts = [...charts.tasksByDepartment].sort(
-    (a, b) => (metrics.taskCompletionRate[b.department] || 0) - (metrics.taskCompletionRate[a.department] || 0)
-  );
 
   return (
     <div className="space-y-6">
@@ -180,164 +194,99 @@ export function DashboardMetrics({
         </div>
       )}
 
-      {/* Main Grid: Calendar LEFT | Departments RIGHT */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        {/* Calendar — takes 3 cols */}
-        <div className="lg:col-span-3 border border-gray-200 p-3">
-          <div className="flex items-center gap-2 mb-3">
-            <CalendarIcon className="w-4 h-4 text-gray-500" />
-            <span className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700">{currentMonth}</span>
-            <span className="text-[10px] font-mono text-gray-400 ml-auto">Darker = more completions</span>
-          </div>
-
-          {/* Day headers */}
-          <div className="grid grid-cols-7 mb-1">
-            {dayNames.map(d => (
-              <div key={d} className="text-[8px] font-mono text-gray-400 text-center py-1 uppercase tracking-wider">
-                {d}
-              </div>
-            ))}
-          </div>
-
-          {/* Calendar grid */}
-          <div className="grid grid-cols-7 gap-px bg-gray-100">
-            {calendarDays.map((day, i) => {
-              if (day.day === 0) {
-                return <div key={`pad-${i}`} className="bg-gray-50 min-h-[48px]" />;
-              }
-              const intensity = day.completed && maxTrendCompleted > 0 ? day.completed / maxTrendCompleted : 0;
-
-              return (
-                <div
-                  key={day.day}
-                  className={cn(
-                    'min-h-[48px] p-1 flex flex-col items-center justify-center transition-all',
-                    day.isToday ? 'ring-2 ring-black ring-inset bg-white' : 'bg-white'
-                  )}
-                >
-                  <span className={cn(
-                    'text-[10px] font-mono',
-                    day.isToday ? 'font-black text-black' : 'text-gray-700'
-                  )}>
-                    {day.day}
-                  </span>
-                  {day.completed !== undefined && day.completed > 0 && (
-                    <div className={cn(
-                      'w-full mt-0.5 rounded-sm h-1',
-                      intensity < 0.25 ? 'bg-gray-200' :
-                      intensity < 0.5 ? 'bg-gray-400' :
-                      intensity < 0.75 ? 'bg-gray-600' :
-                      'bg-black'
-                    )} />
-                  )}
-                  {day.completed !== undefined && day.completed > 0 && (
-                    <span className="text-[7px] font-mono text-gray-400 mt-0.5">{day.completed}</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Legend */}
-          <div className="flex items-center gap-3 mt-2 text-[8px] font-mono text-gray-400">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gray-200 rounded-sm" /> Light</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gray-400 rounded-sm" /> Medium</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gray-600 rounded-sm" /> Heavy</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-black rounded-sm" /> Most</span>
-            <span className="ml-auto">{charts.completionTrend.reduce((s, d) => s + d.completed, 0)} tasks done this month</span>
-          </div>
-        </div>
-
-        {/* Departments + Alerts — takes 2 cols */}
-        <div className="lg:col-span-2 space-y-3">
-          {/* Department completion */}
-          <div className="border border-gray-200 p-3">
-            <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
-              Department Progress
-            </h3>
-            <div className="space-y-2">
-              {sortedDepts.slice(0, 5).map(({ department: dept }) => {
-                const rate = metrics.taskCompletionRate[dept] || 0;
-                return (
-                  <div key={dept}>
-                    <div className="flex items-center justify-between text-[10px] font-mono mb-0.5">
-                      <span className="text-gray-700 truncate">{getDepartmentLabel(dept)}</span>
-                      <span className={cn('font-bold', rate === 100 ? 'text-green-600' : rate < 30 ? 'text-red-500' : 'text-gray-900')}>
-                        {rate}%
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-gray-100 overflow-hidden">
-                      <div
-                        className={cn('h-full transition-all', rate === 100 ? 'bg-green-500' : rate < 30 ? 'bg-red-500' : 'bg-black')}
-                        style={{ width: `${rate}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-              {sortedDepts.length > 5 && (
-                <p className="text-[9px] font-mono text-gray-400">+{sortedDepts.length - 5} more departments</p>
-              )}
-            </div>
-          </div>
-
-          {/* Alert types mini */}
-          <div className="border border-gray-200 p-3">
-            <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
-              Alerts by Type
-            </h3>
-            <div className="grid grid-cols-2 gap-1.5">
-              {Object.values(AlertType).map((type) => {
-                const count = metrics.alertFrequency[type] || 0;
-                return (
-                  <div key={type} className={cn(
-                    'p-2 border text-center',
-                    count > 0 ? 'border-red-200 bg-red-50/50' : 'border-gray-100'
-                  )}>
-                    <p className="text-[8px] font-mono text-gray-500 uppercase truncate">{ALERT_TYPE_LABEL[type]}</p>
-                    <p className={cn('text-sm font-black font-mono', count > 0 ? 'text-red-600' : 'text-gray-300')}>{count}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom: Task breakdown bars */}
+      {/* Full-width Calendar */}
       <div className="border border-gray-200 p-3">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Tasks by Department</span>
-          </div>
-          <div className="flex items-center gap-2 text-[8px] font-mono">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-black" /> Done</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gray-400" /> Active</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-red-500" /> Blocked</span>
-          </div>
+        {/* Month navigation header */}
+        <div className="flex items-center gap-2 mb-3">
+          <CalendarIcon className="w-4 h-4 text-gray-500" />
+          <button
+            type="button"
+            onClick={goToPrevMonth}
+            className="p-1 hover:bg-gray-100 transition-colors"
+            title="Previous month"
+          >
+            <ChevronLeft className="w-4 h-4 text-gray-500" />
+          </button>
+          <button
+            type="button"
+            onClick={goToCurrentMonth}
+            className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700 hover:text-black transition-colors"
+          >
+            {currentMonthLabel}
+          </button>
+          <button
+            type="button"
+            onClick={goToNextMonth}
+            className="p-1 hover:bg-gray-100 transition-colors"
+            title="Next month"
+          >
+            <ChevronRight className="w-4 h-4 text-gray-500" />
+          </button>
+          <span className="text-[10px] font-mono text-gray-400 ml-auto">Darker = more completions</span>
         </div>
-        <div className="space-y-1.5">
-          {charts.tasksByDepartment.map(({ department: dept, done, inProgress, blocked, total }) => {
-            const donePct = total > 0 ? (done / total) * 100 : 0;
-            const inProgPct = total > 0 ? (inProgress / total) * 100 : 0;
-            const blockedPct = total > 0 ? (blocked / total) * 100 : 0;
+
+        {/* Day headers */}
+        <div className="grid grid-cols-7 mb-1">
+          {dayNames.map(d => (
+            <div key={d} className="text-[8px] font-mono text-gray-400 text-center py-1 uppercase tracking-wider">
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar grid */}
+        <div className="grid grid-cols-7 gap-px bg-gray-100">
+          {calendarDays.map((day, i) => {
+            if (day.day === 0) {
+              return <div key={`pad-${i}`} className="bg-gray-50 min-h-[48px]" />;
+            }
+            const intensity = day.completed && maxTrendCompleted > 0 ? day.completed / maxTrendCompleted : 0;
 
             return (
-              <div key={dept}>
-                <div className="flex items-center justify-between text-[9px] font-mono mb-0.5">
-                  <span className="text-gray-600">{getDepartmentLabel(dept)}</span>
-                  <span className="text-gray-400">{done}/{total}</span>
-                </div>
-                <div className="h-4 bg-gray-100 overflow-hidden flex">
-                  {blockedPct > 0 && <div className="h-full bg-red-500 transition-all" style={{ width: `${blockedPct}%` }} />}
-                  {inProgPct > 0 && <div className="h-full bg-gray-400 transition-all" style={{ width: `${inProgPct}%` }} />}
-                  {donePct > 0 && <div className="h-full bg-black transition-all" style={{ width: `${donePct}%` }} />}
-                </div>
+              <div
+                key={day.day}
+                className={cn(
+                  'min-h-[48px] p-1 flex flex-col items-center justify-center transition-all',
+                  day.isToday ? 'ring-2 ring-black ring-inset bg-white' : 'bg-white'
+                )}
+              >
+                <span className={cn(
+                  'text-[10px] font-mono',
+                  day.isToday ? 'font-black text-black' : 'text-gray-700'
+                )}>
+                  {day.day}
+                </span>
+                {day.completed !== undefined && day.completed > 0 && (
+                  <div className={cn(
+                    'w-full mt-0.5 rounded-sm h-1',
+                    intensity < 0.25 ? 'bg-gray-200' :
+                    intensity < 0.5 ? 'bg-gray-400' :
+                    intensity < 0.75 ? 'bg-gray-600' :
+                    'bg-black'
+                  )} />
+                )}
+                {day.completed !== undefined && day.completed > 0 && (
+                  <span className="text-[7px] font-mono text-gray-400 mt-0.5">{day.completed}</span>
+                )}
               </div>
             );
           })}
         </div>
+
+        {/* Legend */}
+        <div className="flex items-center gap-3 mt-2 text-[8px] font-mono text-gray-400">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gray-200 rounded-sm" /> Light</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gray-400 rounded-sm" /> Medium</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gray-600 rounded-sm" /> Heavy</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-black rounded-sm" /> Most</span>
+          <span className="ml-auto">
+            {charts.completionTrend
+              .filter(t => t.date.startsWith(ymPrefix))
+              .reduce((s, d) => s + d.completed, 0)} tasks done this month
+          </span>
+        </div>
       </div>
+
     </div>
   );
 }
