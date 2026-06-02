@@ -14,7 +14,14 @@ const PRIORITIES = [
   { value: ProjectPriority.URGENT, label: 'Urgent', desc: 'Immediate attention required' },
 ];
 
-const PRODUCT_TYPE_OPTIONS = ['Glass', 'Door', 'Railing'];
+const PRODUCT_TYPE_OPTIONS = [
+  'Aluminium Sliding Windows',
+  'Aluminium Doors',
+  'Casement Window',
+  'Glass Slim Partitions',
+  'Aluminium Glass Railing',
+  'Curtain Wall Systems',
+];
 
 interface PdfFile {
   id: string;
@@ -31,7 +38,6 @@ interface FormData {
   priority: ProjectPriority;
   startDate: string;
   deadline: string;
-  endDate: string;
   address: string;
   contactPhone: string;
   totalWindows: number;
@@ -62,7 +68,6 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
     priority: ProjectPriority.NECESSARY,
     startDate: '',
     deadline: '',
-    endDate: '',
     address: '',
     contactPhone: '',
     totalWindows: 0,
@@ -267,10 +272,6 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
 
     if (form.startDate.trim()) {
       body.startDate = form.startDate.trim();
-    }
-
-    if (form.endDate.trim()) {
-      body.endDate = form.endDate.trim();
     }
 
     if (form.templateGroupId) {
@@ -555,15 +556,6 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
                 {dateError}
               </p>
             )}
-          </Field>
-
-          <Field label="End Date">
-            <input
-              type="date"
-              value={form.endDate}
-              onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-              className={inputClass}
-            />
           </Field>
 
           <Field label="Priority" required>
