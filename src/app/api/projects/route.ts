@@ -101,10 +101,17 @@ export const POST = withAuth(
       );
 
       // Auto-generate workflow tasks:
-      // 1. If window specifications with template groups exist, generate per-window tasks
-      // 2. If a selectedTemplateGroupId is provided (but no window specs), generate department tasks from that template group
+      // 1. If a selectedTemplateGroupId is provided, generate department tasks from that template group
+      // 2. If window specifications with template groups exist (per-spec), generate per-window tasks
       // 3. Otherwise generate from active task templates (fallback)
-      if (projectData.windowSpecifications && projectData.windowSpecifications.length > 0) {
+      if (projectData.selectedTemplateGroupId) {
+        // Use the global template group for task generation (handles linkedToProduct multiplication)
+        await generateFromSelectedTemplateGroup(
+          project._id,
+          user._id,
+          projectData.selectedTemplateGroupId
+        );
+      } else if (projectData.windowSpecifications && projectData.windowSpecifications.length > 0) {
         await generateProjectTasks(
           project._id,
           user._id,
@@ -113,12 +120,6 @@ export const POST = withAuth(
             design: ws.design,
             quantity: ws.quantity,
           }))
-        );
-      } else if (projectData.selectedTemplateGroupId) {
-        await generateFromSelectedTemplateGroup(
-          project._id,
-          user._id,
-          projectData.selectedTemplateGroupId
         );
       } else {
         await generateProjectTasks(project._id, user._id);
