@@ -27,6 +27,19 @@ export function InternalTasksPageClient({
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [templateGroups, setTemplateGroups] = useState<ITemplateGroup[]>([]);
 
+  // Auto-refresh list when tasks are created/updated via events
+  useEffect(() => {
+    const handleTaskUpdate = () => {
+      window.location.reload();
+    };
+    window.addEventListener('erp-task-updated', handleTaskUpdate);
+    window.addEventListener('app-data-changed', handleTaskUpdate);
+    return () => {
+      window.removeEventListener('erp-task-updated', handleTaskUpdate);
+      window.removeEventListener('app-data-changed', handleTaskUpdate);
+    };
+  }, []);
+
   // Fetch template groups for the task creation modal
   useEffect(() => {
     if (!taskModalOpen) return;
@@ -80,7 +93,13 @@ export function InternalTasksPageClient({
       if (!response.ok) throw new Error('Failed to update tasks');
 
       // Refresh the page to get updated data
-      window.location.reload();
+      // Dispatch events so other pages auto-refresh
+      window.dispatchEvent(new CustomEvent('app-data-changed', {
+        detail: { entity: 'task', action: 'updated' },
+      }));
+      window.dispatchEvent(new CustomEvent('app-data-changed', {
+        detail: { entity: 'project', action: 'updated' },
+      }));
     } catch (error) {
       console.error('Failed to bulk update tasks:', error);
       alert('Failed to update tasks. Please try again.');
@@ -146,6 +165,7 @@ export function InternalTasksPageClient({
                         {isAdmin && <th className="w-12"></th>}
                         <th>Task</th>
                         <th>Status</th>
+                        <th>Frequency</th>
                         <th>Due Date</th>
                         <th>Assigned To</th>
                         <th></th>
@@ -206,6 +226,11 @@ export function InternalTasksPageClient({
                             </td>
                             <td>
                               <TaskStatusBadge status={task.status} size="sm" />
+                            </td>
+                            <td>
+                              <span className="text-[11px] font-mono text-gray-500 uppercase">
+                                {task.frequency?.replace('_', ' ')}
+                              </span>
                             </td>
                             <td>
                               {task.dueDate ? (

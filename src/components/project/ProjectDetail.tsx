@@ -7,7 +7,7 @@ import ExcelJS from 'exceljs';
 import {
   AlertTriangle, Calendar, Package, ChevronRight,
   CheckCircle2, Copy, Trash2, ArrowUpRight, Edit3,
-  X, Save, Upload, FileText, Tag, Layers,
+  X, Save, Upload, FileText, Tag, Layers, Table2,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 import { cn, getDepartmentLabel, formatDate, ALERT_TYPE_LABEL, normalizeProjectPriority } from '@/lib/utils';
@@ -31,6 +31,27 @@ interface ProjectDetailProps {
   currentUserRole?: UserRole;
 }
 
+function ExcelUpload({ onUpload, loading = false }: { onUpload: (file: File) => Promise<void>; loading?: boolean }) {
+  const handleFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await onUpload(file);
+    event.target.value = '';
+  };
+
+  return (
+    <label className={cn(
+      'inline-flex items-center gap-2 px-4 py-2 text-xs font-mono font-bold uppercase tracking-wide border rounded-md cursor-pointer transition-colors',
+      loading
+        ? 'border-gray-300 text-gray-400 bg-gray-50 pointer-events-none'
+        : 'border-gray-200 hover:bg-gray-50'
+    )}>
+      {loading ? 'Uploading...' : 'Upload Excel'}
+      <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileSelect} disabled={loading} />
+    </label>
+  );
+}
+
 export function ProjectDetail({
   project: initialProject,
   tasks: initialTasks,
@@ -50,6 +71,7 @@ export function ProjectDetail({
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [excelError, setExcelError] = useState<string | null>(null);
   const [excelLoading, setExcelLoading] = useState(false);
+  const [excelViewHtml, setExcelViewHtml] = useState<string | null>(null);
   const [pdfUploading, setPdfUploading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -82,22 +104,116 @@ export function ProjectDetail({
   const handleExcelUpload = async (file: File) => {
     setExcelError(null);
     setExcelLoading(true);
+    setExcelViewHtml(null);
     try {
       const arrayBuffer = await file.arrayBuffer();
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(arrayBuffer);
-      const worksheet = workbook.worksheets[0];
-      if (!worksheet) {
-        setExcelError('The selected spreadsheet does not contain any sheets.');
-        return;
-      }
 
+      // Generate full HTML spreadsheet view
+      let html = '<html><head><style>';
+      html += `
+        body { margin: 0; font-family: 'Segoe UI', -apple-system, sans-serif; font-size: 13px; }
+        .sheet-tabs { display: flex; gap: 0; background: #f3f3f3; border-bottom: 1px solid #d0d0d0; padding: 0 8px; }
+        .sheet-tab { padding: 6px 16px; font-size: 12px; border: 1px solid transparent; border-bottom: none; cursor: pointer; margin-top: 4px; border-radius: 4px 4px 0 0; background: #e8e8e8; color: #666; }
+        .sheet-tab.active { background: #fff; border-color: #d0d0d0; color: #000; font-weight: 600; }
+        .sheet-container { display: none; }
+        .sheet-container.active { display: block; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #d4d4d4; padding: 2px 6px; min-width: 80px; font-size: 12px; white-space: nowrap; }
+        th { background: #f0f0f0; font-weight: 600; color: #333; position: sticky; top: 0; z-index: 1; }
+        tr:nth-child(even) td { background: #fafafa; }
+        .cell-number { text-align: right; }
+        .cell-text { text-align: left; }
+        .grid-container { overflow: auto; max-height: 600px; }
+        .status-bar { background: #f3f3f3; border-top: 1px solid #d0d0d0; padding: 4px 12px; font-size: 11px; color: #666; }
+      `;
+      html += '</style></head><body>';
+
+      // Sheet tabs
+      html += '<div class="sheet-tabs">';
+      workbook.worksheets.forEach((ws, idx) => {
+        html += `<div class="sheet-tab${idx === 0 ? ' active' : ''}" onclick="switchSheet(${idx})">${ws.name || `Sheet${idx + 1}`}</div>`;
+      });
+      html += '</div>';
+
+      // Sheet containers
+      workbook.worksheets.forEach((ws, wsIdx) => {
+        html += `<div class="sheet-container${wsIdx === 0 ? ' active' : ''}" id="sheet-${wsIdx}">`;
+
+        if (ws.rowCount === 0) {
+          html += '<div style="padding: 40px; text-align: center; color: #999;">Empty sheet</div>';
+          html += '</div>';
+          return;
+        }
+
+        html += '<div class="grid-container"><table>';
+        html += '<thead><tr>';
+        // Row number header
+        html += '<th style="min-width: 40px; background: #e8e8e8; text-align: center; color: #888;">#</th>';
+        const colCount = ws.columnCount || ws.rowCount > 0 ? (ws.getRow(1).cellCount || 1) : 1;
+        for (let c = 1; c <= colCount; c++) {
+          const cell = ws.getRow(1).getCell(c);
+          const label = cell.value !== null && cell.value !== undefined ? String(cell.value) : `Column ${c}`;
+          html += `<th>${label.replace(/</g, '<').replace(/>/g, '>')}</th>`;
+        }
+        html += '</tr></thead><tbody>';
+
+        ws.eachRow((row, rowNum) => {
+          if (rowNum === 1) return;
+          html += '<tr>';
+          html += `<td style="min-width: 40px; background: #e8e8e8; text-align: center; color: #888; font-size: 11px;">${rowNum}</td>`;
+          row.eachCell((cell, colNum) => {
+            const val = cell.value;
+            let display = '';
+            let alignClass = 'cell-text';
+            if (val === null || val === undefined) {
+              display = '';
+            } else if (val instanceof Date) {
+              display = val.toLocaleDateString();
+            } else if (typeof val === 'number') {
+              display = Number.isInteger(val) ? val.toLocaleString() : val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              alignClass = 'cell-number';
+            } else {
+              display = String(val);
+            }
+            html += `<td class="${alignClass}">${display.replace(/</g, '<').replace(/>/g, '>') || '&nbsp;'}</td>`;
+          });
+          for (let c = row.cellCount + 1; c <= colCount; c++) {
+            html += '<td></td>';
+          }
+          html += '</tr>';
+        });
+
+        html += '</tbody></table></div></div>';
+      });
+
+      // Status bar
+      const totalRows = workbook.worksheets.reduce((sum, ws) => sum + (ws.rowCount > 1 ? ws.rowCount - 1 : 0), 0);
+      const totalCols = Math.max(...workbook.worksheets.map(ws => ws.columnCount || 0));
+      html += `<div class="status-bar">${workbook.worksheets.length} sheet${workbook.worksheets.length > 1 ? 's' : ''} · ${totalRows} data rows · ${totalCols} columns</div>`;
+
+      html += '<script>function switchSheet(idx){document.querySelectorAll(".sheet-tab, .sheet-container").forEach((el,i)=>el.classList.toggle("active", (i<document.querySelectorAll(".sheet-tab").length ? i : i-document.querySelectorAll(".sheet-tab").length)===idx))}</script>';
+      html += '</body></html>';
+
+      // Store the html for iframe viewing
+      setExcelViewHtml(html);
+
+      // Also convert to data URL for storage
+      const reader = new FileReader();
+      const excelDataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsDataURL(file);
+      });
+
+      // Store simple row data
+      const worksheet = workbook.worksheets[0];
       const headerRow = worksheet.getRow(1);
       const headers: string[] = [];
       headerRow.eachCell((cell) => {
         headers.push(String(cell.value ?? `Column${headers.length + 1}`));
       });
-
       const rows: Record<string, string | number | boolean | null>[] = [];
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return;
@@ -115,17 +231,7 @@ export function ProjectDetail({
             rowData[header] = String(val);
           }
         });
-        if (Object.keys(rowData).length > 0) {
-          rows.push(rowData);
-        }
-      });
-
-      // Convert the Excel file to a data URL for storage (so it can be re-downloaded)
-      const reader = new FileReader();
-      const excelDataUrl = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error('Could not read file'));
-        reader.readAsDataURL(file);
+        if (Object.keys(rowData).length > 0) rows.push(rowData);
       });
 
       const result = await apiFetch(`/api/projects/${project._id}`, {
@@ -152,6 +258,91 @@ export function ProjectDetail({
       setExcelLoading(false);
     }
   };
+
+  // Convert stored excel data URL into HTML view for iframe
+  const renderExcelView = useCallback(async () => {
+    if (!project.excelFile?.data) return;
+    setExcelViewHtml(null);
+    setExcelError(null);
+    try {
+      const response = await fetch(project.excelFile.data);
+      const arrayBuffer = await response.arrayBuffer();
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(arrayBuffer);
+
+      let html = '<html><head><style>';
+      html += `
+        body { margin: 0; font-family: 'Segoe UI', -apple-system, sans-serif; font-size: 13px; }
+        .sheet-tabs { display: flex; gap: 0; background: #f3f3f3; border-bottom: 1px solid #d0d0d0; padding: 0 8px; }
+        .sheet-tab { padding: 6px 16px; font-size: 12px; border: 1px solid transparent; border-bottom: none; cursor: pointer; margin-top: 4px; border-radius: 4px 4px 0 0; background: #e8e8e8; color: #666; user-select: none; }
+        .sheet-tab.active { background: #fff; border-color: #d0d0d0; color: #000; font-weight: 600; }
+        .sheet-container { display: none; }
+        .sheet-container.active { display: block; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #d4d4d4; padding: 2px 6px; min-width: 80px; font-size: 12px; white-space: nowrap; }
+        th { background: #f0f0f0; font-weight: 600; color: #333; position: sticky; top: 0; z-index: 1; }
+        tr:nth-child(even) td { background: #fafafa; }
+        .cell-number { text-align: right; }
+        .cell-text { text-align: left; }
+        .grid-container { overflow: auto; max-height: 600px; }
+        .status-bar { background: #f3f3f3; border-top: 1px solid #d0d0d0; padding: 4px 12px; font-size: 11px; color: #666; }
+      `;
+      html += '</style></head><body>';
+
+      // Sheet tabs
+      html += '<div class="sheet-tabs">';
+      workbook.worksheets.forEach((ws, idx) => {
+        html += `<div class="sheet-tab${idx === 0 ? ' active' : ''}" onclick="switchSheet(${idx})">${ws.name || `Sheet${idx + 1}`}</div>`;
+      });
+      html += '</div>';
+
+      workbook.worksheets.forEach((ws, wsIdx) => {
+        html += `<div class="sheet-container${wsIdx === 0 ? ' active' : ''}" id="sheet-${wsIdx}">`;
+        if (ws.rowCount === 0) {
+          html += '<div style="padding: 40px; text-align: center; color: #999;">Empty sheet</div></div>';
+          return;
+        }
+        const colCount = ws.columnCount || ws.rowCount > 0 ? (ws.getRow(1).cellCount || 1) : 1;
+        html += '<div class="grid-container"><table><thead><tr>';
+        html += '<th style="min-width: 40px; background: #e8e8e8; text-align: center; color: #888;">#</th>';
+        for (let c = 1; c <= colCount; c++) {
+          const cell = ws.getRow(1).getCell(c);
+          const label = cell.value !== null && cell.value !== undefined ? String(cell.value) : `Column ${c}`;
+          html += `<th>${label.replace(/</g, '<').replace(/>/g, '>')}</th>`;
+        }
+        html += '</tr></thead><tbody>';
+        ws.eachRow((row, rowNum) => {
+          if (rowNum === 1) return;
+          html += '<tr>';
+          html += `<td style="min-width: 40px; background: #e8e8e8; text-align: center; color: #888; font-size: 11px;">${rowNum}</td>`;
+          row.eachCell((cell) => {
+            const val = cell.value;
+            let display = '';
+            let alignClass = 'cell-text';
+            if (val === null || val === undefined) display = '';
+            else if (val instanceof Date) display = val.toLocaleDateString();
+            else if (typeof val === 'number') {
+              display = Number.isInteger(val) ? val.toLocaleString() : val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              alignClass = 'cell-number';
+            } else display = String(val);
+            html += `<td class="${alignClass}">${display.replace(/</g, '<').replace(/>/g, '>') || '&nbsp;'}</td>`;
+          });
+          for (let c = row.cellCount + 1; c <= colCount; c++) html += '<td></td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table></div></div>';
+      });
+
+      const totalRows = workbook.worksheets.reduce((sum, ws) => sum + (ws.rowCount > 1 ? ws.rowCount - 1 : 0), 0);
+      const totalCols = Math.max(...workbook.worksheets.map(ws => ws.columnCount || 0));
+      html += `<div class="status-bar">${workbook.worksheets.length} sheet${workbook.worksheets.length > 1 ? 's' : ''} · ${totalRows} data rows · ${totalCols} columns</div>`;
+      html += '<script>function switchSheet(idx){document.querySelectorAll(".sheet-tab, .sheet-container").forEach((el,i)=>{const n=document.querySelectorAll(".sheet-tab").length;el.classList.toggle("active",i<n?(i===idx):(i-n===idx))})}<\/script>';
+      html += '</body></html>';
+      setExcelViewHtml(html);
+    } catch {
+      setExcelError('Failed to render spreadsheet');
+    }
+  }, [project.excelFile?.data]);
 
   // Realtime updates
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -223,23 +414,6 @@ export function ProjectDetail({
     });
     if (result.success && result.data) {
       setProject(result.data as IProject);
-    }
-  };
-
-  // Remove uploaded Excel data
-  const removeExcel = async () => {
-    if (!isAdmin) return;
-    setExcelLoading(true);
-    setExcelError(null);
-    const result = await apiFetch(`/api/projects/${project._id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ excelSheetName: '', excelRows: [], excelFile: null }),
-    });
-    setExcelLoading(false);
-    if (result.success && result.data) {
-      setProject(result.data as IProject);
-    } else {
-      setExcelError(result.error || 'Failed to remove Excel data');
     }
   };
 
@@ -433,7 +607,7 @@ export function ProjectDetail({
               </div>
               <div className="flex items-center gap-1.5 text-xs text-gray-500">
                 <Package className="w-3.5 h-3.5" />
-                <span className="font-mono">{project.totalWindows} windows</span>
+                <span className="font-mono">{project.totalWindows} products</span>
               </div>
               {project.productTypes && project.productTypes.length > 0 && (
                 <div className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -541,7 +715,7 @@ export function ProjectDetail({
               <p className="text-xs text-gray-900">{project.contactPhone || '—'}</p>
             </div>
             <div>
-              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">Total Windows</p>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">Total Products</p>
               <p className="text-xs text-gray-900">{project.totalWindows}</p>
             </div>
             <div>
@@ -737,14 +911,14 @@ export function ProjectDetail({
           )}
         </div>
 
-        {/* Excel Upload Section */}
+        {/* Excel Upload & Embed Section */}
         <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <details className="group">
+          <details className="group" onToggle={(e) => { if (e.currentTarget.open && project.excelFile?.data && !excelViewHtml) renderExcelView(); }}>
             <summary className="flex items-center justify-between cursor-pointer list-none">
               <div>
                 <h2 className="text-sm font-black uppercase tracking-widest text-gray-700">Excel Data</h2>
                 <p className="text-xs text-gray-400 font-mono mt-0.5">
-                  {project.excelRows ? `${project.excelRows.length} rows uploaded` : 'No spreadsheet uploaded'}
+                  {project.excelFile ? `${project.excelFile.name}` : 'No spreadsheet uploaded'}
                 </p>
               </div>
               <div className="text-gray-400 group-open:rotate-180 transition-transform">
@@ -759,78 +933,62 @@ export function ProjectDetail({
                   <p className="text-xs text-red-700 font-mono">{excelError}</p>
                 </div>
               )}
-              {(!project.excelRows || project.excelRows.length === 0) && (
-                <ExcelUpload onUpload={handleExcelUpload} loading={excelLoading} />
-              )}
 
-              {project.excelRows && project.excelRows.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-gray-500">
-                      Sheet: {project.excelSheetName || 'Imported'}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {project.excelFile && (
-                        <a
-                          href={project.excelFile.data}
-                          download={project.excelFile.name}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-gray-200 text-gray-600 hover:border-black hover:text-black transition-colors rounded-md"
-                        >
-                          <FileText className="w-3 h-3" />
-                          Download Original
-                        </a>
-                      )}
-                      {isAdmin && (
-                        <button
-                          type="button"
-                          onClick={removeExcel}
-                          disabled={excelLoading}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors rounded-md"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          Remove
-                        </button>
-                      )}
-                      <ExcelUpload onUpload={handleExcelUpload} loading={excelLoading} />
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto border-2 border-gray-300 rounded-sm">
-                    <table className="min-w-full text-left text-xs font-mono border-collapse">
-                      <thead>
-                        <tr>
-                          <th className="w-10 px-2 py-1.5 text-[10px] font-bold text-gray-500 bg-gray-100 border border-gray-300 text-center sticky left-0 z-10">
-                            #
-                          </th>
-                          {Object.keys(project.excelRows[0]).map((header) => (
-                            <th key={header} className="px-3 py-1.5 font-bold text-gray-700 bg-gray-100 border border-gray-300 text-[11px] whitespace-nowrap">
-                              {header}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {project.excelRows.map((row, rowIndex) => (
-                          <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                            <td className="px-2 py-1.5 text-[10px] font-bold text-gray-400 bg-gray-50 border border-gray-300 text-center select-none sticky left-0 z-10">
-                              {rowIndex + 1}
-                            </td>
-                            {Object.keys(project.excelRows![0]).map((header) => {
-                              const value = row[header];
-                              const displayValue = value === null || value === undefined ? '' : String(value);
-                              return (
-                                <td key={`${rowIndex}-${header}`} className="px-3 py-1.5 text-gray-700 border border-gray-300 whitespace-nowrap min-w-[100px]">
-                                  {displayValue || <span className="text-gray-300">—</span>}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="text-[10px] font-mono text-gray-400 mt-2">
-                    {project.excelRows.length} row{project.excelRows.length === 1 ? '' : 's'} · {Object.keys(project.excelRows[0]).length} column{Object.keys(project.excelRows[0]).length === 1 ? '' : 's'}
-                  </p>
+              {/* Upload controls */}
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs text-gray-400 font-mono">
+                  {project.excelFile
+                    ? `${project.excelFile.name} (${(project.excelFile.size / 1024).toFixed(0)} KB)`
+                    : 'Upload a .xlsx or .xls file to view inline'}
+                </p>
+                <div className="flex items-center gap-2">
+                  {project.excelFile && (
+                    <>
+                      <a
+                        href={project.excelFile.data}
+                        download={project.excelFile.name}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-gray-200 text-gray-600 hover:border-black hover:text-black transition-colors rounded-md"
+                      >
+                        <FileText className="w-3 h-3" />
+                        Download
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => { if (project.excelFile?.data) renderExcelView(); }}
+                        disabled={excelLoading}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-gray-200 text-gray-600 hover:border-black hover:text-black transition-colors rounded-md"
+                      >
+                        <Table2 className="w-3 h-3" />
+                        Refresh View
+                      </button>
+                    </>
+                  )}
+                  <ExcelUpload onUpload={handleExcelUpload} loading={excelLoading} />
+                </div>
+              </div>
+
+              {/* Excel Embedded Viewer */}
+              {excelViewHtml ? (
+                <div className="border-2 border-gray-300 rounded-sm overflow-hidden">
+                  <iframe
+                    srcDoc={excelViewHtml}
+                    className="w-full border-0"
+                    style={{ height: '650px' }}
+                    title="Excel Spreadsheet"
+                    sandbox="allow-scripts"
+                  />
+                </div>
+              ) : project.excelFile ? (
+                <div className="border-2 border-dashed border-gray-200 rounded-sm p-12 text-center">
+                  <Table2 className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400 font-mono">Click to expand this section to view the spreadsheet</p>
+                  <p className="text-xs text-gray-300 font-mono mt-1">Or click &ldquo;Refresh View&rdquo; above</p>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed border-gray-200 rounded-sm p-12 text-center">
+                  <FileText className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400 font-mono">No spreadsheet uploaded yet</p>
+                  <p className="text-xs text-gray-300 font-mono mt-1">Upload an Excel file to view it inline</p>
                 </div>
               )}
             </div>
@@ -1126,7 +1284,7 @@ export function ProjectDetail({
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Total Windows</label>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Total Products</label>
               <input
                 type="number"
                 value={editForm.totalWindows}
@@ -1303,23 +1461,3 @@ export function ProjectDetail({
   );
 }
 
-function ExcelUpload({ onUpload, loading = false }: { onUpload: (file: File) => Promise<void>; loading?: boolean }) {
-  const handleFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    await onUpload(file);
-    event.target.value = '';
-  };
-
-  return (
-    <label className={cn(
-      'inline-flex items-center gap-2 px-4 py-2 text-xs font-mono font-bold uppercase tracking-wide border rounded-md cursor-pointer transition-colors',
-      loading
-        ? 'border-gray-300 text-gray-400 bg-gray-50 pointer-events-none'
-        : 'border-gray-200 hover:bg-gray-50'
-    )}>
-      {loading ? 'Uploading...' : 'Upload Excel'}
-      <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileSelect} disabled={loading} />
-    </label>
-  );
-}

@@ -6,10 +6,13 @@ import { cn, apiFetch, ALERT_TYPE_LABEL } from '@/lib/utils';
 import { AlertType, AlertSeverity, Department } from '@/types';
 import type { IAlert } from '@/types';
 import { useDepartments } from '@/hooks/useDepartments';
+import { dispatchNotification } from '@/hooks/useInAppNotifications';
+import { dispatchDataChange } from '@/hooks/useRealtime';
+import { NotificationType } from '@/types/notifications';
 
 interface CreateAlertFormProps {
-  projectId: string;
-  projectTitle: string;
+  projectId?: string;
+  projectTitle?: string;
   taskId?: string;
   defaultAffectedDepartments?: Department[];
   title?: string;
@@ -75,7 +78,19 @@ export function CreateAlertForm({
     }
 
     if (result.data) {
+      dispatchDataChange('alert', 'created', result.data);
       window.dispatchEvent(new CustomEvent('erp-alert-created', { detail: result.data }));
+
+      // Dispatch in-app notification
+      const alertTypeLabel = (result.data.type || '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+      dispatchNotification({
+        type: NotificationType.ALERT_CREATED,
+        title: `🚨 ${alertTypeLabel} Alert Raised`,
+        body: `${projectTitle ? `Alert in "${projectTitle}": ` : ''}${(result.data.message || '').slice(0, 150)}`,
+        link: '/alerts',
+        metadata: { alertId: result.data._id, projectId: projectId || undefined },
+      });
+
       onSuccess?.(result.data);
     }
   };

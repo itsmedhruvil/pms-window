@@ -41,7 +41,7 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: Proj
                   <th>Status</th>
                   <th>Priority</th>
                   <th>Progress</th>
-                  <th>Windows</th>
+                  <th>Products</th>
                   <th>Deadline</th>
                 </tr>
               </thead>

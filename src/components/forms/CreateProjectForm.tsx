@@ -100,7 +100,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
   }
   if (touched['totalWindows']) {
     if (form.totalWindows <= 0) {
-      fieldErrors['totalWindows'] = 'Number of windows must be greater than 0.';
+      fieldErrors['totalWindows'] = 'Number of products must be greater than 0.';
     }
   }
   if (touched['deadline']) {
@@ -444,7 +444,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             )}
           </Field>
 
-          <Field label="Number of Windows" required>
+          <Field label="Number of Products" required>
             <input
               type="number"
               value={form.totalWindows || ''}
@@ -699,7 +699,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
           {form.contactPhone && (
             <ReviewBlock label="Contact">{form.contactPhone}</ReviewBlock>
           )}
-          <ReviewBlock label="Total Windows">
+          <ReviewBlock label="Total Products">
             <span className="font-bold">{form.totalWindows}</span>
           </ReviewBlock>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertCircle, Layers } from 'lucide-react';
+import { AlertCircle, Layers, Plus, FileText, Check } from 'lucide-react';
 import { apiFetch, DEPARTMENT_LABELS, cn } from '@/lib/utils';
 import { Department } from '@/types';
 import type { ITask, ITemplateGroup } from '@/types';
@@ -13,6 +13,8 @@ interface CreateInternalTaskFormProps {
   department?: Department;
   templateGroups?: ITemplateGroup[];
 }
+
+type Mode = 'simple' | 'import';
 
 interface FormData {
   title: string;
@@ -26,7 +28,12 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
   const departments = useDepartments();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedTemplateGroupId, setSelectedTemplateGroupId] = useState('');
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Mode toggle
+  const [mode, setMode] = useState<Mode>('simple');
+
+  // Simple task form
   const [form, setForm] = useState<FormData>({
     title: '',
     description: '',
@@ -35,49 +42,22 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
     frequency: 'daily',
   });
 
+  // Import template state
+  const [importGroupId, setImportGroupId] = useState('');
+  const [importCount, setImportCount] = useState(0);
+
   // Filter template groups to only those with internal tasks
   const internalTemplateGroups = templateGroups.filter((g) =>
     g.tasks.some((t) => t.type === 'internal')
   );
-  const selectedTemplateTask = selectedTemplateGroupId
-    ? templateGroups
-        .find((g) => g._id === selectedTemplateGroupId)
-        ?.tasks.find((t) => t.type === 'internal')
+  const selectedGroup = importGroupId
+    ? templateGroups.find((g) => g._id === importGroupId)
     : null;
+  const internalTasksInGroup = selectedGroup?.tasks.filter((t) => t.type === 'internal') || [];
 
   const isValid =
     form.title.trim().length >= 3 &&
     form.description.trim().length >= 10;
-
-  const handleTemplateSelect = (groupId: string) => {
-    setSelectedTemplateGroupId(groupId);
-    if (!groupId) {
-      setForm({
-        title: '',
-        description: '',
-        department: department || departments[0]?.name || Department.PRODUCTION,
-        dueDate: '',
-        frequency: 'daily',
-      });
-      return;
-    }
-
-    const group = templateGroups.find((g) => g._id === groupId);
-    if (!group || group.tasks.length === 0) return;
-
-    const internalTasks = group.tasks.filter((t) => t.type === 'internal');
-    if (internalTasks.length === 0) return;
-
-    // Pre-fill with the first internal task
-    const firstTask = internalTasks[0];
-    setForm({
-      title: firstTask.title,
-      description: firstTask.description,
-      department: firstTask.department as Department,
-      dueDate: '',
-      frequency: firstTask.frequency || 'daily',
-    });
-  };
 
   const handleSubmit = async () => {
     if (!isValid) return;
@@ -99,13 +79,90 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
     onSuccess?.(result.data as ITask);
   };
 
+  const handleImport = async () => {
+    if (!selectedGroup || internalTasksInGroup.length === 0) return;
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    let created = 0;
+    let failed = 0;
+
+    // Create tasks one by one
+    for (const task of internalTasksInGroup) {
+      const result = await apiFetch<ITask>('/api/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: task.title,
+          description: task.description,
+          department: task.department,
+          frequency: task.frequency || 'daily',
+          dueDate: '',
+        }),
+      });
+
+      if (result.success) {
+        created++;
+      } else {
+        failed++;
+      }
+    }
+
+    setLoading(false);
+
+    if (created > 0) {
+      setSuccess(`Successfully imported ${created} task${created > 1 ? 's' : ''}${failed > 0 ? ` (${failed} failed)` : ''}!`);
+      setImportCount(created);
+      // Trigger a reload by dispatching the event
+      window.dispatchEvent(new CustomEvent('app-data-changed', {
+        detail: { entity: 'task', action: 'created' },
+      }));
+      // Close modal after a brief delay
+      setTimeout(() => {
+        onCancel();
+      }, 1500);
+    } else {
+      setError('Failed to import tasks. Please try again.');
+    }
+  };
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-black text-gray-900">Create Internal Task</h2>
-          <p className="text-xs text-gray-500 font-mono">Add a department-wide internal task.</p>
+          <p className="text-xs text-gray-500 font-mono">Add department-wide internal tasks.</p>
         </div>
+      </div>
+
+      {/* Mode selector */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => { setMode('simple'); setError(null); setSuccess(null); }}
+          className={cn(
+            'flex items-center gap-2 px-4 py-3 border text-xs font-mono font-bold uppercase tracking-wide transition-colors',
+            mode === 'simple'
+              ? 'border-black bg-black text-white'
+              : 'border-gray-200 text-gray-600 hover:border-gray-400'
+          )}
+        >
+          <Plus className="w-4 h-4" />
+          Simple Task
+        </button>
+        <button
+          type="button"
+          onClick={() => { setMode('import'); setError(null); setSuccess(null); }}
+          className={cn(
+            'flex items-center gap-2 px-4 py-3 border text-xs font-mono font-bold uppercase tracking-wide transition-colors',
+            mode === 'import'
+              ? 'border-black bg-black text-white'
+              : 'border-gray-200 text-gray-600 hover:border-gray-400'
+          )}
+        >
+          <Layers className="w-4 h-4" />
+          Import Template
+        </button>
       </div>
 
       {error && (
@@ -115,46 +172,17 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
         </div>
       )}
 
-      {/* Template Group Selector */}
-      {internalTemplateGroups.length > 0 && (
-        <div className="border border-blue-200 bg-blue-50 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Layers className="w-4 h-4 text-blue-600" />
-            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-blue-700">
-              Reference Task Template
-            </span>
-          </div>
-          <p className="text-[10px] text-blue-600 font-mono mb-2">
-            Select a template group to auto-fill task details from an existing template.
-          </p>
-          <select
-            value={selectedTemplateGroupId}
-            onChange={(e) => handleTemplateSelect(e.target.value)}
-            className="w-full px-3 py-2 text-xs font-mono border border-blue-200 focus:outline-none focus:border-blue-700 transition-colors bg-white"
-          >
-            <option value="">No template reference</option>
-            {internalTemplateGroups.map((g) => (
-              <option key={g._id} value={g._id}>
-                {g.name} ({g.tasks.filter((t) => t.type === 'internal').length} tasks)
-              </option>
-            ))}
-          </select>
-          {selectedTemplateTask && (
-            <div className="mt-3 border border-blue-100 bg-white p-3">
-              <p className="text-sm font-semibold text-gray-900">{selectedTemplateTask.title}</p>
-              <p className="mt-1 text-xs text-gray-600">{selectedTemplateTask.description}</p>
-              <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-mono uppercase tracking-wide text-blue-700">
-                <span>{departments.find((department) => department.name === selectedTemplateTask.department)?.label || DEPARTMENT_LABELS[selectedTemplateTask.department] || selectedTemplateTask.department}</span>
-                <span>{selectedTemplateTask.frequency.replace('_', ' ')}</span>
-              </div>
-            </div>
-          )}
+      {success && (
+        <div className="flex items-center gap-2 p-3 border border-green-200 bg-green-50 text-green-700 text-xs">
+          <Check className="w-4 h-4" />
+          <span>{success}</span>
         </div>
       )}
 
-      <div className="grid gap-4">
-        {!selectedTemplateGroupId && (
-          <>
+      {/* ── SIMPLE MODE ─────────────────────────────────────────────── */}
+      {mode === 'simple' && (
+        <>
+          <div className="grid gap-4">
             <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
               Task Title
               <input
@@ -175,71 +203,186 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
                 placeholder="Describe the task and expected outcome"
               />
             </label>
-          </>
-        )}
 
-        <div className={cn('grid gap-4 sm:grid-cols-2', selectedTemplateGroupId && 'hidden')}>
-          <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
-            Department
-            <select
-              value={form.department}
-              onChange={(e) => setForm({ ...form, department: e.target.value as Department })}
-              className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+                Department
+                <select
+                  value={form.department}
+                  onChange={(e) => setForm({ ...form, department: e.target.value as Department })}
+                  className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+                >
+                  {departments.map((department) => (
+                    <option key={department.name} value={department.name}>{department.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+                Due Date
+                <input
+                  type="date"
+                  value={form.dueDate}
+                  onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                  className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+                />
+              </label>
+            </div>
+
+            <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+              Frequency
+              <select
+                value={form.frequency}
+                onChange={(e) => setForm({ ...form, frequency: e.target.value })}
+                className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+              >
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="need_basis">Need Basis</option>
+                <option value="project">Project</option>
+                <option value="project_recurring">Project Recurring</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 text-xs font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600"
             >
-              {departments.map((department) => (
-                <option key={department.name} value={department.name}>{department.label}</option>
-              ))}
-            </select>
-          </label>
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!isValid || loading}
+              onClick={handleSubmit}
+              className={cn(
+                'px-4 py-2 text-xs font-mono font-bold uppercase transition-colors disabled:opacity-50',
+                'bg-black text-white hover:bg-gray-800'
+              )}
+            >
+              {loading ? 'Creating...' : 'Create Internal Task'}
+            </button>
+          </div>
+        </>
+      )}
 
-          <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
-            Due Date
-            <input
-              type="date"
-              value={form.dueDate}
-              onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-              className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
-            />
-          </label>
-        </div>
+      {/* ── IMPORT MODE ─────────────────────────────────────────────── */}
+      {mode === 'import' && (
+        <div className="space-y-4">
+          {internalTemplateGroups.length === 0 ? (
+            <div className="border border-dashed border-gray-200 p-10 text-center">
+              <Layers className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm font-mono text-gray-400">No template groups with internal tasks available.</p>
+              <p className="text-[10px] font-mono text-gray-400 mt-1">
+                Create a template group with internal-type tasks first.
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-gray-600 font-mono">
+                Select a template group to import all internal tasks at once.
+              </p>
 
-        <label className={cn('block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold', selectedTemplateGroupId && 'hidden')}>
-          Frequency
-          <select
-            value={form.frequency}
-            onChange={(e) => setForm({ ...form, frequency: e.target.value })}
-            className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
-          >
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="need_basis">Need Basis</option>
-            <option value="project">Project</option>
-            <option value="project_recurring">Project Recurring</option>
-          </select>
-        </label>
-      </div>
+              <div className="space-y-2">
+                {internalTemplateGroups.map((group) => {
+                  const internalTasks = group.tasks.filter((t) => t.type === 'internal');
+                  const departmentsInGroup = [...new Set(internalTasks.map((t) => t.department))];
+                  const isSelected = importGroupId === group._id;
 
-      <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-200">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 text-xs font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={!isValid || loading}
-          onClick={handleSubmit}
-          className={cn(
-            'px-4 py-2 text-xs font-mono font-bold uppercase transition-colors disabled:opacity-50',
-            'bg-black text-white hover:bg-gray-800'
+                  return (
+                    <button
+                      key={group._id}
+                      type="button"
+                      onClick={() => setImportGroupId(group._id)}
+                      className={cn(
+                        'w-full text-left border p-4 transition-colors',
+                        isSelected
+                          ? 'border-black bg-gray-50'
+                          : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-gray-900">{group.name}</p>
+                          {group.description && (
+                            <p className="text-xs text-gray-500 font-mono mt-0.5 truncate">{group.description}</p>
+                          )}
+                          <div className="flex items-center gap-3 mt-2 text-[10px] font-mono text-gray-500">
+                            <span className="font-bold text-gray-700">{internalTasks.length} task{internalTasks.length > 1 ? 's' : ''}</span>
+                            <span className="text-gray-300">·</span>
+                            <span>{departmentsInGroup.length} department{departmentsInGroup.length > 1 ? 's' : ''}</span>
+                            <span className="text-gray-300">·</span>
+                            <span className="truncate">
+                              {departmentsInGroup.map((d) =>
+                                departments.find((dept) => dept.name === d)?.label || d
+                              ).join(', ')}
+                            </span>
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <Check className="w-5 h-5 text-black flex-shrink-0" />
+                        )}
+                      </div>
+
+                      {/* Show tasks preview */}
+                      {isSelected && (
+                        <div className="mt-3 pt-3 border-t border-gray-200 space-y-1">
+                          <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-1">
+                            Tasks to import:
+                          </p>
+                          {internalTasks.map((t, idx) => (
+                            <div key={idx} className="flex items-center gap-2 text-[11px]">
+                              <FileText className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                              <span className="text-gray-700 truncate">{t.title}</span>
+                              <span className="text-[9px] font-mono text-gray-400 ml-auto flex-shrink-0">
+                                {departments.find((dept) => dept.name === t.department)?.label || t.department}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="px-4 py-2 text-xs font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!importGroupId || loading || !internalTasksInGroup.length}
+                  onClick={handleImport}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-2 text-xs font-mono font-bold uppercase transition-colors disabled:opacity-50',
+                    'bg-black text-white hover:bg-gray-800'
+                  )}
+                >
+                  {loading ? (
+                    <>
+                      <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Layers className="w-3.5 h-3.5" />
+                      Import {internalTasksInGroup.length} Task{internalTasksInGroup.length > 1 ? 's' : ''}
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
           )}
-        >
-          {loading ? 'Creating…' : 'Create Internal Task'}
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

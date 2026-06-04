@@ -229,7 +229,7 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
       )}
 
       {/* User */}
-      <div className="p-3 lg:p-4 border-t border-gray-200">
+      <div className="p-3 lg:p-4 border-t border-gray-200" suppressHydrationWarning>
         <div className="flex items-center gap-3">
           <UserButton />
           <div className="min-w-0">

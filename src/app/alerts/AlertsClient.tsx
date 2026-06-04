@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
-import { AlertTriangle, Filter, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { AlertTriangle, Filter, ChevronDown, ChevronUp, Plus, Search, X, Check } from 'lucide-react';
 import { FilterDrawer, MobileFilterButton } from '@/components/ui/FilterDrawer';
 import { cn, ALERT_TYPE_LABEL, getDepartmentLabel, timeAgo, apiFetch } from '@/lib/utils';
 import {
@@ -9,9 +9,13 @@ import {
   AlertStatusBadge,
 } from '@/components/ui/badges';
 import { CommentThread } from '@/components/comment/CommentThread';
-import { useGlobalAlerts } from '@/hooks/useRealtime';
-import type { IAlert } from '@/types';
+import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
+import { Modal } from '@/components/ui/Modal';
+import { dispatchDataChange } from '@/hooks/useRealtime';
+import type { IAlert, IProject, ITask } from '@/types';
 import { AlertStatus, AlertType, Department } from '@/types';
+
+type CreateAlertStep = 'type' | 'project' | 'task' | 'form';
 
 interface AlertsClientProps {
   initialAlerts: IAlert[];
@@ -27,11 +31,52 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [createAlertOpen, setCreateAlertOpen] = useState(false);
+  const [createStep, setCreateStep] = useState<CreateAlertStep>('type');
+  const [alertTarget, setAlertTarget] = useState<'global' | 'project' | 'task' | null>(null);
+  const [selectedProject, setSelectedProject] = useState<IProject | null>(null);
+  const [selectedTask, setSelectedTask] = useState<ITask | null>(null);
 
-  // Listen for new alerts globally
-  useGlobalAlerts(useCallback((alert: IAlert) => {
-    setAlerts((prev) => (prev.some((a) => a._id === alert._id) ? prev : [alert, ...prev]));
-  }, []));
+  // Search state
+  const [projectSearch, setProjectSearch] = useState('');
+  const [taskSearch, setTaskSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<IProject[]>([]);
+  const [taskResults, setTaskResults] = useState<ITask[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  // Auto-refresh alert list via custom DOM events (dispatched by CreateAlertForm, handleAction, handleDelete)
+  useEffect(() => {
+    const handleAlertCreated = (e: Event) => {
+      const alert = (e as CustomEvent<IAlert>).detail;
+      if (!alert?._id) return;
+      setAlerts((prev) => {
+        if (prev.some((a) => a._id === alert._id)) return prev;
+        return [alert, ...prev];
+      });
+    };
+
+    const handleAlertUpdated = (e: Event) => {
+      const alert = (e as CustomEvent<IAlert>).detail;
+      if (!alert?._id) return;
+      setAlerts((prev) => prev.map((a) => (a._id === alert._id ? alert : a)));
+    };
+
+    const handleAlertDeleted = (e: Event) => {
+      const deleted = (e as CustomEvent<{ _id: string } | IAlert>).detail;
+      const id = typeof deleted === 'object' && '_id' in deleted ? (deleted as IAlert)._id : '';
+      if (!id) return;
+      setAlerts((prev) => prev.filter((a) => a._id !== id));
+    };
+
+    window.addEventListener('erp-alert-created', handleAlertCreated);
+    window.addEventListener('erp-alert-updated', handleAlertUpdated);
+    window.addEventListener('erp-alert-deleted', handleAlertDeleted);
+    return () => {
+      window.removeEventListener('erp-alert-created', handleAlertCreated);
+      window.removeEventListener('erp-alert-updated', handleAlertUpdated);
+      window.removeEventListener('erp-alert-deleted', handleAlertDeleted);
+    };
+  }, []);
 
   const filtered = alerts.filter((a) => {
     if (statusFilter !== 'all' && a.status !== statusFilter) return false;
@@ -85,6 +130,79 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
     }
   };
 
+  // ── Create Alert Flow ─────────────────────────────────────────────────────
+
+  const resetCreateFlow = () => {
+    setCreateStep('type');
+    setAlertTarget(null);
+    setSelectedProject(null);
+    setSelectedTask(null);
+    setProjectSearch('');
+    setTaskSearch('');
+    setSearchResults([]);
+    setTaskResults([]);
+    setCreateAlertOpen(false);
+  };
+
+  const handleSelectType = (target: 'global' | 'project' | 'task') => {
+    setAlertTarget(target);
+    if (target === 'global') {
+      setCreateStep('form');
+    } else if (target === 'project') {
+      setCreateStep('project');
+    } else {
+      setCreateStep('project'); // Need to select project first for task alerts too
+    }
+  };
+
+  const handleProjectSearch = useCallback(async (query: string) => {
+    setProjectSearch(query);
+    if (query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    const result = await apiFetch<{ items: IProject[] }>(`/api/projects?search=${encodeURIComponent(query)}&limit=10`);
+    if (result.success && result.data) {
+      setSearchResults((result.data as any).items || []);
+    }
+    setSearching(false);
+  }, []);
+
+  const handleSelectProject = (project: IProject) => {
+    setSelectedProject(project);
+    setProjectSearch(project.projectTitle);
+    setSearchResults([]);
+    if (alertTarget === 'project') {
+      setCreateStep('form');
+    } else {
+      // Task alert — fetch tasks for this project
+      fetchTasksForProject(project._id);
+      setCreateStep('task');
+    }
+  };
+
+  const fetchTasksForProject = async (projectId: string) => {
+    setSearching(true);
+    const result = await apiFetch<ITask[]>(`/api/tasks?projectId=${projectId}&limit=200`);
+    if (result.success && result.data) {
+      setTaskResults(Array.isArray(result.data) ? result.data : []);
+    }
+    setSearching(false);
+  };
+
+  const handleSelectTask = (task: ITask) => {
+    setSelectedTask(task);
+    setTaskSearch(task.title);
+    setCreateStep('form');
+  };
+
+  const handleCreateSuccess = () => {
+    resetCreateFlow();
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <div className="p-6">
       {/* Header */}
@@ -99,7 +217,16 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
               </span>
             )}
           </div>
-          <span className="text-xs text-gray-500 font-mono">{alerts.length} total</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 font-mono">{alerts.length} total</span>
+            <button
+              onClick={() => { setCreateAlertOpen(true); setCreateStep('type'); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide border border-red-300 text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <Plus className="w-3 h-3" />
+              Create Alert
+            </button>
+          </div>
         </div>
       </div>
 
@@ -238,6 +365,270 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
           ))}
         </div>
       )}
+
+      {/* ── Create Alert Modal (Multi-step) ──────────────────────────────── */}
+      <Modal open={createAlertOpen} onClose={resetCreateFlow} size="md">
+        {/* Step indicator */}
+        <div className="flex items-center gap-2 px-5 pt-4 pb-2">
+          {(['type', 'project', 'task', 'form'] as const).map((step, idx) => (
+            <div key={step} className="flex items-center gap-2">
+              <div className={cn(
+                'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-mono font-bold',
+                createStep === step
+                  ? 'bg-red-600 text-white'
+                  : ['type', 'project', 'task', 'form'].indexOf(createStep) >= idx
+                  ? 'bg-gray-800 text-white'
+                  : 'bg-gray-200 text-gray-500'
+              )}>
+                {['type', 'project', 'task', 'form'].indexOf(createStep) > idx ? <Check className="w-3 h-3" /> : idx + 1}
+              </div>
+              {idx < 3 && <div className={cn('w-6 h-px', ['type', 'project', 'task', 'form'].indexOf(createStep) > idx ? 'bg-gray-800' : 'bg-gray-200')} />}
+            </div>
+          ))}
+        </div>
+
+        {/* Step 1: Choose alert target type */}
+        {createStep === 'type' && (
+          <div className="p-5 space-y-4">
+            <h2 className="text-lg font-black text-gray-900">What type of alert?</h2>
+            <p className="text-xs text-gray-500 font-mono">Choose the scope of the alert you want to raise.</p>
+
+            <div className="space-y-2">
+              <button
+                onClick={() => handleSelectType('global')}
+                className="w-full flex items-center gap-4 p-4 border border-gray-200 hover:border-red-300 hover:bg-red-50/50 transition-colors text-left"
+              >
+                <div className="w-8 h-8 bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-gray-900">Global Alert</p>
+                  <p className="text-[10px] text-gray-500 font-mono mt-0.5">
+                    Standalone alert not linked to any project or task. Affects selected departments.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleSelectType('project')}
+                className="w-full flex items-center gap-4 p-4 border border-gray-200 hover:border-red-300 hover:bg-red-50/50 transition-colors text-left"
+              >
+                <div className="w-8 h-8 bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-gray-900">Project Alert</p>
+                  <p className="text-[10px] text-gray-500 font-mono mt-0.5">
+                    Links to a specific project. Puts the project on hold and blocks affected department tasks.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleSelectType('task')}
+                className="w-full flex items-center gap-4 p-4 border border-gray-200 hover:border-red-300 hover:bg-red-50/50 transition-colors text-left"
+              >
+                <div className="w-8 h-8 bg-orange-100 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-orange-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-gray-900">Task Alert</p>
+                  <p className="text-[10px] text-gray-500 font-mono mt-0.5">
+                    Links to a specific task within a project. Puts the project on hold and blocks this task.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={resetCreateFlow}
+                className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Select project (for project or task alerts) */}
+        {(createStep === 'project') && (
+          <div className="p-5 space-y-4">
+            <button
+              onClick={() => setCreateStep('type')}
+              className="text-[10px] font-mono text-gray-500 hover:text-black flex items-center gap-1"
+            >
+              ← Back
+            </button>
+            <h2 className="text-lg font-black text-gray-900">
+              {alertTarget === 'task' ? 'Select Project (for Task Alert)' : 'Select Project'}
+            </h2>
+            <p className="text-xs text-gray-500 font-mono">Search for a project by name or client.</p>
+
+            {/* Search input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={projectSearch}
+                onChange={(e) => handleProjectSearch(e.target.value)}
+                placeholder="Search projects (min 2 chars)..."
+                className="w-full pl-9 pr-3 py-2.5 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                autoFocus
+              />
+              {searching && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-gray-300 border-t-black rounded-full animate-spin" />
+              )}
+            </div>
+
+            {/* Results */}
+            {searchResults.length > 0 && (
+              <div className="border border-gray-200 max-h-60 overflow-y-auto divide-y divide-gray-100">
+                {searchResults.map((project) => (
+                  <button
+                    key={project._id}
+                    onClick={() => handleSelectProject(project)}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-900 truncate">{project.projectTitle}</p>
+                      <p className="text-[10px] text-gray-500 font-mono truncate">{project.clientName}</p>
+                    </div>
+                    <span className="text-[10px] font-mono text-gray-400 flex-shrink-0">{project.status?.replace(/_/g, ' ')}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {projectSearch.length >= 2 && searchResults.length === 0 && !searching && (
+              <p className="text-xs text-gray-400 font-mono text-center py-4">No projects found matching &ldquo;{projectSearch}&rdquo;</p>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={resetCreateFlow}
+                className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Select task (for task alerts only) */}
+        {(createStep === 'task') && (
+          <div className="p-5 space-y-4">
+            <button
+              onClick={() => {
+                setCreateStep('project');
+                setSelectedProject(null);
+                setProjectSearch('');
+                setSearchResults([]);
+                setTaskResults([]);
+                setTaskSearch('');
+              }}
+              className="text-[10px] font-mono text-gray-500 hover:text-black flex items-center gap-1"
+            >
+              ← Back
+            </button>
+            <h2 className="text-lg font-black text-gray-900">Select Task</h2>
+            <p className="text-xs text-gray-500 font-mono">
+              Project: <span className="font-bold text-gray-900">{selectedProject?.projectTitle}</span>
+            </p>
+
+            {/* Task search/filter */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={taskSearch}
+                onChange={(e) => {
+                  setTaskSearch(e.target.value);
+                }}
+                placeholder="Filter tasks by title..."
+                className="w-full pl-9 pr-3 py-2.5 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                autoFocus
+              />
+            </div>
+
+            {/* Task list */}
+            {searching ? (
+              <div className="flex items-center justify-center py-8">
+                <span className="w-4 h-4 border-2 border-gray-300 border-t-black rounded-full animate-spin" />
+              </div>
+            ) : taskResults.length > 0 ? (
+              <div className="border border-gray-200 max-h-60 overflow-y-auto divide-y divide-gray-100">
+                {taskResults
+                  .filter((t) => !taskSearch || t.title.toLowerCase().includes(taskSearch.toLowerCase()))
+                  .map((task) => (
+                    <button
+                      key={task._id}
+                      onClick={() => handleSelectTask(task)}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-gray-900 truncate">{task.title}</p>
+                        <p className="text-[10px] text-gray-500 font-mono truncate">{getDepartmentLabel(task.department)}</p>
+                      </div>
+                      <span className="text-[10px] font-mono text-gray-400 flex-shrink-0">{task.status?.replace(/_/g, ' ')}</span>
+                    </button>
+                  ))}
+                {taskResults.filter((t) => !taskSearch || t.title.toLowerCase().includes(taskSearch.toLowerCase())).length === 0 && (
+                  <p className="text-xs text-gray-400 font-mono text-center py-4">No tasks match your filter</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 font-mono text-center py-4">No tasks found for this project</p>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={resetCreateFlow}
+                className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Alert form */}
+        {createStep === 'form' && (
+          <div>
+            <div className="flex items-center gap-2 px-5 pt-1 pb-2">
+              <button
+                onClick={() => {
+                  if (alertTarget === 'task' && selectedTask) {
+                    setCreateStep('task');
+                  } else if (alertTarget === 'project' || alertTarget === 'task') {
+                    setCreateStep('project');
+                  } else {
+                    setCreateStep('type');
+                  }
+                }}
+                className="text-[10px] font-mono text-gray-500 hover:text-black flex items-center gap-1"
+              >
+                ← Back
+              </button>
+            </div>
+            <CreateAlertForm
+              projectId={selectedProject?._id}
+              projectTitle={selectedProject?.projectTitle}
+              taskId={selectedTask?._id}
+              defaultAffectedDepartments={selectedTask ? [selectedTask.department] : []}
+              title={
+                alertTarget === 'global'
+                  ? 'Raise Global Alert'
+                  : alertTarget === 'task'
+                  ? 'Raise Task Alert'
+                  : 'Raise Project Alert'
+              }
+              onSuccess={handleCreateSuccess}
+              onCancel={resetCreateFlow}
+            />
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
