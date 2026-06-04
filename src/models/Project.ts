@@ -32,6 +32,7 @@ export interface IProjectDocument extends Document {
   selectedTemplateGroupId?: mongoose.Types.ObjectId;
   excelSheetName?: string;
   excelRows?: Array<Record<string, string | number | boolean | null>>;
+  excelFile?: { name: string; data: string; size: number };
   priority: ProjectPriority;
   startDate?: Date;
   deadline: Date;
@@ -86,6 +87,14 @@ const ProjectSchema = new Schema<IProjectDocument>(
     selectedTemplateGroupId: { type: Schema.Types.ObjectId, ref: 'TemplateGroup' },
     excelSheetName: { type: String, trim: true },
     excelRows: [{ type: Schema.Types.Mixed }],
+    excelFile: {
+      type: {
+        name: { type: String },
+        data: { type: String },
+        size: { type: Number },
+      },
+      default: null,
+    },
     priority: { type: String, enum: Object.values(ProjectPriority), required: true, default: ProjectPriority.NECESSARY },
     startDate: { type: Date, default: null },
     deadline: { type: Date, required: true },

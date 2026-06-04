@@ -117,19 +117,39 @@ export const UpdateProjectSchema = z.object({
       uploadedAt: z.string().optional(),
     }))
     .optional(),
+  excelFile: z
+    .object({
+      name: z.string(),
+      data: z.string(),
+      size: z.number(),
+    })
+    .nullable()
+    .optional(),
   priority: ProjectPrioritySchema.optional(),
-  startDate: z
-    .string()
-    .transform((str) => new Date(str))
-    .optional(),
-  deadline: z
-    .string()
-    .transform((str) => new Date(str))
-    .optional(),
-  endDate: z
-    .string()
-    .transform((str) => new Date(str))
-    .optional(),
+  startDate: z.preprocess(
+    (value) => {
+      if (!value || value === '' || value === 'Invalid Date') return undefined;
+      const d = new Date(String(value));
+      return isNaN(d.getTime()) ? undefined : d;
+    },
+    z.date().optional()
+  ).optional(),
+  deadline: z.preprocess(
+    (value) => {
+      if (!value || value === '' || value === 'Invalid Date') return undefined;
+      const d = new Date(String(value));
+      return isNaN(d.getTime()) ? undefined : d;
+    },
+    z.date().optional()
+  ).optional(),
+  endDate: z.preprocess(
+    (value) => {
+      if (!value || value === '' || value === 'Invalid Date') return undefined;
+      const d = new Date(String(value));
+      return isNaN(d.getTime()) ? undefined : d;
+    },
+    z.date().optional()
+  ).optional(),
   status: z.nativeEnum(ProjectStatus).optional(),
   productTypes: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
@@ -179,12 +199,25 @@ export const UpdateTaskSchema = z.object({
       z.object({
         id: z.string().min(1),
         name: z.string().min(1).max(160),
-        url: z.string().startsWith('data:image/'),
-        size: z.number().int().positive().max(2_500_000),
+        url: z.string().min(1),
+        size: z.number().int().positive().max(10_000_000),
         uploadedAt: z.string().transform((str) => new Date(str)),
       })
     )
-    .max(6)
+    .max(12)
+    .optional(),
+  attachments: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().min(1).max(260),
+        url: z.string().min(1),
+        size: z.number().int().positive().max(20_000_000),
+        type: z.string().min(1),
+        uploadedAt: z.string().transform((str) => new Date(str)),
+      })
+    )
+    .max(12)
     .optional(),
 });
 

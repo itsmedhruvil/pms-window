@@ -116,6 +116,7 @@ export interface IProject {
   selectedTemplateGroupId?: string;
   excelSheetName?: string;
   excelRows?: Array<Record<string, string | number | boolean | null>>;
+  excelFile?: { name: string; data: string; size: number } | null;
   priority: ProjectPriority;
   startDate?: Date;
   deadline: Date;
@@ -149,6 +150,7 @@ export interface ITask {
   dueDate?: Date;
   completedAt?: Date;
   imageAttachments?: TaskImageAttachment[];
+  attachments?: TaskAttachment[];
   isLocked: boolean;
   sequence: number;
   createdAt: Date;
@@ -173,6 +175,15 @@ export interface TaskImageAttachment {
   name: string;
   url: string;
   size: number;
+  uploadedAt: Date;
+}
+
+export interface TaskAttachment {
+  id: string;
+  name: string;
+  url: string;
+  size: number;
+  type: string;
   uploadedAt: Date;
 }
 

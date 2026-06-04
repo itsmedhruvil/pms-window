@@ -54,78 +54,106 @@ export const GET = withAuth(async (_req: NextRequest, ctx, { user }) => {
 export const PATCH = withAuth(
   async (req: NextRequest, ctx, { user }) => {
     await connectDB();
-    const params = await ctx.params;
-    const { id } = params;
+    try {
+      const params = await ctx.params;
+      const { id } = params;
 
-    const body = await req.json();
-    const parsed = UpdateProjectSchema.safeParse(body);
+      const body = await req.json();
+      const parsed = UpdateProjectSchema.safeParse(body);
 
-    if (!parsed.success) {
-      return NextResponse.json(
-        { success: false, error: parsed.error.flatten() },
-        { status: 400 }
-      );
-    }
-
-    const project = await ProjectModel.findById(id);
-    if (!project) {
-      return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 });
-    }
-
-    const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
-
-    // Restrict attachment/windowSpec changes to admin only
-    if (!isAdmin) {
-      if (parsed.data.pdfAttachments !== undefined ||
-          parsed.data.windowSpecifications !== undefined ||
-          parsed.data.excelRows !== undefined ||
-          parsed.data.excelSheetName !== undefined) {
+      if (!parsed.success) {
         return NextResponse.json(
-          { success: false, error: 'Only admins can modify attachments and specifications' },
-          { status: 403 }
+          { success: false, error: parsed.error.flatten() },
+          { status: 400 }
         );
       }
-    }
 
-    // Validate status transitions
-    if (parsed.data.status) {
-      const newStatus = parsed.data.status;
-      // Cannot complete if tasks are pending
-      if (newStatus === ProjectStatus.COMPLETED) {
-        const incompleteTasks = await TaskModel.countDocuments({
-          projectId: id,
-          status: { $ne: 'done' },
-        });
-        if (incompleteTasks > 0) {
+      const project = await ProjectModel.findById(id);
+      if (!project) {
+        return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 });
+      }
+
+      const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
+
+      // Restrict attachment/windowSpec changes to admin only
+      if (!isAdmin) {
+        if (parsed.data.pdfAttachments !== undefined ||
+            parsed.data.windowSpecifications !== undefined ||
+            parsed.data.excelRows !== undefined ||
+            parsed.data.excelSheetName !== undefined) {
+          return NextResponse.json(
+            { success: false, error: 'Only admins can modify attachments and specifications' },
+            { status: 403 }
+          );
+        }
+      }
+
+      // Validate status transitions
+      if (parsed.data.status) {
+        const newStatus = parsed.data.status;
+        // Cannot complete if tasks are pending
+        if (newStatus === ProjectStatus.COMPLETED) {
+          const incompleteTasks = await TaskModel.countDocuments({
+            projectId: id,
+            status: { $ne: 'done' },
+          });
+          if (incompleteTasks > 0) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `Cannot complete project: ${incompleteTasks} task(s) still pending`,
+              },
+              { status: 400 }
+            );
+          }
+        }
+
+        // Cannot change status if active alerts
+        if (project.activeAlertIds.length > 0 && newStatus !== ProjectStatus.ON_HOLD) {
           return NextResponse.json(
             {
               success: false,
-              error: `Cannot complete project: ${incompleteTasks} task(s) still pending`,
+              error: 'Cannot change project status while active alerts exist',
             },
             { status: 400 }
           );
         }
       }
 
-      // Cannot change status if active alerts
-      if (project.activeAlertIds.length > 0 && newStatus !== ProjectStatus.ON_HOLD) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Cannot change project status while active alerts exist',
-          },
-          { status: 400 }
-        );
+      const updateData = { ...parsed.data } as Record<string, unknown>;
+      delete updateData._id;
+
+      if (updateData.excelFile === null || updateData.excelFile === undefined) {
+        // Handle null/undefined excelFile - unset it and set everything else
+        const { excelFile: _, ...setData } = updateData;
+        const updated = await ProjectModel.findByIdAndUpdate(
+          id,
+          { $set: setData, ...(parsed.data.excelFile === null ? { $unset: { excelFile: '' } } : {}) },
+          { new: true }
+        ).populate('createdBy', 'name email department');
+        if (!updated) {
+          return NextResponse.json({ success: false, error: 'Update failed' }, { status: 500 });
+        }
+        return NextResponse.json({ success: true, data: updated });
       }
+
+      const updated = await ProjectModel.findByIdAndUpdate(
+        id,
+        { $set: updateData },
+        { new: true }
+      ).populate('createdBy', 'name email department');
+
+      if (!updated) {
+        return NextResponse.json({ success: false, error: 'Update failed' }, { status: 500 });
+      }
+      return NextResponse.json({ success: true, data: updated });
+    } catch (error) {
+      console.error('[Project PATCH] Error:', error);
+      return NextResponse.json(
+        { success: false, error: error instanceof Error ? error.message : 'Failed to update project' },
+        { status: 500 }
+      );
     }
-
-    const updated = await ProjectModel.findByIdAndUpdate(
-      id,
-      { $set: parsed.data },
-      { new: true, runValidators: true }
-    ).populate('createdBy', 'name email department');
-
-    return NextResponse.json({ success: true, data: updated });
   },
   [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.DEPARTMENT_USER]
 );

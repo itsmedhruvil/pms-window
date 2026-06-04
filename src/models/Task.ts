@@ -9,6 +9,15 @@ interface TaskImageAttachment {
   uploadedAt: Date;
 }
 
+interface TaskDocAttachment {
+  id: string;
+  name: string;
+  url: string;
+  size: number;
+  type: string;
+  uploadedAt: Date;
+}
+
 export interface ITaskDocument extends Document {
   projectId?: mongoose.Types.ObjectId;
   templateTaskId?: mongoose.Types.ObjectId;
@@ -23,6 +32,7 @@ export interface ITaskDocument extends Document {
   dueDate?: Date;
   completedAt?: Date;
   imageAttachments?: TaskImageAttachment[];
+  attachments?: TaskDocAttachment[];
   isLocked: boolean;
   sequence: number;
   createdAt: Date;
@@ -101,6 +111,19 @@ const TaskSchema = new Schema<ITaskDocument>(
           name: { type: String, required: true },
           url: { type: String, required: true },
           size: { type: Number, required: true },
+          uploadedAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
+    attachments: {
+      type: [
+        {
+          id: { type: String, required: true },
+          name: { type: String, required: true },
+          url: { type: String, required: true },
+          size: { type: Number, required: true },
+          type: { type: String, required: true },
           uploadedAt: { type: Date, default: Date.now },
         },
       ],

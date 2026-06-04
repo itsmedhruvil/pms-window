@@ -109,9 +109,25 @@ export function ProjectDetail({
         }
       });
 
+      // Convert the Excel file to a data URL for storage (so it can be re-downloaded)
+      const reader = new FileReader();
+      const excelDataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsDataURL(file);
+      });
+
       const result = await apiFetch(`/api/projects/${project._id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ excelSheetName: worksheet.name || 'Sheet1', excelRows: rows }),
+        body: JSON.stringify({
+          excelSheetName: worksheet.name || 'Sheet1',
+          excelRows: rows,
+          excelFile: {
+            name: file.name,
+            data: excelDataUrl,
+            size: file.size,
+          },
+        }),
       });
 
       if (result.success && result.data) {
@@ -206,7 +222,7 @@ export function ProjectDetail({
     setExcelError(null);
     const result = await apiFetch(`/api/projects/${project._id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ excelSheetName: '', excelRows: [] }),
+      body: JSON.stringify({ excelSheetName: '', excelRows: [], excelFile: null }),
     });
     setExcelLoading(false);
     if (result.success && result.data) {
@@ -741,6 +757,16 @@ export function ProjectDetail({
                       Sheet: {project.excelSheetName || 'Imported'}
                     </span>
                     <div className="flex items-center gap-2">
+                      {project.excelFile && (
+                        <a
+                          href={project.excelFile.data}
+                          download={project.excelFile.name}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-gray-200 text-gray-600 hover:border-black hover:text-black transition-colors rounded-md"
+                        >
+                          <FileText className="w-3 h-3" />
+                          Download Original
+                        </a>
+                      )}
                       {isAdmin && (
                         <button
                           type="button"
