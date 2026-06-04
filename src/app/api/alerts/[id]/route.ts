@@ -180,10 +180,22 @@ async function deleteHandler(
   const params = await context.params;
   const { id } = params;
 
-  const alert = await AlertModel.findByIdAndDelete(id);
+  const alert = await AlertModel.findById(id);
   if (!alert) {
     return NextResponse.json({ success: false, error: 'Alert not found' }, { status: 404 });
   }
+
+  // If alert is not yet resolved, restore workflow when deleting
+  if (alert.status !== AlertStatus.RESOLVED) {
+    await resolveAlertEffects(id);
+    await createSystemLog({
+      alertId: id,
+      content: `Alert deleted by ${user.name}. Workflow restored.`,
+      authorId: user._id.toString(),
+    });
+  }
+
+  await AlertModel.findByIdAndDelete(id);
 
   // Also clean up associated comments
   const CommentModel = (await import('@/models/Comment')).default;
