@@ -92,7 +92,6 @@ export const CreateProjectSchema = z.object({
       return date >= tomorrow;
     }, { message: 'Deadline must be a future date — please select a date from tomorrow onwards' })
     .transform((str) => new Date(str)),
-  endDate: z.string().optional(),
 });
 
 export const UpdateProjectSchema = z.object({
@@ -135,14 +134,6 @@ export const UpdateProjectSchema = z.object({
     z.date().optional()
   ).optional(),
   deadline: z.preprocess(
-    (value) => {
-      if (!value || value === '' || value === 'Invalid Date') return undefined;
-      const d = new Date(String(value));
-      return isNaN(d.getTime()) ? undefined : d;
-    },
-    z.date().optional()
-  ).optional(),
-  endDate: z.preprocess(
     (value) => {
       if (!value || value === '' || value === 'Invalid Date') return undefined;
       const d = new Date(String(value));

@@ -53,6 +53,15 @@ export function ProjectDetail({
   const [pdfUploading, setPdfUploading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+  const PRODUCT_TYPE_OPTIONS = [
+    'Aluminium Sliding Windows',
+    'Aluminium Doors',
+    'Casement Window',
+    'Glass Slim Partitions',
+    'Aluminium Glass Railing',
+    'Curtain Wall Systems',
+  ];
+
   const [editForm, setEditForm] = useState({
     clientName: initialProject.clientName,
     projectTitle: initialProject.projectTitle,
@@ -62,9 +71,11 @@ export function ProjectDetail({
     totalWindows: initialProject.totalWindows,
     startDate: initialProject.startDate ? new Date(initialProject.startDate).toISOString().split('T')[0] : '',
     deadline: initialProject.deadline ? new Date(initialProject.deadline).toISOString().split('T')[0] : '',
-    endDate: initialProject.endDate ? new Date(initialProject.endDate).toISOString().split('T')[0] : '',
     priority: normalizeProjectPriority(initialProject.priority),
+    productTypes: initialProject.productTypes || [],
+    tags: initialProject.tags || [],
   });
+  const [editTagInput, setEditTagInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -340,8 +351,9 @@ export function ProjectDetail({
         totalWindows: editForm.totalWindows,
         startDate: editForm.startDate,
         deadline: editForm.deadline,
-        endDate: editForm.endDate,
         priority: editForm.priority,
+        productTypes: editForm.productTypes,
+        tags: editForm.tags,
       }),
     });
     setSaving(false);
@@ -364,8 +376,9 @@ export function ProjectDetail({
       totalWindows: project.totalWindows,
       startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
       deadline: project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : '',
-      endDate: project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '',
       priority: normalizeProjectPriority(project.priority),
+      productTypes: project.productTypes || [],
+      tags: project.tags || [],
     });
     setEditError(null);
     setEditModalOpen(true);
@@ -1144,16 +1157,6 @@ export function ProjectDetail({
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">End Date</label>
-              <input
-                type="date"
-                value={editForm.endDate}
-                onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
-                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
-              />
-            </div>
-
-            <div className="space-y-1.5">
               <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Priority</label>
               <div className="grid grid-cols-2 gap-2">
                 {([ProjectPriority.STANDARD, ProjectPriority.NECESSARY, ProjectPriority.PRIORITY, ProjectPriority.URGENT] as const).map((p) => (
@@ -1174,6 +1177,96 @@ export function ProjectDetail({
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Product Types */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Product Types</label>
+              <div className="flex flex-wrap gap-2">
+                {PRODUCT_TYPE_OPTIONS.map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() =>
+                      setEditForm({
+                        ...editForm,
+                        productTypes: editForm.productTypes.includes(type)
+                          ? editForm.productTypes.filter((t) => t !== type)
+                          : [...editForm.productTypes, type],
+                      })
+                    }
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-wide border transition-colors rounded',
+                      editForm.productTypes.includes(type)
+                        ? 'bg-black text-white border-black'
+                        : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                    )}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+              {editForm.productTypes.length > 0 && (
+                <p className="mt-1 text-[10px] font-mono text-gray-400">
+                  Selected: {editForm.productTypes.join(', ')}
+                </p>
+              )}
+            </div>
+
+            {/* Tags */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Tags</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={editTagInput}
+                  onChange={(e) => setEditTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const trimmed = editTagInput.trim();
+                      if (trimmed && !editForm.tags.includes(trimmed)) {
+                        setEditForm({ ...editForm, tags: [...editForm.tags, trimmed] });
+                      }
+                      setEditTagInput('');
+                    }
+                  }}
+                  placeholder="Type a tag and press Enter"
+                  className="flex-1 px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const trimmed = editTagInput.trim();
+                    if (trimmed && !editForm.tags.includes(trimmed)) {
+                      setEditForm({ ...editForm, tags: [...editForm.tags, trimmed] });
+                    }
+                    setEditTagInput('');
+                  }}
+                  className="px-3 py-2 text-xs font-mono font-bold uppercase border border-gray-200 text-gray-600 hover:border-black hover:text-black transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+              {editForm.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {editForm.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono bg-gray-100 text-gray-700 rounded"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => setEditForm({ ...editForm, tags: editForm.tags.filter((t) => t !== tag) })}
+                        className="text-gray-400 hover:text-red-500"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
