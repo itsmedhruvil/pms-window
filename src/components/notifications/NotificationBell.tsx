@@ -6,7 +6,7 @@ import { useInAppNotifications } from '@/hooks/useInAppNotifications';
 import { NotificationType } from '@/types/notifications';
 import { cn } from '@/lib/utils';
 
-const NOTIFICATION_ICONS: Record<NotificationType, { icon: React.ReactNode; color: string; bg: string }> = {
+const NOTIFICATION_ICONS: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
   [NotificationType.ALERT_CREATED]: {
     icon: <AlertTriangle className="w-4 h-4" />,
     color: 'text-red-600',
@@ -46,6 +46,21 @@ const NOTIFICATION_ICONS: Record<NotificationType, { icon: React.ReactNode; colo
     icon: <Lightbulb className="w-4 h-4" />,
     color: 'text-teal-600',
     bg: 'bg-teal-100',
+  },
+  [NotificationType.PROJECT_CREATED]: {
+    icon: <ClipboardList className="w-4 h-4" />,
+    color: 'text-cyan-600',
+    bg: 'bg-cyan-100',
+  },
+  [NotificationType.INTERNAL_TASK_ASSIGNED]: {
+    icon: <UserPlus className="w-4 h-4" />,
+    color: 'text-purple-600',
+    bg: 'bg-purple-100',
+  },
+  [NotificationType.TASK_OVERDUE]: {
+    icon: <AlertTriangle className="w-4 h-4" />,
+    color: 'text-red-600',
+    bg: 'bg-red-50',
   },
 };
 

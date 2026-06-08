@@ -145,8 +145,8 @@ export const POST = withAuth(
         const allUserIds = allUsers.map((u) => u._id.toString());
         if (allUserIds.length > 0) {
           await notifyUsers({
-            type: NotificationType.TASK_STATUS_CHANGED,
-            title: `📋 New Project: ${populated.projectTitle}`,
+            type: NotificationType.PROJECT_CREATED,
+            title: `📦 New Project: ${populated.projectTitle}`,
             body: `"${populated.projectTitle}" was created for client "${populated.clientName}". Tasks have been auto-generated.`,
             link: `/projects/${populated._id}`,
             userIds: allUserIds,

@@ -40,6 +40,26 @@ export function InternalTasksPageClient({
     };
   }, []);
 
+  // Check for overdue tasks every 5 minutes (broadcast)
+  useEffect(() => {
+    // Only admin should trigger this to avoid duplicate notifications
+    if (!isAdmin) return;
+
+    const checkOverdue = () => {
+      apiFetch('/api/notifications', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'overdue-check' }),
+      }).catch(() => {});
+    };
+
+    // Check on mount
+    checkOverdue();
+
+    // Then every 5 minutes
+    const interval = setInterval(checkOverdue, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [isAdmin]);
+
   // Fetch template groups for the task creation modal
   useEffect(() => {
     if (!taskModalOpen) return;

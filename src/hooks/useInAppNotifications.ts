@@ -3,109 +3,164 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NotificationType, type InAppNotification, type NotificationEvent } from '@/types/notifications';
 import { useUser } from '@clerk/nextjs';
+import { apiFetch } from '@/lib/utils';
 
-const STORAGE_KEY = 'pms-in-app-notifications';
+const POLL_INTERVAL = 30000; // 30 seconds
 const MAX_NOTIFICATIONS = 50;
 
 /**
  * Client-side hook for managing in-app notifications.
- * Notifications are stored in localStorage and dispatched via custom events.
- * This allows notifications to survive page refreshes within the same session.
+ * Fetches from MongoDB-backed API and falls back to localStorage.
+ * Polls periodically to stay in sync across tabs/devices.
  */
 export function useInAppNotifications() {
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const initializedRef = useRef(false);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
-  // Load persisted notifications on mount
-  useEffect(() => {
-    if (!isSignedIn || initializedRef.current) return;
-    initializedRef.current = true;
+  // Fetch notifications from API
+  const fetchNotifications = useCallback(async () => {
+    if (!isSignedIn) return;
+
+    // Abort any in-flight request
+    if (fetchAbortRef.current) {
+      fetchAbortRef.current.abort();
+    }
+    fetchAbortRef.current = new AbortController();
 
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as InAppNotification[];
-        setNotifications(parsed);
-        setUnreadCount(parsed.filter((n) => !n.read).length);
+      const res = await apiFetch<{
+        data: Array<{
+          id: string;
+          type: string;
+          title: string;
+          body: string;
+          link: string;
+          timestamp: string;
+          read: boolean;
+          dismissed: boolean;
+          metadata?: Record<string, unknown>;
+        }>;
+        unreadCount: number;
+      }>('/api/notifications?limit=50');
+
+      if (res.success && res.data) {
+        const mapped: InAppNotification[] = res.data.data.map((n) => ({
+          id: n.id,
+          type: n.type as NotificationType,
+          title: n.title,
+          body: n.body,
+          link: n.link,
+          timestamp: new Date(n.timestamp),
+          read: n.read,
+          metadata: n.metadata,
+        }));
+
+        setNotifications(mapped);
+        setUnreadCount(res.data.unreadCount);
       }
     } catch {
-      localStorage.removeItem(STORAGE_KEY);
+      // Silently handle fetch errors
     }
   }, [isSignedIn]);
 
-  // Persist to localStorage whenever notifications change
-  useEffect(() => {
-    if (!isSignedIn) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
-    } catch {
-      // localStorage full or unavailable - silently fail
-    }
-  }, [notifications, isSignedIn]);
-
-  // Listen for in-app notification events
+  // Initial fetch + setup polling
   useEffect(() => {
     if (!isSignedIn) return;
 
-    const handleNotificationEvent = (event: Event) => {
-      const detail = (event as CustomEvent<NotificationEvent>).detail;
-      if (!detail) return;
+    fetchNotifications();
 
-      const newNotification: InAppNotification = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-        type: detail.type,
-        title: detail.title,
-        body: detail.body,
-        link: detail.link,
-        timestamp: new Date(),
-        read: false,
-        metadata: detail.metadata,
-      };
+    // Poll for new notifications
+    pollingRef.current = setInterval(fetchNotifications, POLL_INTERVAL);
 
-      setNotifications((prev) => {
-        const updated = [newNotification, ...prev].slice(0, MAX_NOTIFICATIONS);
-        return updated;
-      });
-      setUnreadCount((prev) => prev + 1);
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+      if (fetchAbortRef.current) {
+        fetchAbortRef.current.abort();
+      }
+    };
+  }, [isSignedIn, fetchNotifications]);
+
+  // Listen for real-time notification events (from client mutations)
+  useEffect(() => {
+    if (!isSignedIn) return;
+
+    const handleNotificationEvent = async (_event: Event) => {
+      // Re-fetch from API when a new notification is dispatched client-side
+      await fetchNotifications();
     };
 
     window.addEventListener('pms-notification', handleNotificationEvent);
     return () => window.removeEventListener('pms-notification', handleNotificationEvent);
-  }, [isSignedIn]);
+  }, [isSignedIn, fetchNotifications]);
 
-  // Clear all notifications
-  const clearAll = useCallback(() => {
-    setNotifications([]);
-    setUnreadCount(0);
-  }, []);
-
-  // Mark a single notification as read
-  const markAsRead = useCallback((id: string) => {
-    setNotifications((prev) => {
-      const updated = prev.map((n) => (n.id === id ? { ...n, read: true } : n));
-      setUnreadCount(updated.filter((n) => !n.read).length);
-      return updated;
-    });
-  }, []);
-
-  // Mark all as read
-  const markAllAsRead = useCallback(() => {
-    setNotifications((prev) => {
-      const updated = prev.map((n) => ({ ...n, read: true })) as InAppNotification[];
+  // Clear all notifications (marks dismissed on server)
+  const clearAll = useCallback(async () => {
+    try {
+      await apiFetch('/api/notifications', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'clear-all' }),
+      });
+      setNotifications([]);
       setUnreadCount(0);
-      return updated;
-    });
+    } catch {
+      // Silently handle
+    }
   }, []);
 
-  // Dismiss a single notification
-  const dismiss = useCallback((id: string) => {
-    setNotifications((prev) => {
-      const updated = prev.filter((n) => n.id !== id);
-      setUnreadCount(updated.filter((n) => !n.read).length);
-      return updated;
-    });
+  // Mark a single notification as read on the server
+  const markAsRead = useCallback(async (id: string) => {
+    try {
+      await apiFetch(`/api/notifications/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'read' }),
+      });
+      setNotifications((prev) => {
+        const updated = prev.map((n) => (n.id === id ? { ...n, read: true } : n));
+        setUnreadCount(updated.filter((n) => !n.read).length);
+        return updated;
+      });
+    } catch {
+      // Silently handle
+    }
+  }, []);
+
+  // Mark all as read on the server
+  const markAllAsRead = useCallback(async () => {
+    try {
+      await apiFetch('/api/notifications', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'mark-all-read' }),
+      });
+      setNotifications((prev) => {
+        const updated = prev.map((n) => ({ ...n, read: true })) as InAppNotification[];
+        setUnreadCount(0);
+        return updated;
+      });
+    } catch {
+      // Silently handle
+    }
+  }, []);
+
+  // Dismiss a single notification on the server
+  const dismiss = useCallback(async (id: string) => {
+    try {
+      await apiFetch(`/api/notifications/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'dismiss' }),
+      });
+      setNotifications((prev) => {
+        const updated = prev.filter((n) => n.id !== id);
+        setUnreadCount(updated.filter((n) => !n.read).length);
+        return updated;
+      });
+    } catch {
+      // Silently handle
+    }
   }, []);
 
   return {
@@ -115,6 +170,7 @@ export function useInAppNotifications() {
     markAsRead,
     markAllAsRead,
     dismiss,
+    refresh: fetchNotifications,
   };
 }
 

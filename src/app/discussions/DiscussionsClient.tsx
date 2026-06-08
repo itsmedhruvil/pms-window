@@ -177,14 +177,10 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     setLoadingProjects(false);
   }, []);
 
-  // Poll for new discussions every 30s (hot reload)
+  // Fetch discussions on mount only (no polling)
   useEffect(() => {
     fetchDiscussions();
     fetchUsers();
-    const interval = setInterval(() => {
-      fetchDiscussions();
-    }, 30000);
-    return () => clearInterval(interval);
   }, [fetchDiscussions, fetchUsers]);
 
   const fetchComments = useCallback(async (discussionId: string) => {
@@ -193,15 +189,6 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
       setComments((prev) => ({ ...prev, [discussionId]: result.data!.items }));
     }
   }, []);
-
-  // Also poll comments for expanded discussion
-  useEffect(() => {
-    if (!expandedId) return;
-    const interval = setInterval(() => {
-      fetchComments(expandedId);
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [expandedId, fetchComments]);
 
   const toggleExpand = (id: string) => {
     if (expandedId === id) { setExpandedId(null); setActiveDiscussionId(null); return; }

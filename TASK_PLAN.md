@@ -1,21 +1,43 @@
-# Implementation Plan
+# Notification System Revamp Plan
 
-## 1. Fix "Mark Done" - Comment check with popup (TaskDetailClient.tsx)
-- Remove textarea from done modal
-- When clicking "Mark Done", check if comments exist for the task
-- If no comments, show a popup alert "Please add a comment first" (no input box)
-- User adds comment in the comment tab, then clicks Mark Done again
+## Current Problems Identified
 
-## 2. Discussions CRUD (Edit/Delete + Cloudinary file upload)
-- Add Edit button on discussion threads (edit title/description via modal)
-- Add Delete button with confirmation
-- Fix file upload to use Cloudinary API instead of base64 data URLs
+1. **Push notifications work partially** but are missing for key events:
+   - No `PROJECT_CREATED` notification type
+   - Internal task creation/assignment has NO notification
+   - No overdue task notifications at all
+   
+2. **In-app notifications are broken** because:
+   - `notifyUsers()` writes to `globalThis.__pendingNotifications` which is **never consumed** by the client
+   - The client-side `dispatchNotification()` in `client-data.ts` only fires on mutations, not on server-side events
+   - No MongoDB persistence — notifications are stored only in `localStorage`, lost across devices/clear
+   
+3. **Wrong notification types being used** — e.g. project creation uses `TASK_STATUS_CHANGED`
 
-## 3. Excel file rendering in tasks
-- When .xlsx/.xls/.csv files are uploaded to a task, render them inline using ExcelJS
+## Fix Plan
 
-## 4. SWR + Hot Reload + AJAX Data Loading
-- Refactor TaskDetailClient to use SWR for fetching
-- Add SWR mutation hooks for task updates
-- Use AJAX polling for real-time updates
-- Efficient cache invalidation patterns
+### 1. Add Missing Notification Types
+- `PROJECT_CREATED` — for new project creation
+- `INTERNAL_TASK_ASSIGNED` — for internal task assignments  
+- `TASK_OVERDUE` — for overdue task reminders
+
+### 2. Create MongoDB Notification Model
+Persist notifications so they survive across devices and sessions.
+
+### 3. Create Notification API Endpoints
+- `GET /api/notifications` — fetch user's notifications
+- `PATCH /api/notifications/[id]` — mark as read
+- `POST /api/notifications/mark-all-read` — mark all as read
+- `POST /api/notifications/overdue-check` — check & notify overdue tasks
+
+### 4. Rewrite `notifyUsers()`
+Replace the broken `globalThis.__pendingNotifications` with MongoDB persistence.
+
+### 5. Wire Up Missing Server-Side Notifications
+- Project creation → `PROJECT_CREATED`
+- Internal task + assignment → notification to assigned user
+- Task overdue check → `TASK_OVERDUE`
+
+### 6. Fix Client-Side Consumption
+- `useInAppNotifications` should fetch from `/api/notifications`
+- Add `useSWRMutation` hooks for marking read/dismissing

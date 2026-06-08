@@ -12,6 +12,9 @@ export enum NotificationType {
   COMMENT_MENTION = 'comment_mention',
   DISCUSSION_REPLY = 'discussion_reply',
   DISCUSSION_CREATED = 'discussion_created',
+  PROJECT_CREATED = 'project_created',
+  INTERNAL_TASK_ASSIGNED = 'internal_task_assigned',
+  TASK_OVERDUE = 'task_overdue',
 }
 
 export interface InAppNotification {

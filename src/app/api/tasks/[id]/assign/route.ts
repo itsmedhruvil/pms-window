@@ -66,17 +66,23 @@ export const POST = withAuth(async (req: NextRequest, ctx, { user }) => {
       authorId: user._id.toString(),
     });
 
+    // Determine if this is an internal task vs project task
+    const isInternal = !task.projectId;
+    const notificationType = isInternal ? NotificationType.INTERNAL_TASK_ASSIGNED : NotificationType.TASK_ASSIGNED;
+    const link = isInternal ? `/internal-tasks?task=${id}` : `/tasks/${id}`;
+
     // Send rich push + in-app notification to the assigned user
     await notifyUsers({
-      type: NotificationType.TASK_ASSIGNED,
-      title: `Task Assigned: ${task.title || 'Task'}`,
-      body: `You have been assigned task "${task.title || 'Task'}" in ${task.department} by ${user.name}.`,
-      link: `/tasks/${id}`,
+      type: notificationType,
+      title: `${isInternal ? '📋 Internal Task' : '📋 Task'} Assigned: ${task.title || 'Task'}`,
+      body: `You have been assigned ${isInternal ? 'internal task' : 'task'} "${task.title || 'Task'}" in ${task.department} by ${user.name}.`,
+      link,
       userIds: [targetUser._id.toString()],
       metadata: {
         taskId: id,
         assignedBy: user.name,
         department: task.department,
+        isInternal,
       },
     });
   } else {

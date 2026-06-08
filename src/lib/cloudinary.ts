@@ -38,18 +38,19 @@ export async function uploadToCloudinary(
   const ext = fileName.split('.').pop()?.toLowerCase() || 'bin';
   const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
   const isVideo = ['mp4', 'webm', 'mov'].includes(ext);
+  const isPdf = ext === 'pdf';
 
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder,
         public_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${fileName.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60)}`,
-        resource_type: isVideo ? 'video' : 'auto',
-        format: isImage ? undefined : ext,
+        resource_type: isVideo ? 'video' : isPdf ? 'image' : 'auto',
+        format: isPdf ? 'pdf' : (isImage ? undefined : ext),
         // For non-image assets, Cloudinary stores as 'raw'
-        type: isImage || isVideo ? 'upload' : 'upload',
+        type: isImage || isVideo || isPdf ? 'upload' : 'upload',
         // Allow large files (up to 20MB for raw, 10MB for images)
-        ...(isImage ? { quality: 'auto', fetch_format: 'auto' } : {}),
+        ...(isImage || isPdf ? { quality: 'auto', fetch_format: 'auto' } : {}),
       },
       (error, result) => {
         if (error || !result) {
