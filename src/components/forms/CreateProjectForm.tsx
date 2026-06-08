@@ -23,14 +23,6 @@ const PRODUCT_TYPE_OPTIONS = [
   'Curtain Wall Systems',
 ];
 
-interface PdfFile {
-  id: string;
-  name: string;
-  url: string;
-  size: number;
-  uploadedAt: string;
-}
-
 interface FormData {
   clientName: string;
   projectTitle: string;
@@ -46,7 +38,6 @@ interface FormData {
   tags: string[];
   windowDesigns: Array<{
     design: string;
-    pdf?: PdfFile;
   }>;
 }
 
@@ -194,36 +185,6 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
     }
   };
 
-  // Window design upload
-  const handleDesignPdfUpload = async (index: number, file: File) => {
-    if (file.type !== 'application/pdf') return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-    const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-    const uploadData = await uploadRes.json();
-
-    if (!uploadData.success) return;
-
-    const pdfFile: PdfFile = {
-      id: `${Date.now()}-${index}`,
-      name: uploadData.data.name,
-      url: uploadData.data.url,
-      size: uploadData.data.size,
-      uploadedAt: new Date().toISOString(),
-    };
-
-    const newDesigns = [...form.windowDesigns];
-    newDesigns[index] = { ...newDesigns[index], pdf: pdfFile };
-    setForm({ ...form, windowDesigns: newDesigns });
-  };
-
-  const removeDesignPdf = (index: number) => {
-    const newDesigns = [...form.windowDesigns];
-    delete newDesigns[index].pdf;
-    setForm({ ...form, windowDesigns: newDesigns });
-  };
-
   // Generate window design rows based on totalWindows
   const windowDesignCount = Math.min(form.totalWindows, 20); // Limit to 20 rows in form
   const windowDesigns = Array.from({ length: windowDesignCount }, (_, i) => ({
@@ -283,17 +244,13 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
       .filter((wd) => wd.design?.trim())
       .map((wd) => {
         const designCount = Math.ceil(form.totalWindows / windowDesignCount);
-        const spec: Record<string, unknown> = {
+        return {
           width: 0,
           height: 0,
           design: wd.design.trim(),
           glassType: '',
           quantity: designCount,
         };
-        if (wd.pdf) {
-          spec.designPdf = wd.pdf;
-        }
-        return spec;
       });
 
     if (specs.length > 0) {
@@ -467,7 +424,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             <div className="border border-gray-200 p-4 bg-gray-50">
               <SectionHeader title="Window Designs (Optional)" />
               <p className="text-[10px] font-mono text-gray-400 mt-1 mb-3">
-                Optionally specify up to {windowDesignCount} design names and upload PDF drawings.
+                Optionally specify up to {windowDesignCount} design names.
               </p>
               <div className="space-y-3">
                 {windowDesigns.map(({ index, label, data }) => (
@@ -479,47 +436,6 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
                       placeholder={`${label} name`}
                       className="flex-1 px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
                     />
-                    <div className="flex-shrink-0">
-                      <input
-                        type="file"
-                        accept=".pdf"
-                        id={`design-pdf-${index}`}
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleDesignPdfUpload(index, file);
-                          e.target.value = '';
-                        }}
-                      />
-                      {data.pdf ? (
-                        <div className="flex items-center gap-1">
-                          <a
-                            href={data.pdf.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 px-2 py-1.5 text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100"
-                          >
-                            <FileText className="w-3 h-3" />
-                            PDF
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => removeDesignPdf(index)}
-                            className="p-1 text-gray-400 hover:text-red-500"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <label
-                          htmlFor={`design-pdf-${index}`}
-                          className="flex items-center gap-1 px-2 py-1.5 text-[10px] font-mono text-gray-500 border border-dashed border-gray-300 rounded cursor-pointer hover:border-gray-500"
-                        >
-                          <Upload className="w-3 h-3" />
-                          PDF
-                        </label>
-                      )}
-                    </div>
                   </div>
                 ))}
               </div>
@@ -712,11 +628,6 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
                   .map((wd, i) => (
                     <div key={i} className="flex items-center gap-2 text-xs">
                       <span className="font-medium">{wd.design}</span>
-                      {wd.pdf && (
-                        <a href={wd.pdf.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-[10px]">
-                          (PDF)
-                        </a>
-                      )}
                     </div>
                   ))}
               </div>

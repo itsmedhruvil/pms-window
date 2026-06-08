@@ -16,7 +16,7 @@ import {
   Bell,
   Building2,
 } from 'lucide-react';
-import { cn, getDepartmentLabel } from '@/lib/utils';
+import { cn, getDepartmentLabel, apiFetch } from '@/lib/utils';
 import { AlertStatus, UserRole } from '@/types';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
@@ -53,6 +53,14 @@ interface AppLayoutProps {
   activeAlertCount?: number;
 }
 
+/** Map of nav item labels to the sidebar-counts key for badge display */
+const COUNT_KEY_MAP: Record<string, string> = {
+  'Alerts': 'activeAlerts',
+  'Discussions': 'discussions',
+  'Internal Tasks': 'internalTasksPending',
+  'Projects': 'activeProjects',
+};
+
 // ── Sidebar (uses Clerk, isolated from main content) ─────────────────────
 
 const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCount?: number }) {
@@ -62,6 +70,49 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
   const [dbDepartment, setDbDepartment] = useState<string | null>(null);
   const fetchedRef = useRef(false);
   const departments = useDepartments();
+  const [counts, setCounts] = useState<Record<string, number>>({});
+
+  // Fetch sidebar counts (discussions, pending tasks, alerts, etc.)
+  useEffect(() => {
+    if (!isSignedIn) return;
+    const fetchCounts = () => {
+      apiFetch<Record<string, number>>('/api/sidebar-counts')
+        .then((res) => {
+          if (res.success && res.data) setCounts(res.data as Record<string, number>);
+        })
+        .catch(() => {});
+    };
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 30000);
+    return () => clearInterval(interval);
+  }, [isSignedIn]);
+
+  // Re-fetch counts on alert events
+  useEffect(() => {
+    const handleEvent = () => {
+      apiFetch<Record<string, number>>('/api/sidebar-counts')
+        .then((res) => {
+          if (res.success && res.data) setCounts(res.data as Record<string, number>);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener('erp-alert-created', handleEvent);
+    window.addEventListener('erp-alert-resolved', handleEvent);
+    window.addEventListener('erp-alert-deleted', handleEvent);
+    return () => {
+      window.removeEventListener('erp-alert-created', handleEvent);
+      window.removeEventListener('erp-alert-resolved', handleEvent);
+      window.removeEventListener('erp-alert-deleted', handleEvent);
+    };
+  }, []);
+
+  /** Get the badge count for a nav item, or null if 0 */
+  const getBadgeCount = (label: string): number | null => {
+    const key = COUNT_KEY_MAP[label];
+    if (!key) return null;
+    const count = counts[key] ?? 0;
+    return count > 0 ? count : null;
+  };
 
   // Fetch role directly from DB to override potentially stale Clerk metadata
   useEffect(() => {
@@ -117,6 +168,7 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
           const isActive = isNavActive(item.href);
           const Icon = item.icon;
           const isAlert = item.href === '/alerts';
+          const badge = isAlert ? (activeAlertCount > 0 ? activeAlertCount : null) : getBadgeCount(item.label);
 
           if (item.prominent) {
             return (
@@ -144,12 +196,14 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
             >
               <Icon className={cn('w-4 h-4 flex-shrink-0', isAlert && activeAlertCount > 0 && !isActive && 'text-red-500')} />
               <span>{item.label}</span>
-              {isAlert && activeAlertCount > 0 && (
+              {badge !== null && (
                 <span className={cn(
-                  'ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full',
-                  isActive ? 'bg-white/20 text-white' : 'bg-red-100 text-red-700'
+                  'ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none',
+                  isActive ? 'bg-white/20 text-white' : 
+                  isAlert ? 'bg-red-100 text-red-700' :
+                  'bg-blue-100 text-blue-700'
                 )}>
-                  {activeAlertCount}
+                  {badge > 99 ? '99+' : badge}
                 </span>
               )}
             </Link>
