@@ -7,7 +7,8 @@ import { generateProjectTasks, generateFromSelectedTemplateGroup } from '@/lib/w
 import { ProjectStatus, UserRole } from '@/types';
 import mongoose from 'mongoose';
 import { createSystemLog } from '@/lib/workflow';
-import { sendPushToOneSignalUsers } from '@/lib/onesignal';
+import { NotificationType } from '@/types/notifications';
+import { notifyUsers } from '@/lib/notifications';
 
 // GET /api/projects - List projects with filters
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
@@ -137,18 +138,24 @@ export const POST = withAuth(
         .populate('createdBy', 'name email department')
         .lean();
 
-      // Fire-and-forget: push notification via OneSignal to all active users
+      // Fire-and-forget: rich push + in-app notification to all active users
       if (populated) {
         const UserModel = (await import('@/models/User')).default;
         const allUsers = await UserModel.find({ isActive: true }).select('_id').lean();
         const allUserIds = allUsers.map((u) => u._id.toString());
         if (allUserIds.length > 0) {
-          sendPushToOneSignalUsers(
-            allUserIds,
-            `New Project: ${populated.projectTitle}`,
-            `"${populated.projectTitle}" was created for client "${populated.clientName}". Check your tasks.`,
-            `/projects/${populated._id}`
-          ).catch(() => {});
+          await notifyUsers({
+            type: NotificationType.TASK_STATUS_CHANGED,
+            title: `📋 New Project: ${populated.projectTitle}`,
+            body: `"${populated.projectTitle}" was created for client "${populated.clientName}". Tasks have been auto-generated.`,
+            link: `/projects/${populated._id}`,
+            userIds: allUserIds,
+            metadata: {
+              projectId: populated._id.toString(),
+              projectTitle: populated.projectTitle,
+              clientName: populated.clientName,
+            },
+          });
         }
       }
 

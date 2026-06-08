@@ -11,7 +11,8 @@ import {
   updateProjectCompletion,
   createSystemLog,
 } from '@/lib/workflow';
-import { sendPushToOneSignalUser } from '@/lib/onesignal';
+import { NotificationType } from '@/types/notifications';
+import { notifyUsers } from '@/lib/notifications';
 
 // GET /api/tasks/[id]
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
@@ -119,19 +120,26 @@ export const PATCH = withAuth(async (req: NextRequest, ctx, { user }) => {
       await updateProjectCompletion(task.projectId.toString());
     }
 
-    // Fire-and-forget: push notification via OneSignal to assigned user about status change
+    // Fire-and-forget: rich push + in-app notification to assigned user about status change
     const statusChangeAssigneeId = extractUserId(updated.assignedUser);
     if (statusChangeAssigneeId) {
       const projectTitle = updated.projectId && typeof updated.projectId === 'object' && 'projectTitle' in updated.projectId
         ? (updated.projectId as unknown as { projectTitle: string }).projectTitle || 'Project'
         : 'Project';
 
-      sendPushToOneSignalUser(
-        statusChangeAssigneeId,
-        `📋 Task Status Changed: ${updated.title}`,
-        `"${updated.title}" in "${projectTitle}" changed from "${oldStatus}" to "${parsed.data.status}" by ${user.name}.`,
-        task.projectId ? `/tasks/${id}` : undefined
-      ).catch(() => {});
+      await notifyUsers({
+        type: NotificationType.TASK_STATUS_CHANGED,
+        title: `📋 Task Status Changed: ${updated.title}`,
+        body: `"${updated.title}" in "${projectTitle}" changed from "${oldStatus}" to "${parsed.data.status}" by ${user.name}.`,
+        link: task.projectId ? `/tasks/${id}` : '/tasks',
+        userIds: [statusChangeAssigneeId],
+        metadata: {
+          taskId: id,
+          oldStatus,
+          newStatus: parsed.data.status,
+          projectTitle,
+        },
+      });
     }
   }
 
@@ -143,19 +151,25 @@ export const PATCH = withAuth(async (req: NextRequest, ctx, { user }) => {
       ? (updated.projectId as unknown as { projectTitle: string }).projectTitle || 'Project'
       : 'Project';
 
-    // Fire-and-forget: push notification via OneSignal to newly assigned user
-    sendPushToOneSignalUser(
-      newAssignedUserId,
-      `👤 Task Assigned: ${updated.title}`,
-      `You have been assigned task "${updated.title}" in project "${projectTitle}".`,
-      task.projectId ? `/tasks/${id}` : undefined
-    ).catch(() => {});
+    // Fire-and-forget: rich push + in-app notification to newly assigned user
+    await notifyUsers({
+      type: NotificationType.TASK_ASSIGNED,
+      title: `👤 Task Assigned: ${updated.title}`,
+      body: `You have been assigned task "${updated.title}" in project "${projectTitle}".`,
+      link: task.projectId ? `/tasks/${id}` : '/tasks',
+      userIds: [newAssignedUserId],
+      metadata: {
+        taskId: id,
+        projectTitle,
+      },
+    });
   }
 
-  if (parsed.data.imageAttachments) {
+  if (parsed.data.files || parsed.data.imageAttachments || parsed.data.attachments) {
+    const fileCount = parsed.data.files?.length || parsed.data.imageAttachments?.length || parsed.data.attachments?.length || 0;
     await createSystemLog({
       taskId: id,
-      content: `Images updated by ${user.name}`,
+      content: `Files updated by ${user.name}: ${fileCount} file(s)`,
       authorId: user._id.toString(),
     });
   }

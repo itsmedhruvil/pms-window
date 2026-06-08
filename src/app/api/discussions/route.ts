@@ -3,7 +3,8 @@ import connectDB from '@/lib/db';
 import DiscussionModel from '@/models/Discussion';
 import { withAuth } from '@/lib/auth';
 import { UserRole } from '@/types';
-import { sendPushToOneSignalUsers } from '@/lib/onesignal';
+import { NotificationType } from '@/types/notifications';
+import { notifyUsers } from '@/lib/notifications';
 
 // GET /api/discussions
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
@@ -61,7 +62,7 @@ export const POST = withAuth(
       .populate('mentions', 'name email department')
       .lean();
 
-    // Fire-and-forget: push notification via OneSignal to admins
+    // Fire-and-forget: rich push + in-app notification to admins
     if (populated) {
       const UserModel = (await import('@/models/User')).default;
       const admins = await UserModel.find({
@@ -73,12 +74,21 @@ export const POST = withAuth(
         const projectInfo = populated.projectId && typeof populated.projectId === 'object'
           ? (populated.projectId as any).projectTitle || 'Project'
           : 'Project';
-        sendPushToOneSignalUsers(
-          adminIds,
-          `New Discussion: ${populated.title}`,
-          `${user.name} started a discussion in project "${projectInfo}".`,
-          `/discussions`
-        ).catch(() => {});
+        const descriptionPreview = populated.description
+          ? populated.description.slice(0, 120) + (populated.description.length > 120 ? '...' : '')
+          : '';
+        await notifyUsers({
+          type: NotificationType.DISCUSSION_CREATED,
+          title: `💡 New Discussion: ${populated.title}`,
+          body: `${user.name} started a discussion in "${projectInfo}".${descriptionPreview ? ` "${descriptionPreview}"` : ''}`,
+          link: `/discussions`,
+          userIds: adminIds,
+          metadata: {
+            discussionId: populated._id.toString(),
+            projectId,
+            startedBy: user.name,
+          },
+        });
       }
     }
 

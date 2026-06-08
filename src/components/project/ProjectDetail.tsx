@@ -17,7 +17,7 @@ import {
 import { useProjectRealtime } from '@/hooks/useRealtime';
 import { ProjectStatusControl } from '@/components/project/ProjectStatusControl';
 import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
-import { Modal } from '@/components/ui/Modal';
+import { Modal, ConfirmModal } from '@/components/ui/Modal';
 import type { IProject, ITask, IAlert, IUser, PdfAttachment, WindowSpec } from '@/types';
 import { TaskStatus, AlertStatus, Department, ProjectPriority, ProjectStatus, UserRole } from '@/types';
 import { useDepartments } from '@/hooks/useDepartments';
@@ -68,6 +68,7 @@ export function ProjectDetail({
   const [alertModalOpen, setAlertModalOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [excelError, setExcelError] = useState<string | null>(null);
   const [excelLoading, setExcelLoading] = useState(false);
@@ -495,13 +496,12 @@ export function ProjectDetail({
   };
 
   const handleDeleteProject = async () => {
-    if (!window.confirm('Delete this project? This cannot be undone.')) return;
-
     setIsDeleting(true);
     setDeleteError(null);
 
     const result = await apiFetch(`/api/projects/${project._id}`, { method: 'DELETE' });
     setIsDeleting(false);
+    setConfirmDeleteOpen(false);
 
     if (!result.success) {
       setDeleteError(typeof result.error === 'string' ? result.error : 'Failed to delete project');
@@ -660,7 +660,7 @@ export function ProjectDetail({
                   Duplicate
                 </button>
                 <button
-                  onClick={handleDeleteProject}
+                  onClick={() => setConfirmDeleteOpen(true)}
                   disabled={isDeleting}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold uppercase border border-red-400 text-red-600 hover:bg-red-50 transition-colors rounded-md disabled:opacity-50"
                 >
@@ -1457,6 +1457,18 @@ export function ProjectDetail({
           </div>
         </div>
       </Modal>
+
+      {/* Confirm Delete modal */}
+      <ConfirmModal
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        onConfirm={handleDeleteProject}
+        title="Delete Project"
+        message={`Are you sure you want to delete "${project.projectTitle}"? This will permanently remove the project along with all its tasks, alerts, and attachments. This action cannot be undone.`}
+        confirmLabel="Delete"
+        danger
+        loading={isDeleting}
+      />
     </div>
   );
 }

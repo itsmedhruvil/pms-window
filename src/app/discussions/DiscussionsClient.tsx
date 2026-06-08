@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { MessageCircle, ChevronDown, ChevronUp, Send, Loader2, User, Search, Upload, Paperclip, X } from 'lucide-react';
+import { MessageCircle, ChevronDown, ChevronUp, Send, Loader2, User, Search, Upload, Paperclip, X, Edit3, Trash2 } from 'lucide-react';
 import { apiFetch, cn, DEPARTMENT_LABELS, timeAgo } from '@/lib/utils';
 import { Department } from '@/types';
 import type { ReactNode } from 'react';
 import type { IDiscussion, IComment, IUser, IProject, ICommentAttachment } from '@/types';
+import { Modal } from '@/components/ui/Modal';
 
 interface DiscussionsClientProps {
   currentUser: Partial<IUser>;
@@ -121,6 +122,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<ICommentAttachment[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -134,6 +136,16 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     description: '',
   });
   const [creating, setCreating] = useState(false);
+
+  // Edit thread modal
+  const [editThread, setEditThread] = useState<{ _id: string; title: string; description: string } | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Delete confirmation
+  const [deleteThread, setDeleteThread] = useState<{ _id: string; title: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // @mention state for chat
   const [availableUsers, setAvailableUsers] = useState<Partial<IUser>[]>([]);
@@ -165,7 +177,15 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     setLoadingProjects(false);
   }, []);
 
-  useEffect(() => { fetchDiscussions(); fetchUsers(); }, [fetchDiscussions, fetchUsers]);
+  // Poll for new discussions every 30s (hot reload)
+  useEffect(() => {
+    fetchDiscussions();
+    fetchUsers();
+    const interval = setInterval(() => {
+      fetchDiscussions();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [fetchDiscussions, fetchUsers]);
 
   const fetchComments = useCallback(async (discussionId: string) => {
     const result = await apiFetch<{ items: IComment[] }>(`/api/comments?discussionId=${discussionId}&limit=100`);
@@ -173,6 +193,15 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
       setComments((prev) => ({ ...prev, [discussionId]: result.data!.items }));
     }
   }, []);
+
+  // Also poll comments for expanded discussion
+  useEffect(() => {
+    if (!expandedId) return;
+    const interval = setInterval(() => {
+      fetchComments(expandedId);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [expandedId, fetchComments]);
 
   const toggleExpand = (id: string) => {
     if (expandedId === id) { setExpandedId(null); setActiveDiscussionId(null); return; }
@@ -183,26 +212,32 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files?.length) return;
+    setUploadingFile(true);
     const newFiles: ICommentAttachment[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const reader = new FileReader();
-      await new Promise<void>((resolve) => {
-        reader.onload = () => {
+      try {
+        // Upload to Cloudinary instead of base64
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+        const uploadData = await uploadRes.json();
+        if (uploadData.success) {
           newFiles.push({
             id: `${Date.now()}-${i}`,
             name: file.name,
-            url: reader.result as string,
+            url: uploadData.data.url,
             type: file.type,
             size: file.size,
             uploadedAt: new Date(),
           });
-          resolve();
-        };
-        reader.readAsDataURL(file);
-      });
+        }
+      } catch {
+        // skip failed
+      }
     }
     setUploadedFiles((prev) => [...prev, ...newFiles]);
+    setUploadingFile(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -213,13 +248,10 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     const val = e.target.value;
     setNewMessage(val);
 
-    // Detect @mention - find the last '@' that's not inside a word boundary
     const atIndex = val.lastIndexOf('@');
     if (atIndex !== -1) {
-      // Check if there's a space between the last word boundary before @ and the @
       const beforeAt = val.slice(0, atIndex);
       const lastChar = beforeAt.trim().slice(-1);
-      // Only trigger if @ is at start or preceded by space/newline
       if (atIndex === 0 || lastChar === '' || lastChar === '\n' || beforeAt.endsWith(' ')) {
         const query = val.slice(atIndex + 1);
         if (!query.includes(' ')) {
@@ -247,14 +279,59 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     u.name?.toLowerCase().includes(mentionQuery.toLowerCase())
   );
 
+  // ── Edit thread ────────────────────────────────────────────────
+  const openEditModal = (discussion: IDiscussion) => {
+    setEditThread({ _id: discussion._id, title: discussion.title, description: discussion.description || '' });
+    setEditTitle(discussion.title);
+    setEditDescription(discussion.description || '');
+    setError(null);
+  };
+
+  const handleEditSave = async () => {
+    if (!editThread || !editTitle.trim()) {
+      setError('Title is required');
+      return;
+    }
+    setSavingEdit(true);
+    setError(null);
+
+    const result = await apiFetch<IDiscussion>(`/api/discussions/${editThread._id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ title: editTitle.trim(), description: editDescription.trim() }),
+    });
+
+    if (result.success && result.data) {
+      setDiscussions((prev) => prev.map((d) => d._id === editThread._id ? result.data! : d));
+      setEditThread(null);
+    } else {
+      setError(result.error || 'Failed to update discussion');
+    }
+    setSavingEdit(false);
+  };
+
+  // ── Delete thread ──────────────────────────────────────────────
+  const handleDeleteConfirm = async () => {
+    if (!deleteThread) return;
+    setDeleting(true);
+    setError(null);
+
+    const result = await apiFetch(`/api/discussions/${deleteThread._id}`, { method: 'DELETE' });
+
+    if (result.success) {
+      setDiscussions((prev) => prev.filter((d) => d._id !== deleteThread._id));
+      if (expandedId === deleteThread._id) setExpandedId(null);
+      setDeleteThread(null);
+    } else {
+      setError(result.error || 'Failed to delete discussion');
+    }
+    setDeleting(false);
+  };
+
   const handleSend = async (discussionId: string) => {
     if (!newMessage.trim() && uploadedFiles.length === 0) return;
     setSending(true);
     setError(null);
 
-    // Parse @mentions from content to extract user IDs
-    // Sort by name length (longest first) to match full multi-word names correctly
-    // e.g., "John Doe" should be matched over just "John"
     const mentionedIds: string[] = [];
     let contentForMentionParsing = newMessage;
     const sortedUsers = [...availableUsers].sort(
@@ -264,13 +341,10 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     for (const u of sortedUsers) {
       if (!u.name || !u._id) continue;
       const escapedName = u.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      // Match @Name preceded by start-of-string or whitespace,
-      // followed by whitespace, punctuation, or end-of-string
       const pattern = new RegExp(`(?:^|\\s)@${escapedName}(?=\\s|$|[.,!?;:])`, 'i');
       const match = contentForMentionParsing.match(pattern);
       if (match) {
         mentionedIds.push(u._id);
-        // Remove matched mention so it's not matched again by a shorter name
         contentForMentionParsing = contentForMentionParsing.replace(match[0], ' ');
       }
     }
@@ -293,7 +367,6 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
       setNewMessage('');
       setUploadedFiles([]);
       setShowMentionDropdown(false);
-      // Refresh discussion to get updated mentions (newly added users)
       fetchDiscussions();
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     } else {
@@ -330,6 +403,12 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
       setError(result.error || 'Failed to create thread');
     }
     setCreating(false);
+  };
+
+  // Check if current user can edit/delete (started the thread or is admin)
+  const canModifyDiscussion = (discussion: IDiscussion) => {
+    const starter = typeof discussion.startedBy === 'object' ? discussion.startedBy as Partial<IUser> : null;
+    return starter?._id === currentUser._id;
   };
 
   return (
@@ -373,7 +452,6 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
               <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500">Start a New Thread</h2>
             </div>
             <div className="p-5 space-y-4">
-              {/* Project */}
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
                   Project <span className="text-red-500">*</span>
@@ -395,7 +473,6 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                 />
               </div>
 
-              {/* Title */}
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
                   Title <span className="text-red-500">*</span>
@@ -409,7 +486,6 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                 />
               </div>
 
-              {/* Description */}
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
                   Description <span className="text-gray-400 font-normal normal-case">(optional)</span>
@@ -423,7 +499,6 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                 />
               </div>
 
-              {/* Submit */}
               <div className="flex justify-end pt-2">
                 <button
                   type="button"
@@ -458,6 +533,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
               const mentionUsers = Array.isArray(discussion.mentions)
                 ? discussion.mentions.map((m: any) => typeof m === 'object' ? m as Partial<IUser> : null).filter(Boolean)
                 : [];
+              const canModify = canModifyDiscussion(discussion);
 
               return (
                 <div key={discussion._id} className="border border-gray-200">
@@ -493,13 +569,34 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                         )}
                       </div>
                     </div>
-                    {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+                    <div className="flex items-center gap-1">
+                      {canModify && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); openEditModal(discussion); }}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors"
+                            title="Edit thread"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setDeleteThread({ _id: discussion._id, title: discussion.title }); }}
+                            className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
+                            title="Delete thread"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+                      {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+                    </div>
                   </button>
 
                   {/* Expanded chat */}
                   {isExpanded && (
                     <div className="border-t border-gray-100">
-                      {/* Messages - show all previous messages for all participants */}
                       <div className="max-h-[500px] overflow-y-auto p-4 space-y-4">
                         {msgs.length === 0 ? (
                           <p className="text-[10px] font-mono text-gray-400 text-center py-6">No messages yet. Say something!</p>
@@ -560,7 +657,6 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                           </div>
                         )}
 
-                        {/* @mention dropdown */}
                         {showMentionDropdown && filteredUsers.length > 0 && (
                           <div className="absolute bottom-full left-3 right-3 mb-1 bg-white border border-gray-200 shadow-lg z-10 max-h-32 overflow-y-auto">
                             {filteredUsers.map((user) => (
@@ -600,10 +696,11 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                             <button
                               type="button"
                               onClick={() => fileInputRef.current?.click()}
-                              className="p-2 text-gray-400 hover:text-black border border-gray-200 hover:border-black transition-colors"
+                              disabled={uploadingFile}
+                              className="p-2 text-gray-400 hover:text-black border border-gray-200 hover:border-black transition-colors disabled:opacity-40"
                               title="Attach file"
                             >
-                              <Upload className="w-3.5 h-3.5" />
+                              {uploadingFile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
                             </button>
                             <button
                               onClick={() => handleSend(discussion._id)}
@@ -624,6 +721,84 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
           </div>
         )}
       </div>
+
+      {/* Edit Thread Modal */}
+      <Modal open={!!editThread} onClose={() => { if (!savingEdit) setEditThread(null); }} size="sm">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-900">Edit Thread</h2>
+            <button type="button" onClick={() => setEditThread(null)} className="text-gray-400 hover:text-gray-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-1.5">Title</label>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="w-full text-xs font-mono border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-1.5">Description</label>
+              <textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={3}
+                className="w-full text-xs font-mono border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors resize-none"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={() => setEditThread(null)}
+              disabled={savingEdit}
+              className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 hover:text-black disabled:opacity-40 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleEditSave}
+              disabled={savingEdit || !editTitle.trim()}
+              className="flex items-center gap-2 px-4 py-2 text-[10px] font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 disabled:opacity-40 transition-colors"
+            >
+              {savingEdit ? <><Loader2 className="w-3 h-3 animate-spin" /> Saving...</> : <><Edit3 className="w-3 h-3" /> Save</>}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal open={!!deleteThread} onClose={() => { if (!deleting) setDeleteThread(null); }} size="sm">
+        <div className="p-6">
+          <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-900 mb-2">Delete Thread</h2>
+          <p className="text-xs font-mono text-gray-600 mb-4">
+            Are you sure you want to delete &ldquo;{deleteThread?.title}&rdquo;? This will also delete all messages in this thread. This action cannot be undone.
+          </p>
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={() => setDeleteThread(null)}
+              disabled={deleting}
+              className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 hover:text-black disabled:opacity-40 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteConfirm}
+              disabled={deleting}
+              className="flex items-center gap-2 px-4 py-2 text-[10px] font-mono font-bold uppercase bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 transition-colors"
+            >
+              {deleting ? <><Loader2 className="w-3 h-3 animate-spin" /> Deleting...</> : <><Trash2 className="w-3 h-3" /> Delete</>}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

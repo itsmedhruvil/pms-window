@@ -5,13 +5,19 @@ import { useUser } from '@clerk/nextjs';
 import { NotificationType } from '@/types/notifications';
 
 /**
- * OneSignal push notification provider.
- * SDK is loaded in layout.tsx - this component handles user identity.
- * Also forwards OneSignal notification events to the in-app notification system.
+ * OneSignal push notification provider with design-rich notification handling.
+ *
+ * Responsibilities:
+ * 1. Log the current user into OneSignal so they receive targeted pushes.
+ * 2. Listen for foreground notifications and forward them to the in-app system
+ *    with proper type metadata, colors, and icons.
+ * 3. Handle notification clicks to navigate to the correct URL.
+ * 4. Consume pending notifications from API responses and dispatch them.
  */
 export default function OneSignalProvider() {
   const { isSignedIn, user } = useUser();
   const setupDone = useRef(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!isSignedIn || !user || setupDone.current) return;
@@ -24,42 +30,57 @@ export default function OneSignalProvider() {
           os.login(user.id);
           console.log('[OneSignal] User subscribed:', user.id);
 
-          // Listen for OneSignal notification received events
-          // and forward them to the in-app notification system
+          // ── Listen for foreground notification received events ──
           os.Notifications?.addEventListener('foregroundWillDisplay', (event: any) => {
-            // Notification received while app is in foreground
             const notification = event.getNotification();
             if (notification) {
               const title = notification.title || 'New Notification';
               const body = notification.body || '';
               const data = notification.additionalData || {};
-              const link = data.url || data.route || '/';
 
-              // Dispatch as in-app notification
+              // Extract structured data from the rich payload
+              const notificationType = data.type || NotificationType.ALERT_CREATED;
+              const icon = data.icon || '🔔';
+              const link = data.url || data.route || data.click_action || '/';
+              const color = data.color || '#6B7280';
+
+              // Build the notification title with the emoji icon
+              const richTitle = `${icon} ${title}`;
+
+              // Dispatch as in-app notification with rich metadata
               const inAppEvent = new CustomEvent('pms-notification', {
                 detail: {
-                  type: data.type || NotificationType.ALERT_CREATED,
-                  title,
+                  type: notificationType,
+                  title: richTitle,
                   body,
                   link,
-                  metadata: { ...data, onesignalId: notification.notificationId },
+                  metadata: {
+                    ...data,
+                    icon,
+                    color,
+                    onesignalId: notification.notificationId,
+                  },
                 },
                 bubbles: true,
               });
               window.dispatchEvent(inAppEvent);
+
+              // Prevent OneSignal from displaying its own notification
+              // (since we're showing it in-app)
+              event.preventDefault();
             }
           });
 
-          // Also listen for click events to mark as read when coming from push
+          // ── Listen for notification clicks to navigate ──
           os.Notifications?.addEventListener('click', (event: any) => {
             const notification = event.getNotification();
             if (notification) {
               const data = notification.additionalData || {};
-              const url = data.url || data.route || '/';
+              const url = data.url || data.route || data.click_action || '/';
 
               // Navigate to the URL
               if (url && typeof window !== 'undefined') {
-                window.location.href = url.startsWith('/') 
+                window.location.href = url.startsWith('/')
                   ? `${window.location.origin}${url}`
                   : url;
               }
@@ -76,14 +97,16 @@ export default function OneSignalProvider() {
 
     // Retry until OneSignal is initialized
     let attempts = 0;
-    const interval = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       attempts++;
       if (tryLogin() || attempts > 30) {
-        clearInterval(interval);
+        if (intervalRef.current) clearInterval(intervalRef.current);
       }
     }, 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [isSignedIn, user]);
 
   return null;

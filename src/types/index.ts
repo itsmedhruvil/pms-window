@@ -135,6 +135,20 @@ export interface IProject {
   updatedAt: Date;
 }
 
+/**
+ * Unified file type for task attachments.
+ * Stores any uploaded asset (image, PDF, doc, etc.) with Cloudinary metadata.
+ */
+export interface TaskFile {
+  id: string;
+  name: string;
+  url: string;
+  size: number;
+  type: string;        // MIME type (e.g. 'image/jpeg', 'application/pdf')
+  publicId?: string;   // Cloudinary public ID
+  uploadedAt: Date;
+}
+
 export interface ITask {
   _id: string;
   projectId?: string | IProject;
@@ -149,8 +163,12 @@ export interface ITask {
   startDate?: Date;
   dueDate?: Date;
   completedAt?: Date;
-  imageAttachments?: TaskImageAttachment[];
-  attachments?: TaskAttachment[];
+  /** Unified files array — replaces imageAttachments + attachments */
+  files?: TaskFile[];
+  /** @deprecated Use files instead */
+  imageAttachments?: TaskFile[];
+  /** @deprecated Use files instead */
+  attachments?: TaskFile[];
   isLocked: boolean;
   sequence: number;
   createdAt: Date;
@@ -170,22 +188,9 @@ export interface ITaskTemplate {
   updatedAt: Date;
 }
 
-export interface TaskImageAttachment {
-  id: string;
-  name: string;
-  url: string;
-  size: number;
-  uploadedAt: Date;
-}
-
-export interface TaskAttachment {
-  id: string;
-  name: string;
-  url: string;
-  size: number;
-  type: string;
-  uploadedAt: Date;
-}
+// Retained for backward compatibility
+export type TaskImageAttachment = TaskFile;
+export type TaskAttachment = TaskFile;
 
 export interface IAlert {
   _id: string;

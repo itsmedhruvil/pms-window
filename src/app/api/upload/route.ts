@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put } from '@vercel/blob';
 import { withAuth } from '@/lib/auth';
+import { uploadToCloudinary } from '@/lib/cloudinary';
 
+/**
+ * POST /api/upload
+ * Upload any file to Cloudinary.
+ * Accepts: all common image types, PDF, DOC, DOCX, XLS, XLSX, CSV, TXT
+ * Supports: multipart/form-data with field name 'file'
+ * Returns: { success, data: { url, name, size, format, publicId, resourceType } }
+ */
 export const POST = withAuth(async (req: NextRequest) => {
   try {
     const formData = await req.formData();
@@ -14,6 +21,7 @@ export const POST = withAuth(async (req: NextRequest) => {
       );
     }
 
+    // Validate file type
     const allowedTypes = [
       'application/pdf',
       'application/msword',
@@ -23,6 +31,7 @@ export const POST = withAuth(async (req: NextRequest) => {
       'image/jpeg',
       'image/png',
       'image/gif',
+      'image/webp',
       'image/svg+xml',
       'text/plain',
       'text/csv',
@@ -35,18 +44,26 @@ export const POST = withAuth(async (req: NextRequest) => {
       );
     }
 
-    // Upload to Vercel Blob
-    const blob = await put(file.name, file, {
-      access: 'public',
-      addRandomSuffix: true,
-    });
+    // Convert File to Buffer for Cloudinary upload
+    const arrayBuffer = await file.arrayBuffer();
+    const fileBuffer = Buffer.from(arrayBuffer);
+
+    // Determine folder based on file type
+    const folder = file.type.startsWith('image/') ? 'pms/task-images' : 'pms/task-files';
+
+    // Upload to Cloudinary
+    const result = await uploadToCloudinary(fileBuffer, file.name, folder);
 
     return NextResponse.json({
       success: true,
       data: {
-        url: blob.url,
+        url: result.url,
+        publicId: result.publicId,
         name: file.name,
         size: file.size,
+        format: result.format,
+        resourceType: result.resourceType,
+        uploadedAt: result.createdAt.toISOString(),
       },
     });
   } catch (error) {

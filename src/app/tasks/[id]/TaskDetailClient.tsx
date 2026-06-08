@@ -1,13 +1,17 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
+import useSWR from 'swr';
+import { invalidateTasks } from '@/lib/client-data';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import ExcelJS from 'exceljs';
 import {
   AlertTriangle,
   ArrowLeft,
   Calendar,
+  Camera,
   CheckCircle2,
   ExternalLink,
   FileText,
@@ -21,6 +25,7 @@ import {
   RotateCcw,
   Upload,
   User,
+  Table2,
   X,
 } from 'lucide-react';
 import { CommentThread } from '@/components/comment/CommentThread';
@@ -28,7 +33,7 @@ import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
 import { Modal } from '@/components/ui/Modal';
 import { TaskStatusBadge } from '@/components/ui/badges';
 import { apiFetch, cn, getDepartmentLabel, formatDate, formatDateTime } from '@/lib/utils';
-import { IAlert, IProject, ITask, IUser, TaskImageAttachment, TaskAttachment, TaskStatus } from '@/types';
+import { IAlert, IComment, IProject, ITask, IUser, TaskStatus } from '@/types';
 
 interface TaskDetailClientProps {
   initialTask: ITask;
@@ -36,12 +41,10 @@ interface TaskDetailClientProps {
   canModify: boolean;
 }
 
-const MAX_IMAGE_SIZE = 10_000_000; // 10 MB for images
-const MAX_FILE_SIZE = 20_000_000;  // 20 MB for documents
-const MAX_IMAGES = 12;
-const MAX_ATTACHMENTS = 12;
+const MAX_FILE_SIZE = 20_000_000; // 20 MB for all files
+const MAX_FILES = 20;
 
-type TabId = 'comments' | 'images' | 'files';
+type TabId = 'comments' | 'files';
 
 function getProject(task: ITask) {
   return typeof task.projectId === 'object' && task.projectId !== null
@@ -60,6 +63,51 @@ function getAssignedUser(task: ITask) {
     : null;
 }
 
+/** Get all files from a task — merges `files`, `imageAttachments`, `attachments` */
+function getAllTaskFiles(task: ITask) {
+  const fileMap = new Map<string, {
+    id: string;
+    name: string;
+    url: string;
+    size: number;
+    type: string;
+    publicId?: string;
+    uploadedAt: Date;
+  }>();
+
+  const sources = [task.files, task.imageAttachments, task.attachments].filter(Boolean) as Array<any[]>;
+  for (const arr of sources) {
+    for (const f of arr) {
+      if (f?.id) {
+        fileMap.set(f.id, {
+          ...f,
+          type: f.type || (f.url?.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i) ? 'image/jpeg' : 'application/octet-stream'),
+        });
+      }
+    }
+  }
+
+  return Array.from(fileMap.values()).sort(
+    (a, b) => new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime()
+  );
+}
+
+function isImageFile(file: { type: string; name?: string }) {
+  return file.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name || '');
+}
+
+function isExcelFile(file: { type: string; name?: string }) {
+  return file.type.includes('spreadsheet') || file.type.includes('excel') || /\.(xlsx|xls|csv)$/i.test(file.name || '');
+}
+
+function getFileIcon(file: { type: string; name?: string }) {
+  if (file.type === 'application/pdf') return '📄';
+  if (file.type.startsWith('image/')) return '🖼️';
+  if (file.type.includes('word') || file.type.includes('document')) return '📝';
+  if (file.type.includes('spreadsheet') || file.type.includes('excel') || file.type.includes('sheet')) return '📊';
+  return '📁';
+}
+
 export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDetailClientProps) {
   const [task, setTask] = useState(initialTask);
   const [saving, setSaving] = useState(false);
@@ -67,8 +115,10 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [alertModalOpen, setAlertModalOpen] = useState(false);
   const [doneModalOpen, setDoneModalOpen] = useState(false);
+  const [noCommentWarning, setNoCommentWarning] = useState(false);
   const [doneComment, setDoneComment] = useState('');
   const [submittingDone, setSubmittingDone] = useState(false);
+  const [checkingComments, setCheckingComments] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('comments');
   const [editingDates, setEditingDates] = useState(false);
   const [editStartDate, setEditStartDate] = useState(
@@ -80,17 +130,88 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
   const [timelineSaving, setTimelineSaving] = useState(false);
   const [timelineError, setTimelineError] = useState<string | null>(null);
   const [fileUploading, setFileUploading] = useState(false);
-  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [excelViewHtml, setExcelViewHtml] = useState<string | null>(null);
+  const [excelViewFileId, setExcelViewFileId] = useState<string | null>(null);
+  const [excelLoading, setExcelLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // SWR-based task polling for hot reload
+  const { mutate: mutateTask } = useSWR(
+    task._id ? `/api/tasks/${task._id}` : null,
+    async (url: string) => {
+      const res = await fetch(url);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to fetch task');
+      return json.data;
+    },
+    {
+      refreshInterval: 30000,
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      dedupingInterval: 2000,
+      onSuccess: (data: ITask) => {
+        setTask(data);
+      },
+    }
+  );
 
   const project = getProject(task);
   const projectId = getProjectId(task);
   const assignedUser = getAssignedUser(task);
-  const images = task.imageAttachments ?? [];
-  const attachments = task.attachments ?? [];
+  const allFiles = getAllTaskFiles(task);
 
   const isOverdue = task.dueDate ? new Date(task.dueDate) < new Date() && task.status !== TaskStatus.DONE : false;
+
+  const checkCommentsBeforeDone = useCallback(async () => {
+    setCheckingComments(true);
+    setNoCommentWarning(false);
+    setStatusError(null);
+
+    const result = await apiFetch<{ items: IComment[]; total: number }>(`/api/comments?taskId=${task._id}&limit=1`);
+
+    if (result.success && result.data) {
+      const count = result.data.total || result.data.items?.length || 0;
+      if (count === 0) {
+        // No comments — show warning popup
+        setNoCommentWarning(true);
+        setDoneModalOpen(true);
+      } else {
+        // Has comments — proceed directly to mark done
+        await markTaskDone();
+      }
+    } else {
+      await markTaskDone();
+    }
+
+    setCheckingComments(false);
+  }, [task._id]);
+
+  const markTaskDone = async () => {
+    setSubmittingDone(true);
+    setStatusError(null);
+
+    const result = await apiFetch<ITask>(`/api/tasks/${task._id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: TaskStatus.DONE }),
+    });
+
+    if (result.success && result.data) {
+      setTask(result.data);
+      setDoneModalOpen(false);
+      setNoCommentWarning(false);
+      setDoneComment('');
+      setActiveTab('comments');
+      await mutateTask();
+      invalidateTasks();
+      router.refresh();
+    } else {
+      setStatusError(typeof result.error === 'string' ? result.error : 'Could not update task status.');
+    }
+
+    setSubmittingDone(false);
+  };
 
   const handleMarkDoneWithComment = async () => {
     if (!doneComment.trim()) {
@@ -100,7 +221,6 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
     setSubmittingDone(true);
     setStatusError(null);
 
-    // First add the comment
     const commentResult = await apiFetch('/api/comments', {
       method: 'POST',
       body: JSON.stringify({
@@ -116,7 +236,6 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
       return;
     }
 
-    // Then mark as done
     const result = await apiFetch<ITask>(`/api/tasks/${task._id}`, {
       method: 'PATCH',
       body: JSON.stringify({ status: TaskStatus.DONE }),
@@ -125,8 +244,11 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
     if (result.success && result.data) {
       setTask(result.data);
       setDoneModalOpen(false);
+      setNoCommentWarning(false);
       setDoneComment('');
       setActiveTab('comments');
+      await mutateTask();
+      invalidateTasks();
       router.refresh();
     } else {
       setStatusError(typeof result.error === 'string' ? result.error : 'Could not update task status.');
@@ -146,6 +268,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
 
     if (result.success && result.data) {
       setTask(result.data);
+      await mutateTask();
       router.refresh();
     } else if (patch.status) {
       setStatusError(typeof result.error === 'string' ? result.error : 'Could not update task status.');
@@ -173,65 +296,16 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
     setEditingDates(false);
   };
 
-  const handleImagesSelected = async (files: FileList | null) => {
-    if (!files?.length) return;
-    setUploadError(null);
-
-    const existing = task.imageAttachments ?? [];
-    const availableSlots = MAX_IMAGES - existing.length;
-    const selected = Array.from(files).slice(0, Math.max(availableSlots, 0));
-
-    if (availableSlots <= 0) {
-      setUploadError(`Maximum ${MAX_IMAGES} images allowed.`);
-      return;
-    }
-
-    const invalid = selected.find((file) => !file.type.startsWith('image/') || file.size > MAX_IMAGE_SIZE);
-    if (invalid) {
-      setUploadError(`Use image files under ${Math.round(MAX_IMAGE_SIZE / 1_000_000)} MB each.`);
-      return;
-    }
-
-    const additions = await Promise.all(
-      selected.map(
-        (file) =>
-          new Promise<TaskImageAttachment>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () =>
-              resolve({
-                id: `${Date.now()}-${crypto.randomUUID()}`,
-                name: file.name,
-                size: file.size,
-                url: String(reader.result),
-                uploadedAt: new Date(),
-              });
-            reader.onerror = () => reject(new Error('Could not read image'));
-            reader.readAsDataURL(file);
-          })
-      )
-    );
-
-    await updateTask({ imageAttachments: [...existing, ...additions] });
-    if (imageInputRef.current) imageInputRef.current.value = '';
-  };
-
-  const removeImage = async (imageId: string) => {
-    await updateTask({
-      imageAttachments: images.filter((image) => image.id !== imageId),
-    });
-  };
-
-  const handleFilesSelected = async (files: FileList | null) => {
+  /** Upload file(s) to Cloudinary via the API, then save to task */
+  const uploadFiles = async (files: FileList | null) => {
     if (!files?.length) return;
     setUploadError(null);
     setFileUploading(true);
 
-    const existing = task.attachments ?? [];
-    const availableSlots = MAX_ATTACHMENTS - existing.length;
-    const selected = Array.from(files).slice(0, Math.max(availableSlots, 0));
+    const selected = Array.from(files).slice(0, MAX_FILES - allFiles.length);
 
-    if (availableSlots <= 0) {
-      setUploadError(`Maximum ${MAX_ATTACHMENTS} files allowed.`);
+    if (allFiles.length >= MAX_FILES) {
+      setUploadError(`Maximum ${MAX_FILES} files allowed.`);
       setFileUploading(false);
       return;
     }
@@ -243,55 +317,172 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
       return;
     }
 
-    const additions = await Promise.all(
-      selected.map(
-        (file) =>
-          new Promise<TaskAttachment>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () =>
-              resolve({
-                id: `${Date.now()}-${crypto.randomUUID()}`,
-                name: file.name,
-                size: file.size,
-                type: file.type,
-                url: String(reader.result),
-                uploadedAt: new Date(),
-              });
-            reader.onerror = () => reject(new Error('Could not read file'));
-            reader.readAsDataURL(file);
-          })
-      )
-    );
+    const existing = allFiles;
+    const additions: Array<{
+      id: string;
+      name: string;
+      url: string;
+      size: number;
+      type: string;
+      publicId?: string;
+      uploadedAt: Date;
+    }> = [];
 
-    await updateTask({ attachments: [...existing, ...additions] });
+    for (const file of selected) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+        const uploadData = await uploadRes.json();
+
+        if (uploadData.success) {
+          additions.push({
+            id: `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
+            name: file.name,
+            url: uploadData.data.url,
+            size: file.size,
+            type: file.type,
+            publicId: uploadData.data.publicId,
+            uploadedAt: new Date(),
+          });
+        }
+      } catch {
+        // skip failed uploads
+      }
+    }
+
+    if (additions.length > 0) {
+      const updatedFiles = [...existing, ...additions];
+      const filesForSave = updatedFiles.map((f) => ({
+        id: f.id,
+        name: f.name,
+        url: f.url,
+        size: f.size,
+        type: f.type,
+        publicId: f.publicId,
+        uploadedAt: f.uploadedAt.toISOString(),
+      }));
+      await updateTask({ files: filesForSave } as any);
+    }
+
     setFileUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
-  const removeAttachment = async (attachmentId: string) => {
-    await updateTask({
-      attachments: attachments.filter((a) => a.id !== attachmentId),
-    });
+  const removeFile = async (fileId: string) => {
+    const updated = allFiles.filter((f) => f.id !== fileId);
+    const filesForSave = updated.map((f) => ({
+      id: f.id,
+      name: f.name,
+      url: f.url,
+      size: f.size,
+      type: f.type,
+      publicId: (f as any).publicId,
+      uploadedAt: f.uploadedAt,
+    }));
+    await updateTask({ files: filesForSave } as any);
+    setExcelViewHtml(null);
+    setExcelViewFileId(null);
   };
+
+  const renderExcelView = useCallback(async (file: { id: string; url: string; name: string }) => {
+    setExcelLoading(true);
+    setExcelViewHtml(null);
+    setExcelViewFileId(file.id);
+    try {
+      const response = await fetch(file.url);
+      const arrayBuffer = await response.arrayBuffer();
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(arrayBuffer);
+
+      let html = '<html><head><style>';
+      html += `
+        body { margin: 0; font-family: 'Segoe UI', -apple-system, sans-serif; font-size: 13px; }
+        .sheet-tabs { display: flex; gap: 0; background: #f3f3f3; border-bottom: 1px solid #d0d0d0; padding: 0 8px; }
+        .sheet-tab { padding: 6px 16px; font-size: 12px; border: 1px solid transparent; border-bottom: none; cursor: pointer; margin-top: 4px; border-radius: 4px 4px 0 0; background: #e8e8e8; color: #666; user-select: none; }
+        .sheet-tab.active { background: #fff; border-color: #d0d0d0; color: #000; font-weight: 600; }
+        .sheet-container { display: none; }
+        .sheet-container.active { display: block; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #d4d4d4; padding: 2px 6px; min-width: 80px; font-size: 12px; white-space: nowrap; }
+        th { background: #f0f0f0; font-weight: 600; color: #333; position: sticky; top: 0; z-index: 1; }
+        tr:nth-child(even) td { background: #fafafa; }
+        .cell-number { text-align: right; }
+        .cell-text { text-align: left; }
+        .grid-container { overflow: auto; max-height: 500px; }
+        .status-bar { background: #f3f3f3; border-top: 1px solid #d0d0d0; padding: 4px 12px; font-size: 11px; color: #666; }
+      `;
+      html += '</style></head><body>';
+
+      html += '<div class="sheet-tabs">';
+      workbook.worksheets.forEach((ws, idx) => {
+        html += `<div class="sheet-tab${idx === 0 ? ' active' : ''}" onclick="switchSheet(${idx})">${ws.name || `Sheet${idx + 1}`}</div>`;
+      });
+      html += '</div>';
+
+      workbook.worksheets.forEach((ws, wsIdx) => {
+        html += `<div class="sheet-container${wsIdx === 0 ? ' active' : ''}" id="sheet-${wsIdx}">`;
+        if (ws.rowCount === 0) {
+          html += '<div style="padding: 40px; text-align: center; color: #999;">Empty sheet</div></div>';
+          return;
+        }
+        const colCount = ws.columnCount || ws.rowCount > 0 ? (ws.getRow(1).cellCount || 1) : 1;
+        html += '<div class="grid-container"><table><thead><tr>';
+        html += '<th style="min-width: 40px; background: #e8e8e8; text-align: center; color: #888;">#</th>';
+        for (let c = 1; c <= colCount; c++) {
+          const cell = ws.getRow(1).getCell(c);
+          const label = cell.value !== null && cell.value !== undefined ? String(cell.value) : `Column ${c}`;
+          html += `<th>${label.replace(/</g, '<').replace(/>/g, '>')}</th>`;
+        }
+        html += '</tr></thead><tbody>';
+
+        ws.eachRow((row, rowNum) => {
+          if (rowNum === 1) return;
+          html += '<tr>';
+          html += `<td style="min-width: 40px; background: #e8e8e8; text-align: center; color: #888; font-size: 11px;">${rowNum}</td>`;
+          row.eachCell((cell) => {
+            const val = cell.value;
+            let display = '';
+            let alignClass = 'cell-text';
+            if (val === null || val === undefined) display = '';
+            else if (val instanceof Date) display = val.toLocaleDateString();
+            else if (typeof val === 'number') {
+              display = Number.isInteger(val) ? val.toLocaleString() : val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              alignClass = 'cell-number';
+            } else display = String(val);
+            html += `<td class="${alignClass}">${display.replace(/</g, '<').replace(/>/g, '>') || '&nbsp;'}</td>`;
+          });
+          for (let c = row.cellCount + 1; c <= colCount; c++) html += '<td></td>';
+          html += '</tr>';
+        });
+
+        html += '</tbody></table></div></div>';
+      });
+
+      const totalRows = workbook.worksheets.reduce((sum, ws) => sum + (ws.rowCount > 1 ? ws.rowCount - 1 : 0), 0);
+      const totalCols = Math.max(...workbook.worksheets.map(ws => ws.columnCount || 0));
+      html += `<div class="status-bar">${workbook.worksheets.length} sheet${workbook.worksheets.length > 1 ? 's' : ''} &middot; ${totalRows} data rows &middot; ${totalCols} columns</div>`;
+      html += '<script>function switchSheet(idx){document.querySelectorAll(".sheet-tab, .sheet-container").forEach((el,i)=>{const n=document.querySelectorAll(".sheet-tab").length;el.classList.toggle("active",i<n?(i===idx):(i-n===idx))})}<\/script>';
+      html += '</body></html>';
+      setExcelViewHtml(html);
+    } catch (err) {
+      console.error('Failed to render Excel:', err);
+      setExcelViewHtml('<html><body><p style="padding:40px;text-align:center;color:#999;font-family:sans-serif;">Could not render this spreadsheet.</p></body></html>');
+    }
+    setExcelLoading(false);
+  }, []);
 
   const tabs: { id: TabId; label: string; icon: typeof ImageIcon }[] = [
     { id: 'comments', label: 'Comments', icon: MessageSquare },
-    { id: 'images', label: 'Images', icon: ImageIcon },
-    { id: 'files', label: 'Files', icon: Paperclip },
+    { id: 'files', label: `Files (${allFiles.length})`, icon: Paperclip },
   ];
 
-  // Determine if a file type is viewable in browser
-  const isViewableFile = (type: string) => {
-    return type === 'application/pdf' || type.startsWith('image/');
-  };
-
-  const getFileIcon = (type: string) => {
-    if (type === 'application/pdf') return '📄';
-    if (type.startsWith('image/')) return '🖼️';
-    if (type.includes('word') || type.includes('document')) return '📝';
-    if (type.includes('spreadsheet') || type.includes('excel') || type.includes('sheet')) return '📊';
-    return '📁';
-  };
+  // Split files into categories for display
+  const imageFiles = allFiles.filter(isImageFile);
+  const excelFiles = allFiles.filter(isExcelFile);
+  const docFiles = allFiles.filter((f) => !isImageFile(f) && !isExcelFile(f));
 
   return (
     <div className="min-h-screen bg-white">
@@ -329,7 +520,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
           </div>
         </div>
 
-        {/* Timeline prompt — show when task is assigned but has no start/due dates */}
+        {/* Timeline prompt */}
         {canModify && assignedUser && !task.startDate && !task.dueDate && (
           <div className="mt-4 border border-amber-300 bg-amber-50 px-4 py-3 flex items-start gap-3">
             <Calendar className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -349,7 +540,6 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
           </div>
         )}
 
-        {/* Overdue indicator */}
         {isOverdue && (
           <div className="mt-3 flex items-center gap-2 text-xs font-mono text-red-600">
             <AlertTriangle className="w-4 h-4 flex-shrink-0" />
@@ -384,167 +574,235 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
             })}
           </div>
 
-          {/* Images tab */}
-          {activeTab === 'images' && (
-            <section className="border border-gray-200">
-              <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
-                <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500">
-                  Images ({images.length}/{MAX_IMAGES})
-                </h2>
-                {canModify && (
-                  <button
-                    type="button"
-                    onClick={() => imageInputRef.current?.click()}
-                    disabled={saving || images.length >= MAX_IMAGES}
-                    className="inline-flex items-center gap-2 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                    Upload
-                  </button>
-                )}
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={(event) => handleImagesSelected(event.target.files)}
-                />
-              </div>
-              {uploadError && (
-                <p className="px-4 pt-3 text-xs font-mono text-red-600">{uploadError}</p>
-              )}
-              {images.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-                  {images.map((image) => (
-                    <figure key={image.id} className="border border-gray-200 bg-white">
-                      <div className="relative aspect-[4/3] bg-gray-50 overflow-hidden">
-                        <Image
-                          src={image.url}
-                          alt={image.name}
-                          fill
-                          unoptimized
-                          className="object-cover"
-                        />
-                      </div>
-                      <figcaption className="p-3 flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-gray-900 truncate">{image.name}</p>
-                          <p className="text-[10px] font-mono text-gray-400 mt-0.5">
-                            {Math.round(image.size / 1024)} KB · {formatDateTime(image.uploadedAt)}
-                          </p>
-                        </div>
-                        {canModify && (
-                          <button
-                            type="button"
-                            onClick={() => removeImage(image.id)}
-                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                            title="Remove image"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </figcaption>
-                    </figure>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-12 text-center">
-                  <ImageIcon className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-                  <p className="text-xs font-mono text-gray-400">No images uploaded for this task.</p>
-                </div>
-              )}
-            </section>
-          )}
-
-          {/* Files tab */}
+          {/* Unified Files tab — with Excel inline rendering */}
           {activeTab === 'files' && (
             <section className="border border-gray-200">
+              {/* Upload area */}
               <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
                 <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500">
-                  Files ({attachments.length}/{MAX_ATTACHMENTS})
+                  Attachments ({allFiles.length}/{MAX_FILES})
                 </h2>
                 {canModify && (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={saving || fileUploading || attachments.length >= MAX_ATTACHMENTS}
-                    className="inline-flex items-center gap-2 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {fileUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                    {fileUploading ? 'Uploading...' : 'Upload'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      disabled={fileUploading || allFiles.length >= MAX_FILES}
+                      className="inline-flex items-center gap-2 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide border border-gray-300 text-gray-700 hover:border-black hover:text-black disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      title="Take photo (mobile)"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Camera</span>
+                    </button>
+                    <input
+                      ref={cameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(event) => uploadFiles(event.target.files)}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={fileUploading || allFiles.length >= MAX_FILES}
+                      className="inline-flex items-center gap-2 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {fileUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                      {fileUploading ? 'Uploading...' : 'Upload'}
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif,.webp,.svg"
+                      multiple
+                      className="hidden"
+                      onChange={(event) => uploadFiles(event.target.files)}
+                    />
+                  </div>
                 )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif,.svg"
-                  multiple
-                  className="hidden"
-                  onChange={(event) => handleFilesSelected(event.target.files)}
-                />
               </div>
+
               {uploadError && (
                 <p className="px-4 pt-3 text-xs font-mono text-red-600">{uploadError}</p>
               )}
-              {attachments.length > 0 ? (
-                <div className="divide-y divide-gray-100">
-                  {attachments.map((file) => (
-                    <div key={file.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
-                      <span className="text-lg flex-shrink-0 mt-0.5">{getFileIcon(file.type)}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs font-bold text-gray-900 truncate">{file.name}</p>
-                          <span className="text-[10px] font-mono text-gray-400 flex-shrink-0">
-                            ({file.size > 1_000_000 ? `${(file.size / 1_000_000).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`})
-                          </span>
-                        </div>
-                        <p className="text-[10px] font-mono text-gray-400 mt-0.5">
-                          {formatDateTime(file.uploadedAt)}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          {isViewableFile(file.type) ? (
-                            <a
-                              href={file.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                            >
-                              <ExternalLink className="w-2.5 h-2.5" />
-                              Preview
-                            </a>
-                          ) : (
-                            <a
-                              href={file.url}
-                              download={file.name}
-                              className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                            >
-                              <FileText className="w-2.5 h-2.5" />
-                              Download
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                      {canModify && (
-                        <button
-                          type="button"
-                          onClick={() => removeAttachment(file.id)}
-                          className="p-1 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0"
-                          title="Remove file"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
+
+              {allFiles.length === 0 ? (
                 <div className="p-12 text-center">
                   <Paperclip className="w-8 h-8 text-gray-300 mx-auto mb-3" />
                   <p className="text-xs font-mono text-gray-400">No files uploaded for this task.</p>
                   <p className="text-[10px] font-mono text-gray-400 mt-0.5">
-                    Upload PDFs, documents, spreadsheets, or images (max {Math.round(MAX_FILE_SIZE / 1_000_000)} MB each)
+                    Upload images, PDFs, documents, spreadsheets, or take a photo (max {Math.round(MAX_FILE_SIZE / 1_000_000)} MB each)
                   </p>
+                </div>
+              ) : (
+                <div className="space-y-6 p-4">
+                  {/* Excel spreadsheets — inline rendered */}
+                  {excelFiles.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500 mb-3">
+                        Spreadsheets ({excelFiles.length})
+                      </h3>
+                      <div className="space-y-4">
+                        {excelFiles.map((file) => (
+                          <div key={file.id} className="border border-gray-200">
+                            <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Table2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                <span className="text-xs font-mono font-bold text-gray-900 truncate">{file.name}</span>
+                                <span className="text-[10px] font-mono text-gray-400">
+                                  ({file.size > 1_000_000 ? `${(file.size / 1_000_000).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`})
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {excelViewFileId !== file.id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => renderExcelView(file)}
+                                    disabled={excelLoading}
+                                    className="text-[10px] font-mono px-2 py-1 bg-black text-white hover:bg-gray-800 transition-colors disabled:opacity-40"
+                                  >
+                                    {excelLoading ? 'Loading...' : 'View'}
+                                  </button>
+                                )}
+                                <a
+                                  href={file.url}
+                                  download={file.name}
+                                  className="text-[10px] font-mono text-blue-600 hover:text-blue-800 underline"
+                                >
+                                  Download
+                                </a>
+                                {canModify && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeFile(file.id)}
+                                    className="text-gray-400 hover:text-red-600 transition-colors"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            {excelViewFileId === file.id && excelViewHtml && (
+                              <div className="border-t border-gray-200">
+                                <iframe
+                                  srcDoc={excelViewHtml}
+                                  className="w-full border-0"
+                                  style={{ height: '500px' }}
+                                  title={`Excel: ${file.name}`}
+                                  sandbox="allow-scripts"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Image gallery */}
+                  {imageFiles.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500 mb-3">
+                        Images ({imageFiles.length})
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {imageFiles.map((file) => (
+                          <figure key={file.id} className="border border-gray-200 bg-white group">
+                            <div className="relative aspect-[4/3] bg-gray-50 overflow-hidden">
+                              <Image
+                                src={file.url}
+                                alt={file.name}
+                                fill
+                                unoptimized
+                                className="object-cover"
+                              />
+                              {canModify && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeFile(file.id)}
+                                  className="absolute top-2 right-2 p-1 bg-black/60 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                  title="Remove"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                            <figcaption className="p-3">
+                              <p className="text-xs font-bold text-gray-900 truncate">{file.name}</p>
+                              <p className="text-[10px] font-mono text-gray-400 mt-0.5">
+                                {file.size > 1_000_000
+                                  ? `${(file.size / 1_000_000).toFixed(1)} MB`
+                                  : `${Math.round(file.size / 1024)} KB`}
+                                {' · '}
+                                {formatDateTime(file.uploadedAt)}
+                              </p>
+                            </figcaption>
+                          </figure>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Document list */}
+                  {docFiles.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500 mb-3">
+                        Documents ({docFiles.length})
+                      </h3>
+                      <div className="divide-y divide-gray-100 border border-gray-200">
+                        {docFiles.map((file) => (
+                          <div key={file.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
+                            <span className="text-lg flex-shrink-0 mt-0.5">{getFileIcon(file)}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-xs font-bold text-gray-900 truncate">{file.name}</p>
+                                <span className="text-[10px] font-mono text-gray-400 flex-shrink-0">
+                                  ({file.size > 1_000_000 ? `${(file.size / 1_000_000).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`})
+                                </span>
+                              </div>
+                              <p className="text-[10px] font-mono text-gray-400 mt-0.5">
+                                {formatDateTime(file.uploadedAt)}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                {file.type === 'application/pdf' || file.type.startsWith('image/') ? (
+                                  <a
+                                    href={file.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                  >
+                                    <ExternalLink className="w-2.5 h-2.5" />
+                                    Preview
+                                  </a>
+                                ) : (
+                                  <a
+                                    href={file.url}
+                                    download={file.name}
+                                    className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                  >
+                                    <FileText className="w-2.5 h-2.5" />
+                                    Download
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                            {canModify && (
+                              <button
+                                type="button"
+                                onClick={() => removeFile(file.id)}
+                                className="p-1 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                                title="Remove file"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </section>
@@ -597,8 +855,8 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                   icon={CheckCircle2}
                   label="Mark Done"
                   active={task.status === TaskStatus.DONE}
-                  disabled={saving || task.isLocked || task.status === TaskStatus.BLOCKED}
-                  onClick={() => setDoneModalOpen(true)}
+                  disabled={saving || task.isLocked || task.status === TaskStatus.BLOCKED || checkingComments}
+                  onClick={checkCommentsBeforeDone}
                 />
               </div>
               {statusError && (
@@ -769,65 +1027,109 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
         </div>
       </Modal>
 
-      {/* Done with comment modal */}
-      <Modal open={doneModalOpen} onClose={() => { if (!submittingDone) setDoneModalOpen(false); }} size="sm">
+      {/* Done modal - shows "no comment" warning or comment textarea */}
+      <Modal open={doneModalOpen} onClose={() => { if (!submittingDone) { setDoneModalOpen(false); setNoCommentWarning(false); setDoneComment(''); } }} size="sm">
         <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-900">
-              Complete Task — Comment Required
-            </h2>
-            {!submittingDone && (
-              <button
-                type="button"
-                onClick={() => { setDoneModalOpen(false); setDoneComment(''); }}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2 p-3 mb-4 border border-amber-300 bg-amber-50">
-            <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-            <p className="text-[10px] font-mono text-amber-800">
-              A comment is required before marking this task as complete. Describe what was accomplished.
-            </p>
-          </div>
-          <textarea
-            value={doneComment}
-            onChange={(e) => setDoneComment(e.target.value)}
-            placeholder="Describe what was completed, any issues encountered, or handover notes..."
-            rows={4}
-            className="w-full text-xs font-mono border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors resize-none placeholder:text-gray-400"
-            autoFocus
-          />
-          <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={() => { setDoneModalOpen(false); setDoneComment(''); }}
-              disabled={submittingDone}
-              className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 hover:text-black disabled:opacity-40 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleMarkDoneWithComment}
-              disabled={submittingDone || !doneComment.trim()}
-              className="flex items-center gap-2 px-4 py-2 text-[10px] font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              {submittingDone ? (
-                <>
-                  <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  {doneComment.trim() ? 'Mark Done' : 'Add comment first'}
-                </>
-              )}
-            </button>
-          </div>
+          {noCommentWarning ? (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-900">
+                  Comment Required
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => { setDoneModalOpen(false); setNoCommentWarning(false); }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex items-center gap-3 p-4 border border-amber-300 bg-amber-50">
+                <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-bold font-mono text-amber-800">Please add a comment first</p>
+                  <p className="text-[10px] font-mono text-amber-700 mt-1">
+                    Go to the <strong>Comments</strong> tab to add a comment about what was accomplished, then click &ldquo;Mark Done&rdquo; again.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => { setDoneModalOpen(false); setNoCommentWarning(false); setActiveTab('comments'); }}
+                  className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 hover:text-black transition-colors"
+                >
+                  Go to Comments
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setDoneModalOpen(false); setNoCommentWarning(false); }}
+                  className="px-4 py-2 text-[10px] font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-900">
+                  Complete Task &mdash; Comment Required
+                </h2>
+                {!submittingDone && (
+                  <button
+                    type="button"
+                    onClick={() => { setDoneModalOpen(false); setDoneComment(''); }}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2 p-3 mb-4 border border-amber-300 bg-amber-50">
+                <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                <p className="text-[10px] font-mono text-amber-800">
+                  A comment is required before marking this task as complete. Describe what was accomplished.
+                </p>
+              </div>
+              <textarea
+                value={doneComment}
+                onChange={(e) => setDoneComment(e.target.value)}
+                placeholder="Describe what was completed, any issues encountered, or handover notes..."
+                rows={4}
+                className="w-full text-xs font-mono border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors resize-none placeholder:text-gray-400"
+                autoFocus
+              />
+              <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => { setDoneModalOpen(false); setDoneComment(''); }}
+                  disabled={submittingDone}
+                  className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 hover:text-black disabled:opacity-40 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleMarkDoneWithComment}
+                  disabled={submittingDone || !doneComment.trim()}
+                  className="flex items-center gap-2 px-4 py-2 text-[10px] font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {submittingDone ? (
+                    <>
+                      <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      {doneComment.trim() ? 'Mark Done' : 'Add comment first'}
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 

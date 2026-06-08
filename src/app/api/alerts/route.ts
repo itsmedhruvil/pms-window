@@ -5,7 +5,8 @@ import { withAuth } from '@/lib/auth';
 import { CreateAlertSchema } from '@/lib/validations';
 import { AlertStatus, UserRole } from '@/types';
 import { applyAlertEffects, createSystemLog } from '@/lib/workflow';
-import { sendPushToOneSignalUsers } from '@/lib/onesignal';
+import { NotificationType } from '@/types/notifications';
+import { notifyUsers } from '@/lib/notifications';
 
 // GET /api/alerts
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
@@ -117,14 +118,21 @@ export const POST = withAuth(
       ];
 
       if (allUserIds.length > 0) {
-        sendPushToOneSignalUsers(
-          allUserIds,
-          `🚨 ${alertTypeLabel} Alert Raised`,
-          hasProject
+        await notifyUsers({
+          type: NotificationType.ALERT_CREATED,
+          title: `🚨 ${alertTypeLabel} Alert Raised`,
+          body: hasProject
             ? `Alert in "${projectTitle}": ${populated.message?.slice(0, 150) || 'No details'}`
             : `Alert on internal task: ${populated.message?.slice(0, 150) || 'No details'}`,
-          linkUrl
-        ).catch(() => {});
+          link: linkUrl,
+          userIds: allUserIds,
+          metadata: {
+            alertId: populated._id.toString(),
+            alertType: populated.type,
+            severity: populated.severity,
+            projectTitle,
+          },
+        });
       }
     }
 

@@ -6,7 +6,8 @@ import { withAuth } from '@/lib/auth';
 import { CreateAlertSchema } from '@/lib/validations';
 import { AlertStatus, UserRole } from '@/types';
 import { applyAlertEffects, createSystemLog } from '@/lib/workflow';
-import { sendPushToOneSignalUsers } from '@/lib/onesignal';
+import { NotificationType } from '@/types/notifications';
+import { notifyUsers } from '@/lib/notifications';
 
 // POST /api/projects/[id]/alert — convenience endpoint to raise alert with projectId in URL
 export const POST = withAuth(
@@ -77,12 +78,19 @@ export const POST = withAuth(
       ];
 
       if (allUserIds.length > 0) {
-        sendPushToOneSignalUsers(
-          allUserIds,
-          `🚨 ${alertTypeLabel} Alert Raised`,
-          `Alert in "${projectTitle}": ${populated.message?.slice(0, 150) || 'No details'}`,
-          `/projects/${projectId}`
-        ).catch(() => {});
+        await notifyUsers({
+          type: NotificationType.ALERT_CREATED,
+          title: `🚨 ${alertTypeLabel} Alert Raised`,
+          body: `Alert in "${projectTitle}": ${populated.message?.slice(0, 150) || 'No details'}`,
+          link: `/projects/${projectId}`,
+          userIds: allUserIds,
+          metadata: {
+            alertId: populated._id.toString(),
+            alertType: parsed.data.type,
+            severity: parsed.data.severity,
+            projectTitle,
+          },
+        });
       }
     }
 

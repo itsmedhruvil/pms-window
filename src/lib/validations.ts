@@ -173,6 +173,16 @@ export const CreateTaskTemplateSchema = z.object({
 
 export const UpdateTaskTemplateSchema = CreateTaskTemplateSchema.partial();
 
+const TaskFileSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(260),
+  url: z.string().min(1),
+  size: z.number().int().positive().max(20_000_000),
+  type: z.string().min(1),
+  publicId: z.string().optional(),
+  uploadedAt: z.string().transform((str) => new Date(str)),
+});
+
 export const UpdateTaskSchema = z.object({
   status: z.nativeEnum(TaskStatus).optional(),
   assignedUser: z.string().nullable().optional(),
@@ -185,31 +195,12 @@ export const UpdateTaskSchema = z.object({
   dueDate: OptionalDateSchema,
   completedAt: OptionalDateSchema,
   description: z.string().optional(),
-  imageAttachments: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        name: z.string().min(1).max(160),
-        url: z.string().min(1),
-        size: z.number().int().positive().max(10_000_000),
-        uploadedAt: z.string().transform((str) => new Date(str)),
-      })
-    )
-    .max(12)
-    .optional(),
-  attachments: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        name: z.string().min(1).max(260),
-        url: z.string().min(1),
-        size: z.number().int().positive().max(20_000_000),
-        type: z.string().min(1),
-        uploadedAt: z.string().transform((str) => new Date(str)),
-      })
-    )
-    .max(12)
-    .optional(),
+  /** Unified files array — replaces imageAttachments + attachments */
+  files: z.array(TaskFileSchema).max(20).optional(),
+  /** @deprecated Use files instead */
+  imageAttachments: z.array(TaskFileSchema).max(12).optional(),
+  /** @deprecated Use files instead */
+  attachments: z.array(TaskFileSchema).max(12).optional(),
 });
 
 export const TaskStatusTransitionSchema = z.object({

@@ -28,6 +28,18 @@ export interface OneSignalPayload {
   }>;
   // Force notification to open at the correct URL
   launch_url?: string;
+  // Thread grouping for stacking notifications
+  thread_id?: string;
+  // Priority (10 = high, 5 = normal)
+  priority?: number;
+  // Android big picture notification
+  big_picture?: string;
+  // Chrome web push big image
+  chrome_web_image?: string;
+  // iOS rich media attachments
+  ios_attachments?: Record<string, string>;
+  // Send to all subscribed users (no targeting)
+  included_segments?: string[];
 }
 
 /**
@@ -140,6 +152,46 @@ export async function sendPushToOneSignalUsers(
     return true;
   } catch (error) {
     console.error('[OneSignal] Send error:', error);
+    return false;
+  }
+}
+
+/**
+ * Send a DESIGN-RICH push notification with the full pre-built payload.
+ * This sends the payload exactly as constructed (with buttons, icons, colors, etc.)
+ * Use this for rich notifications that include action buttons, thread grouping,
+ * big pictures, and structured metadata.
+ */
+export async function sendRichPush(payload: OneSignalPayload): Promise<boolean> {
+  try {
+    if (!ONESIGNAL_APP_ID || !ONESIGNAL_REST_API_KEY) {
+      console.warn('[OneSignal] Missing config - check env vars');
+      return false;
+    }
+
+    const userIds = payload.include_external_user_ids;
+    if (!userIds || userIds.length === 0) return false;
+
+    const response = await fetch(ONESIGNAL_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Basic ${ONESIGNAL_REST_API_KEY}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error('[OneSignal] Rich push API error:', result);
+      return false;
+    }
+
+    console.log('[OneSignal] Rich push sent to', userIds.length, 'users:', result.id);
+    return true;
+  } catch (error) {
+    console.error('[OneSignal] Rich push send error:', error);
     return false;
   }
 }

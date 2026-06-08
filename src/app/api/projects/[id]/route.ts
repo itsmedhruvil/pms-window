@@ -170,13 +170,6 @@ export const DELETE = withAuth(
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 });
     }
 
-    if (project.status === ProjectStatus.IN_PRODUCTION) {
-      return NextResponse.json(
-        { success: false, error: 'Cannot delete a project that is in production' },
-        { status: 400 }
-      );
-    }
-
     // Cascade delete tasks, alerts, comments
     await Promise.all([
       TaskModel.deleteMany({ projectId: id }),

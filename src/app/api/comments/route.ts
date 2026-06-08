@@ -5,7 +5,8 @@ import UserModel from '@/models/User';
 import DiscussionModel from '@/models/Discussion';
 import { withAuth } from '@/lib/auth';
 import { CreateCommentSchema, PaginationSchema } from '@/lib/validations';
-import { sendPushToOneSignalUsers } from '@/lib/onesignal';
+import { NotificationType } from '@/types/notifications';
+import { notifyUsers } from '@/lib/notifications';
 
 // GET /api/comments?taskId=xxx OR ?alertId=xxx OR ?discussionId=xxx
 export const GET = withAuth(async (req: NextRequest) => {
@@ -100,12 +101,18 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
         mentionLink = `/projects`;
       }
 
-      sendPushToOneSignalUsers(
-        uniqueMentionIds,
-        `@${user.name} mentioned you`,
-        `${user.name} mentioned you: ${parsed.data.content.slice(0, 100)}${parsed.data.content.length > 100 ? '...' : ''}`,
-        mentionLink
-      ).catch(() => {});
+      await notifyUsers({
+        type: NotificationType.COMMENT_MENTION,
+        title: `@${user.name} mentioned you`,
+        body: `${user.name} mentioned you in a comment: ${parsed.data.content.slice(0, 100)}${parsed.data.content.length > 100 ? '...' : ''}`,
+        link: mentionLink,
+        userIds: uniqueMentionIds,
+        metadata: {
+          taskId: parsed.data.taskId,
+          alertId: parsed.data.alertId,
+          discussionId: parsed.data.discussionId,
+        },
+      });
     }
   }
 
@@ -126,14 +133,19 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
       mentionIds.forEach((id) => participants.add(id));
       participants.delete(user._id.toString());
 
-      // Fire-and-forget: push notification via OneSignal to all participants
+      // Fire-and-forget: rich push + in-app notification to all participants
       if (participants.size > 0) {
-        sendPushToOneSignalUsers(
-          Array.from(participants),
-          'New reply in discussion',
-          `${user.name} replied: ${parsed.data.content.slice(0, 100)}${parsed.data.content.length > 100 ? '...' : ''}`,
-          `/discussions`
-        ).catch(() => {});
+        await notifyUsers({
+          type: NotificationType.DISCUSSION_REPLY,
+          title: `New reply in discussion`,
+          body: `${user.name} replied in discussion: ${parsed.data.content.slice(0, 100)}${parsed.data.content.length > 100 ? '...' : ''}`,
+          link: `/discussions`,
+          userIds: Array.from(participants),
+          metadata: {
+            discussionId: parsed.data.discussionId,
+            commentId: comment._id.toString(),
+          },
+        });
       }
     }
   }

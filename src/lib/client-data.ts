@@ -46,6 +46,9 @@ const KEYS = {
   departments: '/api/departments',
   dashboard: '/api/dashboard',
   usersList: '/api/users',
+  discussions: (params?: string) => params ? `/api/discussions?${params}` : '/api/discussions',
+  discussion: (id: string) => `/api/discussions/${id}`,
+  comments: (params: string) => `/api/comments?${params}`,
 };
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
@@ -279,6 +282,34 @@ export function invalidateTasks() {
 export function invalidateAlerts() {
   void swrMutate(
     (key: unknown) => typeof key === 'string' && key.startsWith('/api/alerts'),
+    undefined,
+    { revalidate: true }
+  );
+}
+
+export function useDiscussions(params?: Record<string, string>) {
+  const query = params ? new URLSearchParams(params).toString() : '';
+  return useSWR(KEYS.discussions(query), fetcher, {
+    ...defaultConfig,
+    refreshInterval: 30000, // Poll every 30s for hot reload
+  });
+}
+
+export function useDiscussion(id: string) {
+  return useSWR(id ? KEYS.discussion(id) : null, fetcher, defaultConfig);
+}
+
+export function invalidateDiscussions() {
+  void swrMutate(
+    (key: unknown) => typeof key === 'string' && key.startsWith('/api/discussions'),
+    undefined,
+    { revalidate: true }
+  );
+}
+
+export function invalidateComments() {
+  void swrMutate(
+    (key: unknown) => typeof key === 'string' && key.startsWith('/api/comments'),
     undefined,
     { revalidate: true }
   );

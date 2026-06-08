@@ -1,22 +1,22 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 import { Department, TaskStatus, TaskFrequency } from '@/types';
 
-interface TaskImageAttachment {
-  id: string;
-  name: string;
-  url: string;
-  size: number;
-  uploadedAt: Date;
-}
-
-interface TaskDocAttachment {
-  id: string;
-  name: string;
-  url: string;
-  size: number;
-  type: string;
-  uploadedAt: Date;
-}
+/**
+ * Unified file schema — stores any uploaded asset (image, PDF, doc, etc.)
+ * with Cloudinary metadata.
+ */
+const TaskFileSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    name: { type: String, required: true },
+    url: { type: String, required: true },
+    size: { type: Number, required: true },
+    type: { type: String, required: true }, // MIME type
+    publicId: { type: String },              // Cloudinary public ID
+    uploadedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
 
 export interface ITaskDocument extends Document {
   projectId?: mongoose.Types.ObjectId;
@@ -31,8 +31,46 @@ export interface ITaskDocument extends Document {
   startDate?: Date;
   dueDate?: Date;
   completedAt?: Date;
-  imageAttachments?: TaskImageAttachment[];
-  attachments?: TaskDocAttachment[];
+  /** Single unified files array (new uploads go here) */
+  files: Array<{
+    id: string;
+    name: string;
+    url: string;
+    size: number;
+    type: string;
+    publicId?: string;
+    uploadedAt: Date;
+  }>;
+  /** @deprecated Legacy — kept for backward compatibility */
+  imageAttachments: Array<{
+    id: string;
+    name: string;
+    url: string;
+    size: number;
+    type: string;
+    publicId?: string;
+    uploadedAt: Date;
+  }>;
+  /** @deprecated Legacy — kept for backward compatibility */
+  attachments: Array<{
+    id: string;
+    name: string;
+    url: string;
+    size: number;
+    type: string;
+    publicId?: string;
+    uploadedAt: Date;
+  }>;
+  /** Virtual: unified files from all sources */
+  allFiles: Array<{
+    id: string;
+    name: string;
+    url: string;
+    size: number;
+    type: string;
+    publicId?: string;
+    uploadedAt: Date;
+  }>;
   isLocked: boolean;
   sequence: number;
   createdAt: Date;
@@ -104,29 +142,17 @@ const TaskSchema = new Schema<ITaskDocument>(
       type: Date,
       default: null,
     },
+    files: {
+      type: [TaskFileSchema],
+      default: [],
+    },
+    // Deprecated — kept for backward compatibility with existing data
     imageAttachments: {
-      type: [
-        {
-          id: { type: String, required: true },
-          name: { type: String, required: true },
-          url: { type: String, required: true },
-          size: { type: Number, required: true },
-          uploadedAt: { type: Date, default: Date.now },
-        },
-      ],
+      type: [TaskFileSchema],
       default: [],
     },
     attachments: {
-      type: [
-        {
-          id: { type: String, required: true },
-          name: { type: String, required: true },
-          url: { type: String, required: true },
-          size: { type: Number, required: true },
-          type: { type: String, required: true },
-          uploadedAt: { type: Date, default: Date.now },
-        },
-      ],
+      type: [TaskFileSchema],
       default: [],
     },
     isLocked: {
@@ -144,6 +170,23 @@ const TaskSchema = new Schema<ITaskDocument>(
     toObject: { virtuals: true },
   }
 );
+
+// Virtual: unified files accessor (merges files + legacy imageAttachments + attachments)
+TaskSchema.virtual('allFiles').get(function (this: ITaskDocument) {
+  const fileMap = new Map<string, typeof this.files[0]>();
+  
+  // Collect from all three sources, dedup by id
+  const sources = [this.files, this.imageAttachments, this.attachments].filter(Boolean);
+  for (const arr of sources) {
+    for (const f of arr as Array<typeof this.files[0]>) {
+      if (f?.id) fileMap.set(f.id, f);
+    }
+  }
+  
+  return Array.from(fileMap.values()).sort(
+    (a, b) => new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime()
+  );
+});
 
 // Compound indexes - optimized for common query patterns
 TaskSchema.index({ projectId: 1, department: 1, status: 1 });

@@ -5,6 +5,8 @@ import TaskModel from '@/models/Task';
 import UserModel from '@/models/User';
 import { withAuth, canModifyTask } from '@/lib/auth';
 import { createSystemLog } from '@/lib/workflow';
+import { NotificationType } from '@/types/notifications';
+import { notifyUsers } from '@/lib/notifications';
 
 const AssignSchema = z.object({
   userId: z.string().nullable(), // null = unassign
@@ -63,6 +65,20 @@ export const POST = withAuth(async (req: NextRequest, ctx, { user }) => {
       content: `Task assigned to ${targetUser.name} by ${user.name}`,
       authorId: user._id.toString(),
     });
+
+    // Send rich push + in-app notification to the assigned user
+    await notifyUsers({
+      type: NotificationType.TASK_ASSIGNED,
+      title: `Task Assigned: ${task.title || 'Task'}`,
+      body: `You have been assigned task "${task.title || 'Task'}" in ${task.department} by ${user.name}.`,
+      link: `/tasks/${id}`,
+      userIds: [targetUser._id.toString()],
+      metadata: {
+        taskId: id,
+        assignedBy: user.name,
+        department: task.department,
+      },
+    });
   } else {
     const prevUser = task.assignedUser;
     task.assignedUser = undefined;
@@ -82,6 +98,5 @@ export const POST = withAuth(async (req: NextRequest, ctx, { user }) => {
     .populate('assignedUser', 'name email department avatar')
     .lean();
 
-  // Realtime events removed
   return NextResponse.json({ success: true, data: updated });
 });

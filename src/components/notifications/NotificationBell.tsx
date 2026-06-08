@@ -1,30 +1,56 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, X, CheckCheck, ExternalLink, Trash2 } from 'lucide-react';
+import { Bell, X, CheckCheck, ExternalLink, Trash2, AlertTriangle, UserPlus, MessageSquare, ClipboardList, Lightbulb } from 'lucide-react';
 import { useInAppNotifications } from '@/hooks/useInAppNotifications';
 import { NotificationType } from '@/types/notifications';
 import { cn } from '@/lib/utils';
 
-function getNotificationIcon(type: NotificationType) {
-  switch (type) {
-    case NotificationType.ALERT_CREATED:
-    case NotificationType.ALERT_ACKNOWLEDGED:
-    case NotificationType.ALERT_RESOLVED:
-      return '🚨';
-    case NotificationType.TASK_ASSIGNED:
-      return '👤';
-    case NotificationType.TASK_STATUS_CHANGED:
-      return '📋';
-    case NotificationType.COMMENT_MENTION:
-      return '💬';
-    case NotificationType.DISCUSSION_REPLY:
-      return '💬';
-    case NotificationType.DISCUSSION_CREATED:
-      return '💡';
-    default:
-      return '🔔';
-  }
+const NOTIFICATION_ICONS: Record<NotificationType, { icon: React.ReactNode; color: string; bg: string }> = {
+  [NotificationType.ALERT_CREATED]: {
+    icon: <AlertTriangle className="w-4 h-4" />,
+    color: 'text-red-600',
+    bg: 'bg-red-100',
+  },
+  [NotificationType.ALERT_ACKNOWLEDGED]: {
+    icon: <CheckCheck className="w-4 h-4" />,
+    color: 'text-green-600',
+    bg: 'bg-green-100',
+  },
+  [NotificationType.ALERT_RESOLVED]: {
+    icon: <CheckCheck className="w-4 h-4" />,
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-100',
+  },
+  [NotificationType.TASK_ASSIGNED]: {
+    icon: <UserPlus className="w-4 h-4" />,
+    color: 'text-blue-600',
+    bg: 'bg-blue-100',
+  },
+  [NotificationType.TASK_STATUS_CHANGED]: {
+    icon: <ClipboardList className="w-4 h-4" />,
+    color: 'text-violet-600',
+    bg: 'bg-violet-100',
+  },
+  [NotificationType.COMMENT_MENTION]: {
+    icon: <MessageSquare className="w-4 h-4" />,
+    color: 'text-amber-600',
+    bg: 'bg-amber-100',
+  },
+  [NotificationType.DISCUSSION_REPLY]: {
+    icon: <MessageSquare className="w-4 h-4" />,
+    color: 'text-indigo-600',
+    bg: 'bg-indigo-100',
+  },
+  [NotificationType.DISCUSSION_CREATED]: {
+    icon: <Lightbulb className="w-4 h-4" />,
+    color: 'text-teal-600',
+    bg: 'bg-teal-100',
+  },
+};
+
+function getNotificationStyle(type: NotificationType) {
+  return NOTIFICATION_ICONS[type] || NOTIFICATION_ICONS[NotificationType.ALERT_CREATED];
 }
 
 function timeAgo(date: Date): string {
@@ -180,6 +206,7 @@ export function NotificationBell({ serverActiveAlertCount = 0 }: NotificationBel
               <div className="divide-y divide-gray-100">
                 {notifications.map((notification) => {
                   const isUnread = !notification.read;
+                  const style = getNotificationStyle(notification.type);
                   return (
                     <div
                       key={notification.id}
@@ -193,10 +220,14 @@ export function NotificationBell({ serverActiveAlertCount = 0 }: NotificationBel
                         <div className="absolute left-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
                       )}
 
-                      {/* Icon */}
-                      <span className="text-base flex-shrink-0 mt-0.5">
-                        {getNotificationIcon(notification.type)}
-                      </span>
+                      {/* Color-coded icon container */}
+                      <div className={cn(
+                        'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5',
+                        style.bg,
+                        style.color
+                      )}>
+                        {style.icon}
+                      </div>
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
