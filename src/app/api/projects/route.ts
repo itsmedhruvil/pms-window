@@ -105,12 +105,19 @@ export const POST = withAuth(
       // 1. If a selectedTemplateGroupId is provided, generate department tasks from that template group
       // 2. If window specifications with template groups exist (per-spec), generate per-window tasks
       // 3. Otherwise generate from active task templates (fallback)
+      // IMPORTANT: Pass totalWindows from project data and the session to avoid session visibility issues.
+      // The session is needed because the project was just created inside this transaction and
+      // getProjectTotalWindows can't read the uncommitted document.
+      const totalWindows = projectData.totalWindows;
+
       if (projectData.selectedTemplateGroupId) {
         // Use the global template group for task generation (handles linkedToProduct multiplication)
         await generateFromSelectedTemplateGroup(
           project._id,
           user._id,
-          projectData.selectedTemplateGroupId
+          projectData.selectedTemplateGroupId,
+          totalWindows,
+          session
         );
       } else if (projectData.windowSpecifications && projectData.windowSpecifications.length > 0) {
         await generateProjectTasks(
@@ -120,10 +127,12 @@ export const POST = withAuth(
             templateGroupId: ws.templateGroupId,
             design: ws.design,
             quantity: ws.quantity,
-          }))
+          })),
+          totalWindows,
+          session
         );
       } else {
-        await generateProjectTasks(project._id, user._id);
+        await generateProjectTasks(project._id, user._id, undefined, totalWindows, session);
       }
 
       // Create system log

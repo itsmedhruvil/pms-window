@@ -13,6 +13,7 @@ import {
 } from '@/types';
 import type { Department } from '@/types';
 import { getActiveDepartmentNames } from '@/lib/departments';
+import { ClientSession } from 'mongoose';
 
 async function getWorkflowDepartments() {
   const departments = await getActiveDepartmentNames();
@@ -46,14 +47,16 @@ export async function ensureDefaultTaskTemplates() {
 export async function generateProjectTasks(
   projectId: Types.ObjectId,
   createdByUserId: Types.ObjectId,
-  windowSpecifications?: Array<{ templateGroupId?: string; design: string; quantity: number }>
+  windowSpecifications?: Array<{ templateGroupId?: string; design: string; quantity: number }>,
+  totalWindowsOverride?: number,
+  session?: ClientSession
 ): Promise<void> {
   if (windowSpecifications && windowSpecifications.some((ws) => ws.templateGroupId)) {
-    await generateFromTemplateGroups(projectId, createdByUserId, windowSpecifications);
+    await generateFromTemplateGroups(projectId, createdByUserId, windowSpecifications, totalWindowsOverride, session);
     return;
   }
 
-  await generateFromTaskTemplates(projectId, createdByUserId);
+  await generateFromTaskTemplates(projectId, createdByUserId, totalWindowsOverride, session);
 }
 
 /**
@@ -64,13 +67,15 @@ export async function generateProjectTasks(
 export async function generateFromSelectedTemplateGroup(
   projectId: Types.ObjectId,
   createdByUserId: Types.ObjectId,
-  templateGroupId: string
+  templateGroupId: string,
+  totalWindows?: number,
+  session?: ClientSession
 ): Promise<void> {
   const TemplateGroupModel = (await import('@/models/TemplateGroup')).default;
   const group = await TemplateGroupModel.findById(templateGroupId).lean();
   if (!group || !group.tasks.length) {
     // Fall back to default task templates
-    return generateFromTaskTemplates(projectId, createdByUserId);
+    return generateFromTaskTemplates(projectId, createdByUserId, totalWindows, session);
   }
 
   // Separate project tasks from internal tasks
@@ -98,7 +103,7 @@ export async function generateFromSelectedTemplateGroup(
 
   // Create project tasks (linked to this project)
   const departments = await getWorkflowDepartments();
-  const totalWindows = await getProjectTotalWindows(projectId);
+  const resolvedTotalWindows = totalWindows ?? (await getProjectTotalWindows(projectId, session));
 
   for (const dept of departments) {
     const deptTasks = (projectDeptMap.get(dept) || []).sort((a, b) => a.sequence - b.sequence);
@@ -107,15 +112,15 @@ export async function generateFromSelectedTemplateGroup(
     for (const taskData of deptTasks) {
       const isLinked = (taskData as any).linkedToProduct === true;
 
-      if (isLinked && totalWindows > 1) {
+      if (isLinked && resolvedTotalWindows > 1) {
         // Create one task per product
-        for (let w = 0; w < totalWindows; w++) {
+        for (let w = 0; w < resolvedTotalWindows; w++) {
           projectTasks.push({
             _id: new Types.ObjectId(),
             projectId,
             department: dept as Department,
             title: `${taskData.title} for Product No-${w + 1}`,
-            description: `${taskData.description} (Product No-${w + 1} of ${totalWindows})`,
+            description: `${taskData.description} (Product No-${w + 1} of ${resolvedTotalWindows})`,
             status: TaskStatus.TODO,
             frequency: (taskData as any).frequency || 'project',
             dependencyTaskId: null,
@@ -163,37 +168,42 @@ export async function generateFromSelectedTemplateGroup(
 
   // Insert project tasks
   if (projectTasks.length > 0) {
-    await TaskModel.insertMany(projectTasks);
+    await TaskModel.insertMany(projectTasks, { session });
 
-    await CommentModel.create({
+    await CommentModel.create([{
       taskId: projectTasks[0]._id,
       content: `Project workflow initialized from template group "${group.name}". ${projectTasks.length} project tasks created across departments.`,
       author: createdByUserId,
       isSystemLog: true,
-    });
+    }], { session });
   }
 
   // Insert internal tasks
   if (internalTasks.length > 0) {
-    await TaskModel.insertMany(internalTasks);
+    await TaskModel.insertMany(internalTasks, { session });
 
     const deptLabels = [...new Set(internalTasks.map((t: any) => t.department))].join(', ');
-    await CommentModel.create({
+    await CommentModel.create([{
       content: `Internal tasks auto-generated from template group "${group.name}": ${internalTasks.length} tasks created for ${deptLabels}.`,
       author: createdByUserId,
       isSystemLog: true,
-    });
+    }], { session });
   }
 }
 
 /**
  * Old behavior: generate tasks from active TaskTemplates
  */
+
 /**
  * Get the total windows count for a project to use in task multiplication
  */
-async function getProjectTotalWindows(projectId: Types.ObjectId): Promise<number> {
-  const project = await ProjectModel.findById(projectId).select('totalWindows').lean();
+async function getProjectTotalWindows(projectId: Types.ObjectId, session?: ClientSession): Promise<number> {
+  const query = ProjectModel.findById(projectId).select('totalWindows').lean();
+  if (session) {
+    query.session(session);
+  }
+  const project = await query;
   return project?.totalWindows || 1;
 }
 
@@ -205,7 +215,8 @@ async function getProjectTotalWindows(projectId: Types.ObjectId): Promise<number
 async function generateWindowMultipliedTasks(
   projectId: Types.ObjectId,
   totalWindows: number,
-  sequenceStart: number
+  sequenceStart: number,
+  session?: ClientSession
 ): Promise<{ tasks: any[]; nextSequence: number }> {
   const tasks: any[] = [];
   let seq = sequenceStart;
@@ -262,7 +273,9 @@ async function generateWindowMultipliedTasks(
 
 async function generateFromTaskTemplates(
   projectId: Types.ObjectId,
-  createdByUserId: Types.ObjectId
+  createdByUserId: Types.ObjectId,
+  totalWindowsOverride?: number,
+  session?: ClientSession
 ): Promise<void> {
   await ensureDefaultTaskTemplates();
 
@@ -270,7 +283,7 @@ async function generateFromTaskTemplates(
   let globalSequence = 0;
   let previousDeptLastTaskId: Types.ObjectId | null = null;
   const departments = await getWorkflowDepartments();
-  const totalWindows = await getProjectTotalWindows(projectId);
+  const resolvedTotalWindows = totalWindowsOverride ?? (await getProjectTotalWindows(projectId, session));
 
   for (const dept of departments) {
     const deptTasks = await TaskTemplateModel.find({ department: dept, isActive: true })
@@ -282,9 +295,9 @@ async function generateFromTaskTemplates(
       const taskData = deptTasks[i];
       const isLinked = (taskData as any).linkedToProduct === true;
 
-      if (isLinked && totalWindows > 1) {
+      if (isLinked && resolvedTotalWindows > 1) {
         // Create one task per product
-        for (let w = 0; w < totalWindows; w++) {
+        for (let w = 0; w < resolvedTotalWindows; w++) {
           const taskId = new Types.ObjectId();
           tasks.push({
             _id: taskId,
@@ -292,7 +305,7 @@ async function generateFromTaskTemplates(
             templateTaskId: taskData._id,
             department: dept,
             title: `${taskData.title} for Product No-${w + 1}`,
-            description: `${taskData.description} (Product No-${w + 1} of ${totalWindows})`,
+            description: `${taskData.description} (Product No-${w + 1} of ${resolvedTotalWindows})`,
             status: TaskStatus.TODO,
             frequency: (taskData as any).frequency || 'project',
             dependencyTaskId: null,
@@ -326,20 +339,21 @@ async function generateFromTaskTemplates(
   // Add window-multiplied tasks for Operations (dispatch) and Site (installation, QC)
   const { tasks: windowTasks, nextSequence } = await generateWindowMultipliedTasks(
     projectId,
-    totalWindows,
-    globalSequence
+    resolvedTotalWindows,
+    globalSequence,
+    session
   );
   tasks.push(...windowTasks);
   globalSequence = nextSequence;
 
-  await TaskModel.insertMany(tasks);
+  await TaskModel.insertMany(tasks, { session });
 
-  await CommentModel.create({
+  await CommentModel.create([{
     taskId: tasks[0]._id,
-    content: `Project workflow initialized. ${tasks.length} tasks created across ${departments.length} departments (including ${totalWindows} window-based dispatch/installation/QC tasks).`,
+    content: `Project workflow initialized. ${tasks.length} tasks created across ${departments.length} departments (including ${resolvedTotalWindows} window-based dispatch/installation/QC tasks).`,
     author: createdByUserId,
     isSystemLog: true,
-  });
+  }], { session });
 }
 
 /**
@@ -350,13 +364,18 @@ async function generateFromTaskTemplates(
 async function generateFromTemplateGroups(
   projectId: Types.ObjectId,
   createdByUserId: Types.ObjectId,
-  windowSpecifications: Array<{ templateGroupId?: string; design: string; quantity: number }>
+  windowSpecifications: Array<{ templateGroupId?: string; design: string; quantity: number }>,
+  totalWindowsOverride?: number,
+  session?: ClientSession
 ): Promise<void> {
   const TemplateGroupModel = (await import('@/models/TemplateGroup')).default;
   const tasks = [];
   let globalSequence = 0;
   let previousDeptLastTaskId: Types.ObjectId | null = null;
   const departments = await getWorkflowDepartments();
+
+  // Get total windows for linked-to-product multiplication
+  const resolvedTotalWindows = totalWindowsOverride ?? (await getProjectTotalWindows(projectId, session));
 
   // Process each window spec
   for (const spec of windowSpecifications) {
@@ -374,9 +393,6 @@ async function generateFromTemplateGroups(
       deptMap.get(task.department)!.push(task);
     }
 
-    // Get total windows for linked-to-product multiplication
-    const totalWindows = await getProjectTotalWindows(projectId);
-
     for (const dept of departments) {
       const deptTasks = (deptMap.get(dept) || []).sort((a, b) => a.sequence - b.sequence);
       if (deptTasks.length === 0) continue;
@@ -387,16 +403,16 @@ async function generateFromTemplateGroups(
         const taskData = deptTasks[i];
         const isLinked = (taskData as any).linkedToProduct === true;
 
-        if (isLinked && totalWindows > 1) {
+        if (isLinked && resolvedTotalWindows > 1) {
           // Create one task per product
-          for (let w = 0; w < totalWindows; w++) {
+          for (let w = 0; w < resolvedTotalWindows; w++) {
             const taskId = new Types.ObjectId();
             tasks.push({
               _id: taskId,
               projectId,
               department: dept as any,
               title: `${taskData.title} — ${spec.design} for Product No-${w + 1}`,
-              description: `${taskData.description} (Product No-${w + 1} of ${totalWindows} — ${spec.design})`,
+              description: `${taskData.description} (Product No-${w + 1} of ${resolvedTotalWindows} — ${spec.design})`,
               status: TaskStatus.TODO,
               frequency: (taskData as any).frequency || 'project',
               dependencyTaskId: null,
@@ -429,27 +445,27 @@ async function generateFromTemplateGroups(
 
   // If no template groups matched, fall back to old behavior
   if (tasks.length === 0) {
-    return generateFromTaskTemplates(projectId, createdByUserId);
+    return generateFromTaskTemplates(projectId, createdByUserId, resolvedTotalWindows, session);
   }
 
   // Add window-multiplied tasks for Operations (dispatch) and Site (installation, QC)
-  const totalWindows = await getProjectTotalWindows(projectId);
   const { tasks: windowTasks, nextSequence } = await generateWindowMultipliedTasks(
     projectId,
-    totalWindows,
-    globalSequence
+    resolvedTotalWindows,
+    globalSequence,
+    session
   );
   tasks.push(...windowTasks);
   globalSequence = nextSequence;
 
-  await TaskModel.insertMany(tasks);
+  await TaskModel.insertMany(tasks, { session });
 
-  await CommentModel.create({
+  await CommentModel.create([{
     taskId: tasks[0]._id,
-    content: `Project workflow initialized from template groups. ${tasks.length} tasks created for ${windowSpecifications.filter((ws) => ws.templateGroupId).length} window types (including ${totalWindows} window-based dispatch/installation/QC tasks).`,
+    content: `Project workflow initialized from template groups. ${tasks.length} tasks created for ${windowSpecifications.filter((ws) => ws.templateGroupId).length} window types (including ${resolvedTotalWindows} window-based dispatch/installation/QC tasks).`,
     author: createdByUserId,
     isSystemLog: true,
-  });
+  }], { session });
 }
 
 /**
