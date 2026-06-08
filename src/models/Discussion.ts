@@ -6,6 +6,7 @@ export interface IDiscussionDocument extends Document {
   description: string;
   startedBy: mongoose.Types.ObjectId;
   mentions: mongoose.Types.ObjectId[]; // Users who have access (starter + @mentioned)
+  lastMessageAt: Date; // Timestamp of the most recent comment — used for unread tracking
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +40,10 @@ const DiscussionSchema = new Schema<IDiscussionDocument>(
         ref: 'User',
       },
     ],
+    lastMessageAt: {
+      type: Date,
+      default: Date.now,
+    },
   },
   {
     timestamps: true,

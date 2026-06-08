@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import DiscussionModel from '@/models/Discussion';
+import DiscussionReadModel from '@/models/DiscussionRead';
+import CommentModel from '@/models/Comment';
 import { withAuth } from '@/lib/auth';
 import { UserRole } from '@/types';
 import { NotificationType } from '@/types/notifications';
@@ -29,7 +31,39 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
     .limit(limit)
     .lean();
 
-  return NextResponse.json({ success: true, data: discussions });
+  // Fetch unread counts for this user across all discussions
+  const discussionIds = discussions.map((d) => d._id);
+  const readRecords = await DiscussionReadModel.find({
+    discussionId: { $in: discussionIds },
+    userId: user._id,
+  }).lean();
+  const readMap = new Map(readRecords.map((r) => [r.discussionId.toString(), r.lastReadAt]));
+
+  // Fetch comment counts per discussion for unread calculation
+  const commentCounts = await CommentModel.aggregate([
+    { $match: { discussionId: { $in: discussionIds } } },
+    { $group: { _id: '$discussionId', count: { $sum: 1 }, lastCreated: { $max: '$createdAt' } } },
+  ]);
+  const commentCountMap = new Map(commentCounts.map((c) => [c._id.toString(), c]));
+
+  // Enhance discussions with unread info
+  const enhanced = discussions.map((d) => {
+    const dId = d._id.toString();
+    const lastReadAt = readMap.get(dId);
+    const commentInfo = commentCountMap.get(dId);
+    const lastMessageAt = commentInfo?.lastCreated || d.createdAt;
+    const totalComments = commentInfo?.count || 0;
+    const unread = lastReadAt && lastReadAt >= lastMessageAt ? 0 : totalComments;
+    return {
+      ...d,
+      lastMessageAt,
+      totalComments,
+      unreadCount: unread > 0 ? unread : (lastReadAt ? 0 : totalComments),
+      lastReadAt: lastReadAt || null,
+    };
+  });
+
+  return NextResponse.json({ success: true, data: enhanced });
 });
 
 // POST /api/discussions

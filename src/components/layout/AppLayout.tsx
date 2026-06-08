@@ -56,7 +56,7 @@ interface AppLayoutProps {
 /** Map of nav item labels to the sidebar-counts key for badge display */
 const COUNT_KEY_MAP: Record<string, string> = {
   'Alerts': 'activeAlerts',
-  'Discussions': 'discussions',
+  'Discussions': 'unreadDiscussions',
   'Internal Tasks': 'internalTasksPending',
   'Projects': 'activeProjects',
 };

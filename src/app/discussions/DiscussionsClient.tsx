@@ -1,12 +1,19 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { MessageCircle, ChevronDown, ChevronUp, Send, Loader2, User, Search, Upload, Paperclip, X, Edit3, Trash2 } from 'lucide-react';
+import { MessageCircle, ChevronDown, ChevronUp, Send, Loader2, User, Search, Upload, Paperclip, X, Edit3, Trash2, MailOpen, Mail } from 'lucide-react';
 import { apiFetch, cn, DEPARTMENT_LABELS, timeAgo } from '@/lib/utils';
 import { Department } from '@/types';
 import type { ReactNode } from 'react';
 import type { IDiscussion, IComment, IUser, IProject, ICommentAttachment } from '@/types';
 import { Modal } from '@/components/ui/Modal';
+
+interface ExtendedDiscussion extends IDiscussion {
+  unreadCount?: number;
+  totalComments?: number;
+  lastMessageAt?: string;
+  lastReadAt?: string | null;
+}
 
 interface DiscussionsClientProps {
   currentUser: Partial<IUser>;
@@ -114,7 +121,7 @@ function SearchableSelect<T extends { _id: string }>({
 // ── Main component ─────────────────────────────────────────────────
 
 export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
-  const [discussions, setDiscussions] = useState<IDiscussion[]>([]);
+  const [discussions, setDiscussions] = useState<ExtendedDiscussion[]>([]);
   const [comments, setComments] = useState<Record<string, IComment[]>>({});
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -125,6 +132,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
   const [uploadingFile, setUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
 
   // New thread form
   const [showNewForm, setShowNewForm] = useState(false);
@@ -148,21 +156,18 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
   const [deleting, setDeleting] = useState(false);
 
   // @mention state for chat
-  const [availableUsers, setAvailableUsers] = useState<Partial<IUser>[]>([]);
-  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<Partial<IUser>[]>([]);  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionStartIndex, setMentionStartIndex] = useState(-1);
   const [activeDiscussionId, setActiveDiscussionId] = useState<string | null>(null);
   const chatInputRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
   const fetchDiscussions = useCallback(async () => {
-    setLoading(true);
-    const result = await apiFetch<IDiscussion[]>('/api/discussions?limit=100');
+    const result = await apiFetch<ExtendedDiscussion[]>('/api/discussions?limit=100');
     if (result.success && result.data) {
       const items = Array.isArray(result.data) ? result.data : [];
       setDiscussions(items);
     }
-    setLoading(false);
   }, []);
 
   const fetchUsers = useCallback(async () => {
@@ -177,10 +182,19 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     setLoadingProjects(false);
   }, []);
 
-  // Fetch discussions on mount only (no polling)
+  // Fetch discussions on mount + poll every 10 seconds for hot reload
   useEffect(() => {
-    fetchDiscussions();
+    setLoading(true);
+    fetchDiscussions().finally(() => setLoading(false));
     fetchUsers();
+
+    pollRef.current = setInterval(() => {
+      fetchDiscussions();
+    }, 10000);
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, [fetchDiscussions, fetchUsers]);
 
   const fetchComments = useCallback(async (discussionId: string) => {
@@ -190,11 +204,31 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     }
   }, []);
 
-  const toggleExpand = (id: string) => {
-    if (expandedId === id) { setExpandedId(null); setActiveDiscussionId(null); return; }
+  /** Mark a discussion as read by the current user */
+  const markAsRead = useCallback(async (discussionId: string) => {
+    await apiFetch('/api/discussions/read', {
+      method: 'POST',
+      body: JSON.stringify({ discussionId }),
+    });
+    // Update local state to reflect it's been read
+    setDiscussions((prev) =>
+      prev.map((d) =>
+        d._id === discussionId ? { ...d, unreadCount: 0 } : d
+      )
+    );
+  }, []);
+
+  const toggleExpand = async (id: string) => {
+    if (expandedId === id) {
+      setExpandedId(null);
+      setActiveDiscussionId(null);
+      return;
+    }
     setExpandedId(id);
     setActiveDiscussionId(id);
     if (!comments[id]) fetchComments(id);
+    // Mark as read when expanded
+    await markAsRead(id);
   };
 
   const handleFileUpload = async (files: FileList | null) => {
@@ -204,7 +238,6 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       try {
-        // Upload to Cloudinary instead of base64
         const formData = new FormData();
         formData.append('file', file);
         const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -288,7 +321,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     });
 
     if (result.success && result.data) {
-      setDiscussions((prev) => prev.map((d) => d._id === editThread._id ? result.data! : d));
+      setDiscussions((prev) => prev.map((d) => d._id === editThread._id ? { ...result.data!, unreadCount: d.unreadCount } : d));
       setEditThread(null);
     } else {
       setError(result.error || 'Failed to update discussion');
@@ -354,6 +387,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
       setNewMessage('');
       setUploadedFiles([]);
       setShowMentionDropdown(false);
+      // Re-fetch discussions to update unread counts in sidebar and badge
       fetchDiscussions();
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     } else {
@@ -380,12 +414,14 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     });
 
     if (result.success && result.data) {
-      setDiscussions((prev) => [result.data!, ...prev]);
+      setDiscussions((prev) => [{ ...result.data!, unreadCount: 0 }, ...prev]);
       setExpandedId(result.data._id);
       setActiveDiscussionId(result.data._id);
       setNewThread({ projectId: '', title: '', description: '' });
       setShowNewForm(false);
       fetchComments(result.data._id);
+      // Mark as read since creator has seen it
+      await markAsRead(result.data._id);
     } else {
       setError(result.error || 'Failed to create thread');
     }
@@ -521,22 +557,50 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                 ? discussion.mentions.map((m: any) => typeof m === 'object' ? m as Partial<IUser> : null).filter(Boolean)
                 : [];
               const canModify = canModifyDiscussion(discussion);
+              const unreadCount = discussion.unreadCount || 0;
 
               return (
-                <div key={discussion._id} className="border border-gray-200">
+                <div key={discussion._id} className={cn(
+                  'border border-gray-200 transition-colors',
+                  unreadCount > 0 && !isExpanded ? 'border-l-4 border-l-blue-500 bg-blue-50/30' : ''
+                )}>
                   {/* Thread header */}
                   <button
                     type="button"
                     onClick={() => toggleExpand(discussion._id)}
                     className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-gray-50/50"
                   >
-                    <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
-                      <MessageCircle className="w-4 h-4 text-blue-600" />
+                    <div className={cn(
+                      'mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full',
+                      unreadCount > 0 ? 'bg-blue-500' : 'bg-blue-100'
+                    )}>
+                      {unreadCount > 0 ? (
+                        <Mail className="w-4 h-4 text-white" />
+                      ) : (
+                        <MailOpen className="w-4 h-4 text-blue-600" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-bold text-gray-900">{discussion.title}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className={cn(
+                          'text-sm',
+                          unreadCount > 0 ? 'font-extrabold text-gray-900' : 'font-bold text-gray-900'
+                        )}>
+                          {discussion.title}
+                        </h3>
+                        {unreadCount > 0 && (
+                          <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold bg-blue-500 text-white rounded-full min-w-[18px] leading-none">
+                            {unreadCount > 99 ? '99+' : unreadCount}
+                          </span>
+                        )}
+                      </div>
                       {discussion.description && (
-                        <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">{discussion.description}</p>
+                        <p className={cn(
+                          'text-xs mt-0.5 line-clamp-1',
+                          unreadCount > 0 ? 'text-gray-800 font-medium' : 'text-gray-600'
+                        )}>
+                          {discussion.description}
+                        </p>
                       )}
                       <div className="flex items-center gap-3 mt-1.5 text-[10px] font-mono text-gray-400 flex-wrap">
                         <span>{startedBy?.name || 'Unknown'}</span>
@@ -544,7 +608,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                         <span>·</span>
                         <span>{timeAgo(discussion.createdAt)}</span>
                         <span>·</span>
-                        <span>{msgs.length} message{msgs.length === 1 ? '' : 's'}</span>
+                        <span>{msgs.length || discussion.totalComments || 0} message{(msgs.length || discussion.totalComments || 0) === 1 ? '' : 's'}</span>
                         {project?.projectTitle && (
                           <span className="truncate max-w-[200px] font-medium text-gray-600">📁 {project.projectTitle}</span>
                         )}
@@ -556,7 +620,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       {canModify && (
                         <>
                           <button
