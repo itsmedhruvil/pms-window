@@ -33,11 +33,14 @@ export const POST = withAuth(async (req: NextRequest) => {
       'image/gif',
       'image/webp',
       'image/svg+xml',
+      'image/heic',
+      'image/heif',
       'text/plain',
       'text/csv',
     ];
 
-    if (!allowedTypes.includes(file.type)) {
+    // Also accept any image/* type since mobile browsers may send unknown formats
+    if (!allowedTypes.includes(file.type) && !file.type.startsWith('image/')) {
       return NextResponse.json(
         { success: false, error: 'Only PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, and image files are allowed' },
         { status: 400 }
