@@ -13,6 +13,19 @@ module.exports = {
         mono: ['Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
+        // Brand palette
+        brand: {
+          50:  '#eef2ff',
+          100: '#dbe4ff',
+          200: '#bac8ff',
+          300: '#91a7ff',
+          400: '#748ffc',
+          500: '#5c7cfa',
+          600: '#4c6ef5',
+          700: '#4263eb',
+          800: '#3b5bdb',
+          900: '#364fc7',
+        },
         // Monochrome palette — RED only for alerts
         alert: {
           50:  '#fff1f1',
@@ -25,6 +38,13 @@ module.exports = {
           700: '#b91c1c',
           800: '#991b1b',
           900: '#7f1d1d',
+        },
+        // Task status colors
+        task: {
+          todo: '#6b7280',
+          inProgress: '#3b82f6',
+          blocked: '#ef4444',
+          done: '#10b981',
         },
       },
       animation: {

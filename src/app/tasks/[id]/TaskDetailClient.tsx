@@ -6,13 +6,13 @@ import { invalidateTasks } from '@/lib/client-data';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import ExcelJS from 'exceljs';
 import {
   AlertTriangle,
   ArrowLeft,
   Calendar,
   Camera,
   CheckCircle2,
+  Download,
   ExternalLink,
   FileText,
   Hash,
@@ -25,7 +25,6 @@ import {
   RotateCcw,
   Upload,
   User,
-  Table2,
   X,
 } from 'lucide-react';
 import { CommentThread } from '@/components/comment/CommentThread';
@@ -96,10 +95,6 @@ function isImageFile(file: { type: string; name?: string }) {
   return file.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name || '');
 }
 
-function isExcelFile(file: { type: string; name?: string }) {
-  return file.type.includes('spreadsheet') || file.type.includes('excel') || /\.(xlsx|xls|csv)$/i.test(file.name || '');
-}
-
 function getFileIcon(file: { type: string; name?: string }) {
   if (file.type === 'application/pdf') return '📄';
   if (file.type.startsWith('image/')) return '🖼️';
@@ -130,9 +125,6 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
   const [timelineSaving, setTimelineSaving] = useState(false);
   const [timelineError, setTimelineError] = useState<string | null>(null);
   const [fileUploading, setFileUploading] = useState(false);
-  const [excelViewHtml, setExcelViewHtml] = useState<string | null>(null);
-  const [excelViewFileId, setExcelViewFileId] = useState<string | null>(null);
-  const [excelLoading, setExcelLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -174,11 +166,9 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
     if (result.success && result.data) {
       const count = result.data.total || result.data.items?.length || 0;
       if (count === 0) {
-        // No comments — show warning popup
         setNoCommentWarning(true);
         setDoneModalOpen(true);
       } else {
-        // Has comments — proceed directly to mark done
         await markTaskDone();
       }
     } else {
@@ -383,106 +373,15 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
       uploadedAt: f.uploadedAt,
     }));
     await updateTask({ files: filesForSave } as any);
-    setExcelViewHtml(null);
-    setExcelViewFileId(null);
   };
-
-  const renderExcelView = useCallback(async (file: { id: string; url: string; name: string }) => {
-    setExcelLoading(true);
-    setExcelViewHtml(null);
-    setExcelViewFileId(file.id);
-    try {
-      const response = await fetch(file.url);
-      const arrayBuffer = await response.arrayBuffer();
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(arrayBuffer);
-
-      let html = '<html><head><style>';
-      html += `
-        body { margin: 0; font-family: 'Segoe UI', -apple-system, sans-serif; font-size: 13px; }
-        .sheet-tabs { display: flex; gap: 0; background: #f3f3f3; border-bottom: 1px solid #d0d0d0; padding: 0 8px; }
-        .sheet-tab { padding: 6px 16px; font-size: 12px; border: 1px solid transparent; border-bottom: none; cursor: pointer; margin-top: 4px; border-radius: 4px 4px 0 0; background: #e8e8e8; color: #666; user-select: none; }
-        .sheet-tab.active { background: #fff; border-color: #d0d0d0; color: #000; font-weight: 600; }
-        .sheet-container { display: none; }
-        .sheet-container.active { display: block; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #d4d4d4; padding: 2px 6px; min-width: 80px; font-size: 12px; white-space: nowrap; }
-        th { background: #f0f0f0; font-weight: 600; color: #333; position: sticky; top: 0; z-index: 1; }
-        tr:nth-child(even) td { background: #fafafa; }
-        .cell-number { text-align: right; }
-        .cell-text { text-align: left; }
-        .grid-container { overflow: auto; max-height: 500px; }
-        .status-bar { background: #f3f3f3; border-top: 1px solid #d0d0d0; padding: 4px 12px; font-size: 11px; color: #666; }
-      `;
-      html += '</style></head><body>';
-
-      html += '<div class="sheet-tabs">';
-      workbook.worksheets.forEach((ws, idx) => {
-        html += `<div class="sheet-tab${idx === 0 ? ' active' : ''}" onclick="switchSheet(${idx})">${ws.name || `Sheet${idx + 1}`}</div>`;
-      });
-      html += '</div>';
-
-      workbook.worksheets.forEach((ws, wsIdx) => {
-        html += `<div class="sheet-container${wsIdx === 0 ? ' active' : ''}" id="sheet-${wsIdx}">`;
-        if (ws.rowCount === 0) {
-          html += '<div style="padding: 40px; text-align: center; color: #999;">Empty sheet</div></div>';
-          return;
-        }
-        const colCount = ws.columnCount || ws.rowCount > 0 ? (ws.getRow(1).cellCount || 1) : 1;
-        html += '<div class="grid-container"><table><thead><tr>';
-        html += '<th style="min-width: 40px; background: #e8e8e8; text-align: center; color: #888;">#</th>';
-        for (let c = 1; c <= colCount; c++) {
-          const cell = ws.getRow(1).getCell(c);
-          const label = cell.value !== null && cell.value !== undefined ? String(cell.value) : `Column ${c}`;
-          html += `<th>${label.replace(/</g, '<').replace(/>/g, '>')}</th>`;
-        }
-        html += '</tr></thead><tbody>';
-
-        ws.eachRow((row, rowNum) => {
-          if (rowNum === 1) return;
-          html += '<tr>';
-          html += `<td style="min-width: 40px; background: #e8e8e8; text-align: center; color: #888; font-size: 11px;">${rowNum}</td>`;
-          row.eachCell((cell) => {
-            const val = cell.value;
-            let display = '';
-            let alignClass = 'cell-text';
-            if (val === null || val === undefined) display = '';
-            else if (val instanceof Date) display = val.toLocaleDateString();
-            else if (typeof val === 'number') {
-              display = Number.isInteger(val) ? val.toLocaleString() : val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-              alignClass = 'cell-number';
-            } else display = String(val);
-            html += `<td class="${alignClass}">${display.replace(/</g, '<').replace(/>/g, '>') || '&nbsp;'}</td>`;
-          });
-          for (let c = row.cellCount + 1; c <= colCount; c++) html += '<td></td>';
-          html += '</tr>';
-        });
-
-        html += '</tbody></table></div></div>';
-      });
-
-      const totalRows = workbook.worksheets.reduce((sum, ws) => sum + (ws.rowCount > 1 ? ws.rowCount - 1 : 0), 0);
-      const totalCols = Math.max(...workbook.worksheets.map(ws => ws.columnCount || 0));
-      html += `<div class="status-bar">${workbook.worksheets.length} sheet${workbook.worksheets.length > 1 ? 's' : ''} &middot; ${totalRows} data rows &middot; ${totalCols} columns</div>`;
-      html += '<script>function switchSheet(idx){document.querySelectorAll(".sheet-tab, .sheet-container").forEach((el,i)=>{const n=document.querySelectorAll(".sheet-tab").length;el.classList.toggle("active",i<n?(i===idx):(i-n===idx))})}<\/script>';
-      html += '</body></html>';
-      setExcelViewHtml(html);
-    } catch (err) {
-      console.error('Failed to render Excel:', err);
-      setExcelViewHtml('<html><body><p style="padding:40px;text-align:center;color:#999;font-family:sans-serif;">Could not render this spreadsheet.</p></body></html>');
-    }
-    setExcelLoading(false);
-  }, []);
 
   const tabs: { id: TabId; label: string; icon: typeof ImageIcon }[] = [
     { id: 'comments', label: 'Comments', icon: MessageSquare },
     { id: 'files', label: `Files (${allFiles.length})`, icon: Paperclip },
   ];
 
-  // Split files into categories for display
   const imageFiles = allFiles.filter(isImageFile);
-  const excelFiles = allFiles.filter(isExcelFile);
-  const docFiles = allFiles.filter((f) => !isImageFile(f) && !isExcelFile(f));
+  const otherFiles = allFiles.filter((f) => !isImageFile(f));
 
   return (
     <div className="min-h-screen bg-white">
@@ -520,7 +419,6 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
           </div>
         </div>
 
-        {/* Timeline prompt */}
         {canModify && assignedUser && !task.startDate && !task.dueDate && (
           <div className="mt-4 border border-amber-300 bg-amber-50 px-4 py-3 flex items-start gap-3">
             <Calendar className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -574,10 +472,9 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
             })}
           </div>
 
-          {/* Unified Files tab — with Excel inline rendering */}
+          {/* Files tab — upload + download only, no inline rendering */}
           {activeTab === 'files' && (
             <section className="border border-gray-200">
-              {/* Upload area */}
               <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
                 <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500">
                   Attachments ({allFiles.length}/{MAX_FILES})
@@ -638,69 +535,6 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                 </div>
               ) : (
                 <div className="space-y-6 p-4">
-                  {/* Excel spreadsheets — inline rendered */}
-                  {excelFiles.length > 0 && (
-                    <div>
-                      <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500 mb-3">
-                        Spreadsheets ({excelFiles.length})
-                      </h3>
-                      <div className="space-y-4">
-                        {excelFiles.map((file) => (
-                          <div key={file.id} className="border border-gray-200">
-                            <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <Table2 className="w-4 h-4 text-green-600 flex-shrink-0" />
-                                <span className="text-xs font-mono font-bold text-gray-900 truncate">{file.name}</span>
-                                <span className="text-[10px] font-mono text-gray-400">
-                                  ({file.size > 1_000_000 ? `${(file.size / 1_000_000).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`})
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {excelViewFileId !== file.id && (
-                                  <button
-                                    type="button"
-                                    onClick={() => renderExcelView(file)}
-                                    disabled={excelLoading}
-                                    className="text-[10px] font-mono px-2 py-1 bg-black text-white hover:bg-gray-800 transition-colors disabled:opacity-40"
-                                  >
-                                    {excelLoading ? 'Loading...' : 'View'}
-                                  </button>
-                                )}
-                                <a
-                                  href={file.url}
-                                  download={file.name}
-                                  className="text-[10px] font-mono text-blue-600 hover:text-blue-800 underline"
-                                >
-                                  Download
-                                </a>
-                                {canModify && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removeFile(file.id)}
-                                    className="text-gray-400 hover:text-red-600 transition-colors"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            {excelViewFileId === file.id && excelViewHtml && (
-                              <div className="border-t border-gray-200">
-                                <iframe
-                                  srcDoc={excelViewHtml}
-                                  className="w-full border-0"
-                                  style={{ height: '500px' }}
-                                  title={`Excel: ${file.name}`}
-                                  sandbox="allow-scripts"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Image gallery */}
                   {imageFiles.length > 0 && (
                     <div>
@@ -738,6 +572,14 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                                 {' · '}
                                 {formatDateTime(file.uploadedAt)}
                               </p>
+                              <a
+                                href={file.url}
+                                download={file.name}
+                                className="inline-flex items-center gap-1 text-[10px] font-mono text-blue-600 hover:text-blue-800 mt-1"
+                              >
+                                <Download className="w-3 h-3" />
+                                Download
+                              </a>
                             </figcaption>
                           </figure>
                         ))}
@@ -745,14 +587,14 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                     </div>
                   )}
 
-                  {/* Document list */}
-                  {docFiles.length > 0 && (
+                  {/* Other files (documents, spreadsheets, etc.) */}
+                  {otherFiles.length > 0 && (
                     <div>
                       <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500 mb-3">
-                        Documents ({docFiles.length})
+                        Documents ({otherFiles.length})
                       </h3>
                       <div className="divide-y divide-gray-100 border border-gray-200">
-                        {docFiles.map((file) => (
+                        {otherFiles.map((file) => (
                           <div key={file.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
                             <span className="text-lg flex-shrink-0 mt-0.5">{getFileIcon(file)}</span>
                             <div className="flex-1 min-w-0">
@@ -766,7 +608,15 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                                 {formatDateTime(file.uploadedAt)}
                               </p>
                               <div className="flex items-center gap-2 mt-1">
-                                {file.type === 'application/pdf' || file.type.startsWith('image/') ? (
+                                <a
+                                  href={file.url}
+                                  download={file.name}
+                                  className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                >
+                                  <Download className="w-3 h-3" />
+                                  Download
+                                </a>
+                                {(file.type === 'application/pdf' || file.type.startsWith('image/')) && (
                                   <a
                                     href={file.url}
                                     target="_blank"
@@ -774,16 +624,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                                     className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center gap-1"
                                   >
                                     <ExternalLink className="w-2.5 h-2.5" />
-                                    Preview
-                                  </a>
-                                ) : (
-                                  <a
-                                    href={file.url}
-                                    download={file.name}
-                                    className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                                  >
-                                    <FileText className="w-2.5 h-2.5" />
-                                    Download
+                                    Open
                                   </a>
                                 )}
                               </div>
@@ -824,7 +665,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                   </div>
                 </div>
               ) : (
-                <CommentThread taskId={task._id} currentUser={currentUser} />
+                <CommentThread taskId={task._id} currentUser={currentUser} availableUsers={[]} />
               )}
             </section>
           )}
@@ -887,7 +728,6 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
               )}
               <DetailRow icon={User} label="Assigned To" value={assignedUser?.name ?? 'Unassigned'} />
 
-              {/* Editable timeline section */}
               <div className="border-t border-gray-100 pt-3 mt-3">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
@@ -1027,7 +867,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
         </div>
       </Modal>
 
-      {/* Done modal - shows "no comment" warning or comment textarea */}
+      {/* Done modal */}
       <Modal open={doneModalOpen} onClose={() => { if (!submittingDone) { setDoneModalOpen(false); setNoCommentWarning(false); setDoneComment(''); } }} size="sm">
         <div className="p-6">
           {noCommentWarning ? (

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { MessageCircle, ChevronDown, ChevronUp, Send, Loader2, User, Search, Upload, Paperclip, X, Edit3, Trash2, MailOpen, Mail } from 'lucide-react';
+import { MessageCircle, ChevronDown, ChevronUp, Send, Loader2, User, Search, Upload, Paperclip, X, Edit3, Trash2, MailOpen, Mail, Download } from 'lucide-react';
 import { apiFetch, cn, DEPARTMENT_LABELS, timeAgo } from '@/lib/utils';
 import { Department } from '@/types';
 import type { ReactNode } from 'react';
@@ -130,6 +130,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
   const [error, setError] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<ICommentAttachment[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -669,20 +670,40 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                                   {msg.attachments && msg.attachments.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mt-2">
                                       {msg.attachments.map((att) => (
-                                        <a
-                                          key={att.id}
-                                          href={att.url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-mono bg-gray-50 border border-gray-200 text-gray-600 hover:border-black transition-colors"
-                                        >
+                                        <div key={att.id} className="group relative">
                                           {att.type.startsWith('image/') ? (
-                                            <img src={att.url} alt={att.name} className="w-5 h-5 object-cover rounded" />
+                                            <div className="inline-flex flex-col items-start">
+                                              <button
+                                                onClick={() => setPreviewImage({ url: att.url, name: att.name })}
+                                                className="border border-gray-200 hover:border-black transition-colors overflow-hidden"
+                                              >
+                                                <img src={att.url} alt={att.name} className="w-16 h-16 object-cover" />
+                                              </button>
+                                              <div className="flex items-center gap-1 mt-0.5">
+                                                <span className="text-[9px] font-mono text-gray-400 truncate max-w-[80px]">{att.name}</span>
+                                                <a
+                                                  href={att.url}
+                                                  download={att.name}
+                                                  className="text-[9px] font-mono text-blue-600 hover:text-blue-800"
+                                                  title="Download"
+                                                >
+                                                  <Download className="w-2.5 h-2.5" />
+                                                </a>
+                                              </div>
+                                            </div>
                                           ) : (
-                                            <Paperclip className="w-3 h-3" />
+                                            <a
+                                              href={att.url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-mono bg-gray-50 border border-gray-200 text-gray-600 hover:border-black transition-colors"
+                                            >
+                                              <Paperclip className="w-3 h-3" />
+                                              <span className="truncate max-w-[100px]">{att.name}</span>
+                                              <Download className="w-2.5 h-2.5 text-gray-400 ml-1" />
+                                            </a>
                                           )}
-                                          {att.name}
-                                        </a>
+                                        </div>
                                       ))}
                                     </div>
                                   )}
@@ -850,6 +871,38 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
           </div>
         </div>
       </Modal>
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between bg-white px-4 py-2 border-b border-gray-200">
+              <span className="text-xs font-mono font-bold text-gray-900 truncate max-w-[300px]">{previewImage.name}</span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewImage.url}
+                  download={previewImage.name}
+                  className="flex items-center gap-1 text-[10px] font-mono text-blue-600 hover:text-blue-800"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download
+                </a>
+                <button onClick={() => setPreviewImage(null)} className="text-gray-400 hover:text-white ml-2">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <img
+              src={previewImage.url}
+              alt={previewImage.name}
+              className="max-w-full max-h-[80vh] object-contain bg-white"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

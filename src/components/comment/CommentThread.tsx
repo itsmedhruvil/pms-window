@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Bot } from 'lucide-react';
+import { Send, Bot, Upload, Paperclip, X, Loader2, Download, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import { timeAgo, apiFetch } from '@/lib/utils';
-import type { IComment, IUser } from '@/types';
+import type { IComment, IUser, ICommentAttachment } from '@/types';
 
 interface CommentThreadProps {
   taskId?: string;
@@ -12,7 +12,7 @@ interface CommentThreadProps {
   availableUsers?: Partial<IUser>[];
 }
 
-export function CommentThread({ taskId, alertId, availableUsers: propUsers = [] }: CommentThreadProps) {
+export function CommentThread({ taskId, alertId, availableUsers: propUsers = [], currentUser }: CommentThreadProps) {
   const [comments, setComments] = useState<IComment[]>([]);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,8 +21,12 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [] 
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [availableUsers, setAvailableUsers] = useState<Partial<IUser>[]>(propUsers);
+  const [uploadedFiles, setUploadedFiles] = useState<ICommentAttachment[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchComments = useCallback(async () => {
     const params = taskId ? `taskId=${taskId}` : `alertId=${alertId}`;
@@ -33,7 +37,6 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [] 
     setFetching(false);
   }, [alertId, taskId]);
 
-  // Load users for @mention if not provided as props
   const fetchUsers = useCallback(async () => {
     if (propUsers.length > 0) return;
     const result = await apiFetch<Partial<IUser>[]>('/api/users');
@@ -55,7 +58,6 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [] 
     const val = e.target.value;
     setContent(val);
 
-    // Detect @mention
     const atIndex = val.lastIndexOf('@');
     if (atIndex !== -1) {
       const query = val.slice(atIndex + 1);
@@ -78,8 +80,40 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [] 
     textareaRef.current?.focus();
   };
 
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploadingFile(true);
+    const newFiles: ICommentAttachment[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+        const uploadData = await uploadRes.json();
+        if (uploadData.success) {
+          newFiles.push({
+            id: `${Date.now()}-${i}`,
+            name: file.name,
+            url: uploadData.data.url,
+            type: file.type,
+            size: file.size,
+            uploadedAt: new Date(),
+          });
+        }
+      } catch {
+        // skip failed
+      }
+    }
+    setUploadedFiles((prev) => [...prev, ...newFiles]);
+    setUploadingFile(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeFile = (id: string) => setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
+
   const handleSubmit = async () => {
-    if (!content.trim()) return;
+    if (!content.trim() && uploadedFiles.length === 0) return;
     setLoading(true);
 
     const result = await apiFetch<IComment>('/api/comments', {
@@ -89,6 +123,7 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [] 
         alertId,
         content: content.trim(),
         mentions,
+        attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined,
       }),
     });
 
@@ -96,6 +131,7 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [] 
       setComments((prev) => [...prev, result.data!]);
       setContent('');
       setMentions([]);
+      setUploadedFiles([]);
     }
 
     setLoading(false);
@@ -106,80 +142,148 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [] 
   );
 
   return (
-    <div className="flex flex-col h-full border-t border-gray-100">
-      {/* Thread header */}
-      <div className="px-4 py-2 border-b border-gray-100 bg-gray-50">
-        <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-gray-500">
-          Discussion Thread · {comments.length} messages
-        </span>
+    <>
+      <div className="flex flex-col h-full border-t border-gray-100">
+        {/* Thread header */}
+        <div className="px-4 py-2 border-b border-gray-100 bg-gray-50">
+          <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-gray-500">
+            Discussion Thread · {comments.length} messages
+          </span>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {fetching && (
+            <div className="flex items-center justify-center h-16">
+              <span className="text-xs text-gray-400 font-mono">Loading...</span>
+            </div>
+          )}
+
+          {!fetching && comments.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-xs text-gray-400 font-mono">No messages yet. Start the discussion.</p>
+            </div>
+          )}
+
+          {comments.map((comment) => (
+            <CommentItem key={comment._id} comment={comment} onImagePreview={(url, name) => setPreviewImage({ url, name })} />
+          ))}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Input */}
+        <div className="border-t border-gray-200 p-3 bg-white relative">
+          {showMentionDropdown && filteredUsers.length > 0 && (
+            <div className="absolute bottom-full left-3 right-3 mb-1 bg-white border border-gray-200 shadow-lg z-10 max-h-32 overflow-y-auto">
+              {filteredUsers.map((user) => (
+                <button
+                  key={user._id}
+                  onClick={() => insertMention(user)}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 border-b border-gray-100 last:border-0"
+                >
+                  <span className="font-medium text-gray-900">{user.name}</span>
+                  <span className="text-gray-400 font-mono text-[10px] uppercase">{user.department}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Pending file attachments */}
+          {uploadedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {uploadedFiles.map((f) => (
+                <span key={f.id} className="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-mono bg-gray-50 border border-gray-200 text-gray-700">
+                  {f.type.startsWith('image/') ? (
+                    <img src={f.url} alt={f.name} className="w-5 h-5 object-cover rounded" />
+                  ) : (
+                    <Paperclip className="w-3 h-3" />
+                  )}
+                  {f.name}
+                  <button type="button" onClick={() => removeFile(f.id)} className="text-gray-400 hover:text-red-500"><X className="w-3 h-3" /></button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-2 items-end">
+            <div className="flex-1 relative">
+              <textarea
+                ref={textareaRef}
+                value={content}
+                onChange={handleContentChange}
+                placeholder="Add a comment... Use @name to mention"
+                rows={2}
+                className="w-full text-sm resize-none border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors placeholder:text-gray-400 font-mono"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.metaKey) handleSubmit();
+                }}
+              />
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+              className="hidden"
+              onChange={(e) => handleFileUpload(e.target.files)}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingFile}
+              className="flex-shrink-0 p-2.5 text-gray-400 hover:text-black border border-gray-200 hover:border-black transition-colors disabled:opacity-40"
+              title="Attach file"
+            >
+              {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={loading || (!content.trim() && uploadedFiles.length === 0)}
+              className="flex-shrink-0 p-2.5 bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </button>
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1 font-mono">⌘+Enter to send · @name to mention · Attach files</p>
+        </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {fetching && (
-          <div className="flex items-center justify-center h-16">
-            <span className="text-xs text-gray-400 font-mono">Loading...</span>
-          </div>
-        )}
-
-        {!fetching && comments.length === 0 && (
-          <div className="text-center py-8">
-            <p className="text-xs text-gray-400 font-mono">No messages yet. Start the discussion.</p>
-          </div>
-        )}
-
-        {comments.map((comment) => (
-          <CommentItem key={comment._id} comment={comment} />
-        ))}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Input */}
-      <div className="border-t border-gray-200 p-3 bg-white relative">
-        {showMentionDropdown && filteredUsers.length > 0 && (
-          <div className="absolute bottom-full left-3 right-3 mb-1 bg-white border border-gray-200 shadow-lg z-10 max-h-32 overflow-y-auto">
-            {filteredUsers.map((user) => (
-              <button
-                key={user._id}
-                onClick={() => insertMention(user)}
-                className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 border-b border-gray-100 last:border-0"
-              >
-                <span className="font-medium text-gray-900">{user.name}</span>
-                <span className="text-gray-400 font-mono text-[10px] uppercase">{user.department}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="flex gap-2 items-end">
-          <div className="flex-1 relative">
-            <textarea
-              ref={textareaRef}
-              value={content}
-              onChange={handleContentChange}
-              placeholder="Add a comment... Use @name to mention"
-              rows={2}
-              className="w-full text-sm resize-none border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors placeholder:text-gray-400 font-mono"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && e.metaKey) handleSubmit();
-              }}
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between bg-white px-4 py-2 border-b border-gray-200">
+              <span className="text-xs font-mono font-bold text-gray-900 truncate max-w-[300px]">{previewImage.name}</span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewImage.url}
+                  download={previewImage.name}
+                  className="flex items-center gap-1 text-[10px] font-mono text-blue-600 hover:text-blue-800"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download
+                </a>
+                <button onClick={() => setPreviewImage(null)} className="text-gray-400 hover:text-white ml-2">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <img
+              src={previewImage.url}
+              alt={previewImage.name}
+              className="max-w-full max-h-[80vh] object-contain bg-white"
             />
           </div>
-          <button
-            onClick={handleSubmit}
-            disabled={loading || !content.trim()}
-            className="flex-shrink-0 p-2.5 bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <Send className="w-4 h-4" />
-          </button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1 font-mono">⌘+Enter to send</p>
-      </div>
-    </div>
+      )}
+    </>
   );
 }
 
-function CommentItem({ comment }: { comment: IComment }) {
+function CommentItem({ comment, onImagePreview }: { comment: IComment; onImagePreview: (url: string, name: string) => void }) {
   const author = typeof comment.author === 'object' ? comment.author as Partial<IUser> : null;
   const isSystemLog = comment.isSystemLog;
 
@@ -215,6 +319,48 @@ function CommentItem({ comment }: { comment: IComment }) {
         <div className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">
           {renderContentWithMentions(comment.content)}
         </div>
+
+        {/* Attachments */}
+        {comment.attachments && comment.attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {comment.attachments.map((att) => (
+              <div key={att.id} className="group relative">
+                {att.type.startsWith('image/') ? (
+                  <div className="inline-flex flex-col items-start">
+                    <button
+                      onClick={() => onImagePreview(att.url, att.name)}
+                      className="border border-gray-200 hover:border-black transition-colors overflow-hidden"
+                    >
+                      <img src={att.url} alt={att.name} className="w-20 h-20 object-cover" />
+                    </button>
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-[9px] font-mono text-gray-400 truncate max-w-[80px]">{att.name}</span>
+                      <a
+                        href={att.url}
+                        download={att.name}
+                        className="text-[9px] font-mono text-blue-600 hover:text-blue-800"
+                        title="Download"
+                      >
+                        <Download className="w-2.5 h-2.5" />
+                      </a>
+                    </div>
+                  </div>
+                ) : (
+                  <a
+                    href={att.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-mono bg-gray-50 border border-gray-200 text-gray-600 hover:border-black transition-colors"
+                  >
+                    <Paperclip className="w-3 h-3" />
+                    <span className="truncate max-w-[100px]">{att.name}</span>
+                    <Download className="w-2.5 h-2.5 text-gray-400 ml-1" />
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
