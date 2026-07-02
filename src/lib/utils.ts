@@ -63,11 +63,11 @@ export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
 };
 
 export const PROJECT_STATUS_STYLE: Record<ProjectStatus, string> = {
-  [ProjectStatus.NEW]: 'bg-gray-100 text-gray-800 border-gray-200',
-  [ProjectStatus.IN_PRODUCTION]: 'bg-black text-white border-black',
+  [ProjectStatus.NEW]: 'bg-primary-100 text-dark-600 border-primary-200',
+  [ProjectStatus.IN_PRODUCTION]: 'bg-dark-500 text-white border-dark-500',
   [ProjectStatus.ON_HOLD]: 'bg-red-50 text-red-700 border-red-300',
-  [ProjectStatus.COMPLETED]: 'bg-gray-800 text-white border-gray-800',
-  [ProjectStatus.DISPATCHED]: 'bg-gray-200 text-gray-700 border-gray-300',
+  [ProjectStatus.COMPLETED]: 'bg-dark-600 text-white border-dark-600',
+  [ProjectStatus.DISPATCHED]: 'bg-primary-200 text-dark-600 border-primary-300',
 };
 
 export const PRIORITY_LABEL: Record<ProjectPriority, string> = {
@@ -78,9 +78,9 @@ export const PRIORITY_LABEL: Record<ProjectPriority, string> = {
 };
 
 export const PRIORITY_STYLE: Record<ProjectPriority, string> = {
-  [ProjectPriority.STANDARD]: 'text-gray-500 border-gray-200',
-  [ProjectPriority.NECESSARY]: 'text-gray-700 border-gray-400',
-  [ProjectPriority.PRIORITY]: 'text-black border-black font-semibold',
+  [ProjectPriority.STANDARD]: 'text-primary-500 border-primary-200',
+  [ProjectPriority.NECESSARY]: 'text-dark-600 border-primary-400',
+  [ProjectPriority.PRIORITY]: 'text-dark-500 border-dark-500 font-semibold',
   [ProjectPriority.URGENT]: 'text-red-600 border-red-500 font-bold',
 };
 
@@ -109,10 +109,10 @@ export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
 };
 
 export const TASK_STATUS_STYLE: Record<TaskStatus, string> = {
-  [TaskStatus.TODO]: 'bg-gray-100 text-gray-600 border-gray-200',
-  [TaskStatus.IN_PROGRESS]: 'bg-black text-white border-black',
+  [TaskStatus.TODO]: 'bg-primary-100 text-dark-400 border-primary-200',
+  [TaskStatus.IN_PROGRESS]: 'bg-dark-500 text-white border-dark-500',
   [TaskStatus.BLOCKED]: 'bg-red-50 text-red-700 border-red-400',
-  [TaskStatus.DONE]: 'bg-gray-800 text-white border-gray-800',
+  [TaskStatus.DONE]: 'bg-dark-600 text-white border-dark-600',
 };
 
 export const ALERT_TYPE_LABEL: Record<AlertType, string> = {

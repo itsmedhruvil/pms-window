@@ -130,8 +130,8 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-black text-gray-900">Create Internal Task</h2>
-          <p className="text-xs text-gray-500 font-mono">Add department-wide internal tasks.</p>
+          <h2 className="text-lg font-black text-dark-500">Create Internal Task</h2>
+          <p className="text-xs text-primary-500 font-mono">Add department-wide internal tasks.</p>
         </div>
       </div>
 
@@ -143,8 +143,8 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
           className={cn(
             'flex items-center gap-2 px-4 py-3 border text-xs font-mono font-bold uppercase tracking-wide transition-colors',
             mode === 'simple'
-              ? 'border-black bg-black text-white'
-              : 'border-gray-200 text-gray-600 hover:border-gray-400'
+              ? 'border-dark-500 bg-dark-500 text-white'
+              : 'border-primary-200 text-dark-400 hover:border-primary-400'
           )}
         >
           <Plus className="w-4 h-4" />
@@ -156,8 +156,8 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
           className={cn(
             'flex items-center gap-2 px-4 py-3 border text-xs font-mono font-bold uppercase tracking-wide transition-colors',
             mode === 'import'
-              ? 'border-black bg-black text-white'
-              : 'border-gray-200 text-gray-600 hover:border-gray-400'
+              ? 'border-dark-500 bg-dark-500 text-white'
+              : 'border-primary-200 text-dark-400 hover:border-primary-400'
           )}
         >
           <Layers className="w-4 h-4" />
@@ -183,34 +183,34 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
       {mode === 'simple' && (
         <>
           <div className="grid gap-4">
-            <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+            <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
               Task Title
               <input
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+                className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
                 placeholder="E.g. Review production schedules"
               />
             </label>
 
-            <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+            <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
               Description
               <textarea
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={4}
-                className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+                className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
                 placeholder="Describe the task and expected outcome"
               />
             </label>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+              <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
                 Department
                 <select
                   value={form.department}
                   onChange={(e) => setForm({ ...form, department: e.target.value as Department })}
-                  className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+                  className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
                 >
                   {departments.map((department) => (
                     <option key={department.name} value={department.name}>{department.label}</option>
@@ -218,23 +218,23 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
                 </select>
               </label>
 
-              <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+              <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
                 Due Date
                 <input
                   type="date"
                   value={form.dueDate}
                   onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                  className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+                  className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
                 />
               </label>
             </div>
 
-            <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+            <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
               Frequency
               <select
                 value={form.frequency}
                 onChange={(e) => setForm({ ...form, frequency: e.target.value })}
-                className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+                className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
               >
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
@@ -246,11 +246,11 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
             </label>
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-primary-200">
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 text-xs font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600"
+              className="px-4 py-2 text-xs font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400"
             >
               Cancel
             </button>
@@ -260,7 +260,7 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
               onClick={handleSubmit}
               className={cn(
                 'px-4 py-2 text-xs font-mono font-bold uppercase transition-colors disabled:opacity-50',
-                'bg-black text-white hover:bg-gray-800'
+                'bg-dark-500 text-white hover:bg-dark-600'
               )}
             >
               {loading ? 'Creating...' : 'Create Internal Task'}
@@ -273,16 +273,16 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
       {mode === 'import' && (
         <div className="space-y-4">
           {internalTemplateGroups.length === 0 ? (
-            <div className="border border-dashed border-gray-200 p-10 text-center">
-              <Layers className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-              <p className="text-sm font-mono text-gray-400">No template groups with internal tasks available.</p>
-              <p className="text-[10px] font-mono text-gray-400 mt-1">
+            <div className="border border-dashed border-primary-200 p-10 text-center">
+              <Layers className="w-8 h-8 text-primary-300 mx-auto mb-3" />
+              <p className="text-sm font-mono text-primary-400">No template groups with internal tasks available.</p>
+              <p className="text-[10px] font-mono text-primary-400 mt-1">
                 Create a template group with internal-type tasks first.
               </p>
             </div>
           ) : (
             <>
-              <p className="text-xs text-gray-600 font-mono">
+              <p className="text-xs text-dark-400 font-mono">
                 Select a template group to import all internal tasks at once.
               </p>
 
@@ -300,21 +300,21 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
                       className={cn(
                         'w-full text-left border p-4 transition-colors',
                         isSelected
-                          ? 'border-black bg-gray-50'
-                          : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                          ? 'border-dark-500 bg-primary-50'
+                          : 'border-primary-200 hover:border-primary-400 hover:bg-primary-50'
                       )}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-gray-900">{group.name}</p>
+                          <p className="text-sm font-bold text-dark-500">{group.name}</p>
                           {group.description && (
-                            <p className="text-xs text-gray-500 font-mono mt-0.5 truncate">{group.description}</p>
+                            <p className="text-xs text-primary-500 font-mono mt-0.5 truncate">{group.description}</p>
                           )}
-                          <div className="flex items-center gap-3 mt-2 text-[10px] font-mono text-gray-500">
-                            <span className="font-bold text-gray-700">{internalTasks.length} task{internalTasks.length > 1 ? 's' : ''}</span>
-                            <span className="text-gray-300">·</span>
+                          <div className="flex items-center gap-3 mt-2 text-[10px] font-mono text-primary-500">
+                            <span className="font-bold text-dark-600">{internalTasks.length} task{internalTasks.length > 1 ? 's' : ''}</span>
+                            <span className="text-primary-300">·</span>
                             <span>{departmentsInGroup.length} department{departmentsInGroup.length > 1 ? 's' : ''}</span>
-                            <span className="text-gray-300">·</span>
+                            <span className="text-primary-300">·</span>
                             <span className="truncate">
                               {departmentsInGroup.map((d) =>
                                 departments.find((dept) => dept.name === d)?.label || d
@@ -323,21 +323,21 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
                           </div>
                         </div>
                         {isSelected && (
-                          <Check className="w-5 h-5 text-black flex-shrink-0" />
+                          <Check className="w-5 h-5 text-dark-500 flex-shrink-0" />
                         )}
                       </div>
 
                       {/* Show tasks preview */}
                       {isSelected && (
-                        <div className="mt-3 pt-3 border-t border-gray-200 space-y-1">
-                          <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-1">
+                        <div className="mt-3 pt-3 border-t border-primary-200 space-y-1">
+                          <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500 mb-1">
                             Tasks to import:
                           </p>
                           {internalTasks.map((t, idx) => (
                             <div key={idx} className="flex items-center gap-2 text-[11px]">
-                              <FileText className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                              <span className="text-gray-700 truncate">{t.title}</span>
-                              <span className="text-[9px] font-mono text-gray-400 ml-auto flex-shrink-0">
+                              <FileText className="w-3 h-3 text-primary-400 flex-shrink-0" />
+                              <span className="text-dark-600 truncate">{t.title}</span>
+                              <span className="text-[9px] font-mono text-primary-400 ml-auto flex-shrink-0">
                                 {departments.find((dept) => dept.name === t.department)?.label || t.department}
                               </span>
                             </div>
@@ -349,11 +349,11 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
                 })}
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-primary-200">
                 <button
                   type="button"
                   onClick={onCancel}
-                  className="px-4 py-2 text-xs font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600"
+                  className="px-4 py-2 text-xs font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400"
                 >
                   Cancel
                 </button>
@@ -363,7 +363,7 @@ export function CreateInternalTaskForm({ onSuccess, onCancel, department, templa
                   onClick={handleImport}
                   className={cn(
                     'flex items-center gap-2 px-4 py-2 text-xs font-mono font-bold uppercase transition-colors disabled:opacity-50',
-                    'bg-black text-white hover:bg-gray-800'
+                    'bg-dark-500 text-white hover:bg-dark-600'
                   )}
                 >
                   {loading ? (

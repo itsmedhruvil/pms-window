@@ -55,7 +55,7 @@ export function DashboardAlertsPane({
     switch (severity) {
       case 'critical': return 'border-red-500 bg-red-50';
       case 'high': return 'border-orange-400 bg-orange-50';
-      default: return 'border-gray-300 bg-gray-50';
+      default: return 'border-primary-300 bg-primary-50';
     }
   };
 
@@ -67,13 +67,13 @@ export function DashboardAlertsPane({
     : [];
 
   return (
-    <div className="border border-gray-200">
+    <div className="border border-primary-200">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50/50">
+      <div className="px-4 py-3 border-b border-primary-200 bg-primary-50/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-red-500" />
-            <span className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500">
+            <span className="text-xs font-mono font-bold uppercase tracking-widest text-primary-500">
               Active Alerts
             </span>
             {activeAlerts.length > 0 && (
@@ -86,7 +86,7 @@ export function DashboardAlertsPane({
             <button
               type="button"
               onClick={() => refreshAlerts()}
-              className="text-[9px] font-mono text-gray-400 hover:text-gray-700 px-1.5 py-0.5"
+              className="text-[9px] font-mono text-primary-400 hover:text-dark-600 px-1.5 py-0.5"
               title="Refresh"
             >
               ↻
@@ -97,11 +97,11 @@ export function DashboardAlertsPane({
 
       {loading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+          <Loader2 className="w-4 h-4 text-primary-400 animate-spin" />
         </div>
       ) : error ? (
         <div className="px-4 py-6 text-center">
-          <p className="text-[10px] font-mono text-gray-400">Failed to load</p>
+          <p className="text-[10px] font-mono text-primary-400">Failed to load</p>
           <button
             type="button"
             onClick={() => refreshAlerts()}
@@ -123,24 +123,24 @@ export function DashboardAlertsPane({
                     key={alert._id}
                     href={`/alerts`}
                     className={cn(
-                      'block px-4 py-2.5 transition-colors hover:bg-gray-50 border-l-2',
+                      'block px-4 py-2.5 transition-colors hover:bg-primary-50 border-l-2',
                       getAlertSeverityColor(alert.severity)
                     )}
                   >
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-bold text-gray-900 truncate">
+                        <p className="text-[10px] font-bold text-dark-500 truncate">
                           {project?.projectTitle || 'Project'}
                         </p>
-                        <p className="text-[9px] text-gray-600 mt-0.5 line-clamp-2">
+                        <p className="text-[9px] text-dark-400 mt-0.5 line-clamp-2">
                           {alert.message}
                         </p>
-                        <div className="flex items-center gap-2 mt-1 text-[8px] font-mono text-gray-400">
+                        <div className="flex items-center gap-2 mt-1 text-[8px] font-mono text-primary-400">
                           <span className={cn(
                             'uppercase font-bold',
                             alert.severity === 'critical' ? 'text-red-600' :
-                            alert.severity === 'high' ? 'text-orange-600' : 'text-gray-500'
+                            alert.severity === 'high' ? 'text-orange-600' : 'text-primary-500'
                           )}>
                             {alert.severity}
                           </span>
@@ -155,9 +155,9 @@ export function DashboardAlertsPane({
             </div>
           ) : (
             <div className="px-4 py-8 text-center">
-              <Bell className="w-6 h-6 text-gray-300 mx-auto mb-2" />
-              <p className="text-[10px] font-mono text-gray-400">No active alerts</p>
-              <p className="text-[9px] font-mono text-gray-400 mt-0.5">Everything is looking good!</p>
+              <Bell className="w-6 h-6 text-primary-300 mx-auto mb-2" />
+              <p className="text-[10px] font-mono text-primary-400">No active alerts</p>
+              <p className="text-[9px] font-mono text-primary-400 mt-0.5">Everything is looking good!</p>
             </div>
           )}
         </div>
@@ -169,7 +169,7 @@ export function DashboardAlertsPane({
       {/* Department Progress (moved here from DashboardMetrics) */}
       {data && sortedDepts.length > 0 && (
         <div className="px-4 py-3">
-          <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
+          <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500 mb-2">
             Department Progress
           </h3>
           <div className="space-y-2">
@@ -178,14 +178,14 @@ export function DashboardAlertsPane({
               return (
                 <div key={dept}>
                   <div className="flex items-center justify-between text-[10px] font-mono mb-0.5">
-                    <span className="text-gray-700 truncate">{getDepartmentLabel(dept)}</span>
-                    <span className={cn('font-bold', rate === 100 ? 'text-green-600' : rate < 30 ? 'text-red-500' : 'text-gray-900')}>
+                    <span className="text-dark-600 truncate">{getDepartmentLabel(dept)}</span>
+                    <span className={cn('font-bold', rate === 100 ? 'text-green-600' : rate < 30 ? 'text-red-500' : 'text-dark-500')}>
                       {rate}%
                     </span>
                   </div>
-                  <div className="h-1.5 bg-gray-100 overflow-hidden">
+                  <div className="h-1.5 bg-primary-100 overflow-hidden">
                     <div
-                      className={cn('h-full transition-all', rate === 100 ? 'bg-green-500' : rate < 30 ? 'bg-red-500' : 'bg-black')}
+                      className={cn('h-full transition-all', rate === 100 ? 'bg-green-500' : rate < 30 ? 'bg-red-500' : 'bg-dark-500')}
                       style={{ width: `${rate}%` }}
                     />
                   </div>
@@ -199,7 +199,7 @@ export function DashboardAlertsPane({
       {/* Alerts by Type (moved here from DashboardMetrics) */}
       {data && (
         <div className="px-4 py-3">
-          <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
+          <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500 mb-2">
             Alerts by Type
           </h3>
           <div className="grid grid-cols-2 gap-1.5">
@@ -208,10 +208,10 @@ export function DashboardAlertsPane({
               return (
                 <div key={type} className={cn(
                   'p-2 border text-center',
-                  count > 0 ? 'border-red-200 bg-red-50/50' : 'border-gray-100'
+                  count > 0 ? 'border-red-200 bg-red-50/50' : 'border-primary-100'
                 )}>
-                  <p className="text-[8px] font-mono text-gray-500 uppercase truncate">{ALERT_TYPE_LABEL[type]}</p>
-                  <p className={cn('text-sm font-black font-mono', count > 0 ? 'text-red-600' : 'text-gray-300')}>{count}</p>
+                  <p className="text-[8px] font-mono text-primary-500 uppercase truncate">{ALERT_TYPE_LABEL[type]}</p>
+                  <p className={cn('text-sm font-black font-mono', count > 0 ? 'text-red-600' : 'text-primary-300')}>{count}</p>
                 </div>
               );
             })}
@@ -220,7 +220,7 @@ export function DashboardAlertsPane({
       )}
 
       {/* Footer links */}
-      <div className="px-4 py-2 border-t border-gray-200 bg-gray-50/50 flex items-center justify-between">
+      <div className="px-4 py-2 border-t border-primary-200 bg-primary-50/50 flex items-center justify-between">
         <Link
           href="/alerts"
           className="text-[9px] font-mono text-blue-600 hover:text-blue-800 flex items-center gap-1"

@@ -36,7 +36,7 @@ export function AlertSidebar({ alerts, onAlertAction, currentUserId, isAdmin }: 
   if (activeAlerts.length === 0) return null;
 
   return (
-    <div className="fixed right-0 top-16 h-[calc(100vh-4rem)] w-80 border-l border-gray-200 bg-white z-[60] flex flex-col overflow-hidden">
+    <div className="fixed right-0 top-16 h-[calc(100vh-4rem)] w-80 border-l border-primary-200 bg-white z-[60] flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-red-100 bg-red-50">
         <div className="flex items-center gap-2">
@@ -96,13 +96,13 @@ function AlertCard({
 
   return (
     <div className={cn(
-      'border-b border-gray-100 transition-colors',
+      'border-b border-primary-100 transition-colors',
       isCritical ? 'border-l-4 border-l-red-600' : 'border-l-4 border-l-red-400'
     )}>
       {/* Alert header */}
       <button
         onClick={onToggle}
-        className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors"
+        className="w-full text-left px-4 py-3 hover:bg-primary-50 transition-colors"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -110,19 +110,19 @@ function AlertCard({
               <AlertSeverityBadge severity={alert.severity} />
               <AlertStatusBadge status={alert.status} />
             </div>
-            <p className="text-xs font-semibold text-gray-900 truncate">
+            <p className="text-xs font-semibold text-dark-500 truncate">
               {ALERT_TYPE_LABEL[alert.type]}
             </p>
-            <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+            <p className="text-[11px] text-primary-500 mt-0.5 truncate">
               {typeof alert.projectId === 'object' && 'projectTitle' in alert.projectId
                 ? (alert.projectId as { projectTitle: string }).projectTitle
                 : 'Project'}
             </p>
           </div>
           {isExpanded ? (
-            <ChevronUp className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
+            <ChevronUp className="w-3.5 h-3.5 text-primary-400 flex-shrink-0 mt-0.5" />
           ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
+            <ChevronDown className="w-3.5 h-3.5 text-primary-400 flex-shrink-0 mt-0.5" />
           )}
         </div>
       </button>
@@ -130,27 +130,27 @@ function AlertCard({
       {/* Expanded content */}
       {isExpanded && (
         <div className="px-4 pb-4 space-y-3">
-          <p className="text-xs text-gray-700 leading-relaxed border-l-2 border-gray-200 pl-2">
+          <p className="text-xs text-dark-600 leading-relaxed border-l-2 border-primary-200 pl-2">
             {alert.message}
           </p>
 
           <div className="space-y-1">
-            <div className="flex items-center gap-2 text-[11px] text-gray-500">
+            <div className="flex items-center gap-2 text-[11px] text-primary-500">
               <span className="font-mono">RAISED BY</span>
-              <span className="font-medium text-gray-700">
+              <span className="font-medium text-dark-600">
                 {typeof alert.raisedBy === 'object' && 'name' in alert.raisedBy
                   ? (alert.raisedBy as { name: string }).name
                   : 'Admin'}
               </span>
             </div>
-            <div className="text-[11px] text-gray-400">
+            <div className="text-[11px] text-primary-400">
               {timeAgo(alert.createdAt)}
             </div>
           </div>
 
           {/* Affected departments + acknowledgement status */}
           <div>
-            <span className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-wider mb-1 block">Acknowledgements</span>
+            <span className="text-[10px] font-mono font-bold text-primary-500 uppercase tracking-wider mb-1 block">Acknowledgements</span>
             <div className="flex flex-wrap gap-1">
               {alert.affectedDepartments.map((dept) => {
                 const deptAcknowledged = Array.isArray(alert.acknowledgedBy)
@@ -167,8 +167,8 @@ function AlertCard({
                     className={cn(
                       'text-[10px] font-mono px-1.5 py-0.5 uppercase tracking-wide',
               deptAcknowledged
-                ? 'bg-gray-800 text-white'
-                : 'bg-gray-100 text-gray-600'
+                ? 'bg-dark-600 text-white'
+                : 'bg-primary-100 text-dark-400'
                     )}
                   >
                     {deptAcknowledged ? '✓ ' : ''}{dept.replace('_', ' ')}
@@ -177,7 +177,7 @@ function AlertCard({
               })}
             </div>
             {Array.isArray(alert.acknowledgedBy) && alert.acknowledgedBy.length > 0 && (
-              <div className="mt-1 text-[10px] text-gray-400">
+              <div className="mt-1 text-[10px] text-primary-400">
                 Acknowledged by: {alert.acknowledgedBy
                   .map((a) => {
                     if (typeof a === 'object' && a !== null && 'name' in a) {
@@ -198,7 +198,7 @@ function AlertCard({
               <button
                 onClick={onAcknowledge}
                 disabled={loading === alert._id + 'acknowledge'}
-                className="flex-1 text-[11px] font-mono font-bold py-1.5 px-2 border border-black text-black hover:bg-black hover:text-white transition-colors disabled:opacity-50 uppercase tracking-wide"
+                className="flex-1 text-[11px] font-mono font-bold py-1.5 px-2 border border-dark-500 text-dark-500 hover:bg-dark-500 hover:text-white transition-colors disabled:opacity-50 uppercase tracking-wide"
               >
                 {loading === alert._id + 'acknowledge' ? '...' : 'Acknowledge'}
               </button>
@@ -207,7 +207,7 @@ function AlertCard({
               <button
                 onClick={onResolve}
                 disabled={loading === alert._id + 'resolve'}
-                className="flex-1 text-[11px] font-mono font-bold py-1.5 px-2 bg-black text-white hover:bg-gray-800 transition-colors disabled:opacity-50 uppercase tracking-wide"
+                className="flex-1 text-[11px] font-mono font-bold py-1.5 px-2 bg-dark-500 text-white hover:bg-dark-600 transition-colors disabled:opacity-50 uppercase tracking-wide"
               >
                 {loading === alert._id + 'resolve' ? '...' : 'Resolve'}
               </button>

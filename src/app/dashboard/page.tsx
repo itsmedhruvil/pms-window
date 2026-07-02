@@ -25,21 +25,21 @@ export default async function DashboardPage() {
   return (
     <AppLayout activeAlertCount={data?.metrics?.activeAlertCount ?? 0}>
       <div className="p-4 sm:p-6">
-        <div className="mb-6 pb-4 border-b border-gray-200">
+        <div className="mb-6 pb-4 border-b border-primary-200">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-black text-gray-900 tracking-tight">
+              <h1 className="text-xl font-black text-dark-500 tracking-tight">
                 {isAdmin ? 'Operations Dashboard' : `${user.department.charAt(0).toUpperCase() + user.department.slice(1)} Dashboard`}
               </h1>
-              <p className="text-xs text-gray-500 font-mono mt-0.5">
+              <p className="text-xs text-primary-500 font-mono mt-0.5">
                 {isAdmin ? 'Real-time manufacturing workflow overview' : 'Your department task overview'}
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-gray-500 font-mono">
+              <p className="text-xs text-primary-500 font-mono">
                 {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
-              <p className="text-[10px] text-gray-400 font-mono mt-0.5">Welcome, {user.name}</p>
+              <p className="text-[10px] text-primary-400 font-mono mt-0.5">Welcome, {user.name}</p>
             </div>
           </div>
         </div>
@@ -54,9 +54,9 @@ export default async function DashboardPage() {
                 currentDepartment={isAdmin ? undefined : user.department}
               />
             ) : (
-              <div className="border border-gray-200 p-12 text-center">
-                <p className="text-sm text-gray-500 font-mono">No data available yet.</p>
-                <p className="text-xs text-gray-400 font-mono mt-1">Create your first project to see metrics here.</p>
+              <div className="border border-primary-200 p-12 text-center">
+                <p className="text-sm text-primary-500 font-mono">No data available yet.</p>
+                <p className="text-xs text-primary-400 font-mono mt-1">Create your first project to see metrics here.</p>
               </div>
             )}
           </div>
@@ -69,14 +69,14 @@ export default async function DashboardPage() {
 
         {/* Tasks by Department — full-width */}
         {data && data.charts.tasksByDepartment.length > 0 && (
-          <div className="mt-6 border border-gray-200 p-3">
+          <div className="mt-6 border border-primary-200 p-3">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Tasks by Department</span>
+                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">Tasks by Department</span>
               </div>
               <div className="flex items-center gap-2 text-[8px] font-mono">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-black" /> Done</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gray-400" /> Active</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-dark-500" /> Done</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-primary-400" /> Active</span>
                 <span className="flex items-center gap-1"><span className="w-2 h-2 bg-red-500" /> Blocked</span>
               </div>
             </div>
@@ -89,13 +89,13 @@ export default async function DashboardPage() {
                 return (
                   <div key={dept}>
                     <div className="flex items-center justify-between text-[9px] font-mono mb-0.5">
-                      <span className="text-gray-600">{getDepartmentLabel(dept)}</span>
-                      <span className="text-gray-400">{done}/{total}</span>
+                      <span className="text-dark-400">{getDepartmentLabel(dept)}</span>
+                      <span className="text-primary-400">{done}/{total}</span>
                     </div>
-                    <div className="h-4 bg-gray-100 overflow-hidden flex">
+                    <div className="h-4 bg-primary-100 overflow-hidden flex">
                       {blockedPct > 0 && <div className="h-full bg-red-500 transition-all" style={{ width: `${blockedPct}%` }} />}
-                      {inProgPct > 0 && <div className="h-full bg-gray-400 transition-all" style={{ width: `${inProgPct}%` }} />}
-                      {donePct > 0 && <div className="h-full bg-black transition-all" style={{ width: `${donePct}%` }} />}
+                      {inProgPct > 0 && <div className="h-full bg-primary-400 transition-all" style={{ width: `${inProgPct}%` }} />}
+                      {donePct > 0 && <div className="h-full bg-dark-500 transition-all" style={{ width: `${donePct}%` }} />}
                     </div>
                   </div>
                 );

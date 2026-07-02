@@ -206,10 +206,10 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="mb-6 pb-4 border-b border-gray-200">
+      <div className="mb-6 pb-4 border-b border-primary-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-black text-gray-900">Alerts</h1>
+            <h1 className="text-xl font-black text-dark-500">Alerts</h1>
             {activeCount > 0 && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-100 border border-red-300 text-red-700 text-xs font-mono font-bold">
                 <AlertTriangle className="w-3 h-3 animate-pulse" />
@@ -218,7 +218,7 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
             )}
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500 font-mono">{alerts.length} total</span>
+            <span className="text-xs text-primary-500 font-mono">{alerts.length} total</span>
             <button
               onClick={() => { setCreateAlertOpen(true); setCreateStep('type'); }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide border border-red-300 text-red-600 hover:bg-red-50 transition-colors"
@@ -232,7 +232,7 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
 
       {/* Filters */}
       <div className="flex items-center gap-3 mb-5">
-        <Filter className="w-3.5 h-3.5 text-gray-400" />
+        <Filter className="w-3.5 h-3.5 text-primary-400" />
 
         {/* Desktop filters */}
         <div className="hidden sm:flex items-center gap-3">
@@ -245,11 +245,11 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
                   'px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wide border transition-colors',
                   statusFilter === s
                     ? s === 'all'
-                      ? 'bg-black text-white border-black'
+                      ? 'bg-dark-500 text-white border-dark-500'
                       : s === AlertStatus.ACTIVE
                       ? 'bg-red-600 text-white border-red-700'
-                      : 'bg-gray-800 text-white border-gray-800'
-                    : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                      : 'bg-dark-600 text-white border-dark-600'
+                    : 'border-primary-200 text-primary-500 hover:border-primary-400'
                 )}
               >
                 {s === 'all' ? 'All' : s}
@@ -257,12 +257,12 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
             ))}
           </div>
 
-          <div className="w-px h-4 bg-gray-200" />
+          <div className="w-px h-4 bg-primary-200" />
 
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as AlertType | 'all')}
-            className="text-[10px] font-mono border border-gray-200 px-2 py-1 focus:outline-none focus:border-black"
+            className="text-[10px] font-mono border border-primary-200 px-2 py-1 focus:outline-none focus:border-dark-500"
           >
             <option value="all">All Types</option>
             {Object.values(AlertType).map((t) => (
@@ -281,7 +281,7 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
       {/* Mobile filter drawer */}
       <FilterDrawer open={mobileFilterOpen} onClose={() => setMobileFilterOpen(false)} title="Alert Filters">
         <div className="mb-5">
-          <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
+          <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500 mb-2">
             Status
           </label>
           <div className="flex flex-wrap gap-1.5">
@@ -293,11 +293,11 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
                   'px-2.5 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide border transition-colors',
                   statusFilter === s
                     ? s === 'all'
-                      ? 'bg-black text-white border-black'
+                      ? 'bg-dark-500 text-white border-dark-500'
                       : s === AlertStatus.ACTIVE
                       ? 'bg-red-600 text-white border-red-700'
-                      : 'bg-gray-800 text-white border-gray-800'
-                    : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                      : 'bg-dark-600 text-white border-dark-600'
+                    : 'border-primary-200 text-primary-500 hover:border-primary-400'
                 )}
               >
                 {s === 'all' ? 'All' : s}
@@ -307,7 +307,7 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
         </div>
 
         <div className="mb-5">
-          <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
+          <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500 mb-2">
             Type
           </label>
           <div className="space-y-0.5">
@@ -316,8 +316,8 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
                 key={t}
                 onClick={() => { setTypeFilter(t); setMobileFilterOpen(false); }}
                 className={cn(
-                  'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-gray-50 transition-colors',
-                  typeFilter === t ? 'bg-gray-100 font-bold' : ''
+                  'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-primary-50 transition-colors',
+                  typeFilter === t ? 'bg-primary-100 font-bold' : ''
                 )}
               >
                 {t === 'all' ? 'All Types' : ALERT_TYPE_LABEL[t]}
@@ -342,9 +342,9 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
 
       {/* Alert list */}
       {filtered.length === 0 ? (
-        <div className="border border-dashed border-gray-200 p-16 text-center">
-          <AlertTriangle className="w-8 h-8 text-gray-200 mx-auto mb-3" />
-          <p className="text-sm text-gray-400 font-mono">No alerts match your filter</p>
+        <div className="border border-dashed border-primary-200 p-16 text-center">
+          <AlertTriangle className="w-8 h-8 text-primary-200 mx-auto mb-3" />
+          <p className="text-sm text-primary-400 font-mono">No alerts match your filter</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -377,12 +377,12 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
                 createStep === step
                   ? 'bg-red-600 text-white'
                   : ['type', 'project', 'task', 'form'].indexOf(createStep) >= idx
-                  ? 'bg-gray-800 text-white'
-                  : 'bg-gray-200 text-gray-500'
+                  ? 'bg-dark-600 text-white'
+                  : 'bg-primary-200 text-primary-500'
               )}>
                 {['type', 'project', 'task', 'form'].indexOf(createStep) > idx ? <Check className="w-3 h-3" /> : idx + 1}
               </div>
-              {idx < 3 && <div className={cn('w-6 h-px', ['type', 'project', 'task', 'form'].indexOf(createStep) > idx ? 'bg-gray-800' : 'bg-gray-200')} />}
+              {idx < 3 && <div className={cn('w-6 h-px', ['type', 'project', 'task', 'form'].indexOf(createStep) > idx ? 'bg-dark-600' : 'bg-primary-200')} />}
             </div>
           ))}
         </div>
@@ -390,20 +390,20 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
         {/* Step 1: Choose alert target type */}
         {createStep === 'type' && (
           <div className="p-5 space-y-4">
-            <h2 className="text-lg font-black text-gray-900">What type of alert?</h2>
-            <p className="text-xs text-gray-500 font-mono">Choose the scope of the alert you want to raise.</p>
+            <h2 className="text-lg font-black text-dark-500">What type of alert?</h2>
+            <p className="text-xs text-primary-500 font-mono">Choose the scope of the alert you want to raise.</p>
 
             <div className="space-y-2">
               <button
                 onClick={() => handleSelectType('global')}
-                className="w-full flex items-center gap-4 p-4 border border-gray-200 hover:border-red-300 hover:bg-red-50/50 transition-colors text-left"
+                className="w-full flex items-center gap-4 p-4 border border-primary-200 hover:border-red-300 hover:bg-red-50/50 transition-colors text-left"
               >
                 <div className="w-8 h-8 bg-red-100 flex items-center justify-center flex-shrink-0">
                   <AlertTriangle className="w-4 h-4 text-red-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-gray-900">Global Alert</p>
-                  <p className="text-[10px] text-gray-500 font-mono mt-0.5">
+                  <p className="text-xs font-bold text-dark-500">Global Alert</p>
+                  <p className="text-[10px] text-primary-500 font-mono mt-0.5">
                     Standalone alert not linked to any project or task. Affects selected departments.
                   </p>
                 </div>
@@ -411,14 +411,14 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
 
               <button
                 onClick={() => handleSelectType('project')}
-                className="w-full flex items-center gap-4 p-4 border border-gray-200 hover:border-red-300 hover:bg-red-50/50 transition-colors text-left"
+                className="w-full flex items-center gap-4 p-4 border border-primary-200 hover:border-red-300 hover:bg-red-50/50 transition-colors text-left"
               >
                 <div className="w-8 h-8 bg-amber-100 flex items-center justify-center flex-shrink-0">
                   <AlertTriangle className="w-4 h-4 text-amber-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-gray-900">Project Alert</p>
-                  <p className="text-[10px] text-gray-500 font-mono mt-0.5">
+                  <p className="text-xs font-bold text-dark-500">Project Alert</p>
+                  <p className="text-[10px] text-primary-500 font-mono mt-0.5">
                     Links to a specific project. Puts the project on hold and blocks affected department tasks.
                   </p>
                 </div>
@@ -426,14 +426,14 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
 
               <button
                 onClick={() => handleSelectType('task')}
-                className="w-full flex items-center gap-4 p-4 border border-gray-200 hover:border-red-300 hover:bg-red-50/50 transition-colors text-left"
+                className="w-full flex items-center gap-4 p-4 border border-primary-200 hover:border-red-300 hover:bg-red-50/50 transition-colors text-left"
               >
                 <div className="w-8 h-8 bg-orange-100 flex items-center justify-center flex-shrink-0">
                   <AlertTriangle className="w-4 h-4 text-orange-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-gray-900">Task Alert</p>
-                  <p className="text-[10px] text-gray-500 font-mono mt-0.5">
+                  <p className="text-xs font-bold text-dark-500">Task Alert</p>
+                  <p className="text-[10px] text-primary-500 font-mono mt-0.5">
                     Links to a specific task within a project. Puts the project on hold and blocks this task.
                   </p>
                 </div>
@@ -443,7 +443,7 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
             <div className="flex justify-end pt-2">
               <button
                 onClick={resetCreateFlow}
-                className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 transition-colors"
+                className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400 transition-colors"
               >
                 Cancel
               </button>
@@ -456,58 +456,58 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
           <div className="p-5 space-y-4">
             <button
               onClick={() => setCreateStep('type')}
-              className="text-[10px] font-mono text-gray-500 hover:text-black flex items-center gap-1"
+              className="text-[10px] font-mono text-primary-500 hover:text-dark-500 flex items-center gap-1"
             >
               ← Back
             </button>
-            <h2 className="text-lg font-black text-gray-900">
+            <h2 className="text-lg font-black text-dark-500">
               {alertTarget === 'task' ? 'Select Project (for Task Alert)' : 'Select Project'}
             </h2>
-            <p className="text-xs text-gray-500 font-mono">Search for a project by name or client.</p>
+            <p className="text-xs text-primary-500 font-mono">Search for a project by name or client.</p>
 
             {/* Search input */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-400" />
               <input
                 type="text"
                 value={projectSearch}
                 onChange={(e) => handleProjectSearch(e.target.value)}
                 placeholder="Search projects (min 2 chars)..."
-                className="w-full pl-9 pr-3 py-2.5 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                className="w-full pl-9 pr-3 py-2.5 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors"
                 autoFocus
               />
               {searching && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-gray-300 border-t-black rounded-full animate-spin" />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-primary-300 border-t-black rounded-full animate-spin" />
               )}
             </div>
 
             {/* Results */}
             {searchResults.length > 0 && (
-              <div className="border border-gray-200 max-h-60 overflow-y-auto divide-y divide-gray-100">
+              <div className="border border-primary-200 max-h-60 overflow-y-auto divide-y divide-gray-100">
                 {searchResults.map((project) => (
                   <button
                     key={project._id}
                     onClick={() => handleSelectProject(project)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-primary-50 transition-colors text-left"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-gray-900 truncate">{project.projectTitle}</p>
-                      <p className="text-[10px] text-gray-500 font-mono truncate">{project.clientName}</p>
+                      <p className="text-xs font-bold text-dark-500 truncate">{project.projectTitle}</p>
+                      <p className="text-[10px] text-primary-500 font-mono truncate">{project.clientName}</p>
                     </div>
-                    <span className="text-[10px] font-mono text-gray-400 flex-shrink-0">{project.status?.replace(/_/g, ' ')}</span>
+                    <span className="text-[10px] font-mono text-primary-400 flex-shrink-0">{project.status?.replace(/_/g, ' ')}</span>
                   </button>
                 ))}
               </div>
             )}
 
             {projectSearch.length >= 2 && searchResults.length === 0 && !searching && (
-              <p className="text-xs text-gray-400 font-mono text-center py-4">No projects found matching &ldquo;{projectSearch}&rdquo;</p>
+              <p className="text-xs text-primary-400 font-mono text-center py-4">No projects found matching &ldquo;{projectSearch}&rdquo;</p>
             )}
 
             <div className="flex justify-end pt-2">
               <button
                 onClick={resetCreateFlow}
-                className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 transition-colors"
+                className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400 transition-colors"
               >
                 Cancel
               </button>
@@ -527,18 +527,18 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
                 setTaskResults([]);
                 setTaskSearch('');
               }}
-              className="text-[10px] font-mono text-gray-500 hover:text-black flex items-center gap-1"
+              className="text-[10px] font-mono text-primary-500 hover:text-dark-500 flex items-center gap-1"
             >
               ← Back
             </button>
-            <h2 className="text-lg font-black text-gray-900">Select Task</h2>
-            <p className="text-xs text-gray-500 font-mono">
-              Project: <span className="font-bold text-gray-900">{selectedProject?.projectTitle}</span>
+            <h2 className="text-lg font-black text-dark-500">Select Task</h2>
+            <p className="text-xs text-primary-500 font-mono">
+              Project: <span className="font-bold text-dark-500">{selectedProject?.projectTitle}</span>
             </p>
 
             {/* Task search/filter */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-400" />
               <input
                 type="text"
                 value={taskSearch}
@@ -546,7 +546,7 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
                   setTaskSearch(e.target.value);
                 }}
                 placeholder="Filter tasks by title..."
-                className="w-full pl-9 pr-3 py-2.5 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                className="w-full pl-9 pr-3 py-2.5 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors"
                 autoFocus
               />
             </div>
@@ -554,37 +554,37 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
             {/* Task list */}
             {searching ? (
               <div className="flex items-center justify-center py-8">
-                <span className="w-4 h-4 border-2 border-gray-300 border-t-black rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-primary-300 border-t-black rounded-full animate-spin" />
               </div>
             ) : taskResults.length > 0 ? (
-              <div className="border border-gray-200 max-h-60 overflow-y-auto divide-y divide-gray-100">
+              <div className="border border-primary-200 max-h-60 overflow-y-auto divide-y divide-gray-100">
                 {taskResults
                   .filter((t) => !taskSearch || t.title.toLowerCase().includes(taskSearch.toLowerCase()))
                   .map((task) => (
                     <button
                       key={task._id}
                       onClick={() => handleSelectTask(task)}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-primary-50 transition-colors text-left"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-gray-900 truncate">{task.title}</p>
-                        <p className="text-[10px] text-gray-500 font-mono truncate">{getDepartmentLabel(task.department)}</p>
+                        <p className="text-xs font-bold text-dark-500 truncate">{task.title}</p>
+                        <p className="text-[10px] text-primary-500 font-mono truncate">{getDepartmentLabel(task.department)}</p>
                       </div>
-                      <span className="text-[10px] font-mono text-gray-400 flex-shrink-0">{task.status?.replace(/_/g, ' ')}</span>
+                      <span className="text-[10px] font-mono text-primary-400 flex-shrink-0">{task.status?.replace(/_/g, ' ')}</span>
                     </button>
                   ))}
                 {taskResults.filter((t) => !taskSearch || t.title.toLowerCase().includes(taskSearch.toLowerCase())).length === 0 && (
-                  <p className="text-xs text-gray-400 font-mono text-center py-4">No tasks match your filter</p>
+                  <p className="text-xs text-primary-400 font-mono text-center py-4">No tasks match your filter</p>
                 )}
               </div>
             ) : (
-              <p className="text-xs text-gray-400 font-mono text-center py-4">No tasks found for this project</p>
+              <p className="text-xs text-primary-400 font-mono text-center py-4">No tasks found for this project</p>
             )}
 
             <div className="flex justify-end pt-2">
               <button
                 onClick={resetCreateFlow}
-                className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 transition-colors"
+                className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400 transition-colors"
               >
                 Cancel
               </button>
@@ -606,7 +606,7 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
                     setCreateStep('type');
                   }
                 }}
-                className="text-[10px] font-mono text-gray-500 hover:text-black flex items-center gap-1"
+                className="text-[10px] font-mono text-primary-500 hover:text-dark-500 flex items-center gap-1"
               >
                 ← Back
               </button>
@@ -682,11 +682,11 @@ function AlertRow({
         ? 'border-red-300 bg-red-50/20 border-l-4 border-l-red-500'
         : isAcknowledged
         ? 'border-yellow-200 border-l-4 border-l-yellow-400'
-        : 'border-gray-200 border-l-4 border-l-gray-300'
+        : 'border-primary-200 border-l-4 border-l-gray-300'
     )}>
       {/* Row header */}
       <div
-        className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-gray-50/50 transition-colors"
+        className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-primary-50/50 transition-colors"
         onClick={onToggle}
       >
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -696,41 +696,41 @@ function AlertRow({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-gray-900">
+            <span className="text-xs font-bold text-dark-500">
               {ALERT_TYPE_LABEL[alert.type]}
             </span>
             {project && (
-              <span className="text-[11px] text-gray-500 font-mono truncate">
+              <span className="text-[11px] text-primary-500 font-mono truncate">
                 {project.projectTitle}
               </span>
             )}
           </div>
-          <p className="text-[11px] text-gray-600 mt-0.5 truncate">{alert.message}</p>
+          <p className="text-[11px] text-dark-400 mt-0.5 truncate">{alert.message}</p>
         </div>
 
         <div className="flex items-center gap-4 flex-shrink-0">
           <div className="text-right hidden sm:block">
-            <p className="text-[10px] text-gray-500 font-mono">by {raisedBy}</p>
-            <p className="text-[10px] text-gray-400 font-mono">{timeAgo(alert.createdAt)}</p>
+            <p className="text-[10px] text-primary-500 font-mono">by {raisedBy}</p>
+            <p className="text-[10px] text-primary-400 font-mono">{timeAgo(alert.createdAt)}</p>
           </div>
           {isExpanded
-            ? <ChevronUp className="w-4 h-4 text-gray-400" />
-            : <ChevronDown className="w-4 h-4 text-gray-400" />}
+            ? <ChevronUp className="w-4 h-4 text-primary-400" />
+            : <ChevronDown className="w-4 h-4 text-primary-400" />}
         </div>
       </div>
 
       {/* Expanded panel */}
       {isExpanded && (
-        <div className="border-t border-gray-100">
+        <div className="border-t border-primary-100">
           <div className="px-4 py-4 space-y-4">
             {/* Full message */}
-            <div className="border-l-2 border-gray-200 pl-3">
-              <p className="text-xs text-gray-700 leading-relaxed">{alert.message}</p>
+            <div className="border-l-2 border-primary-200 pl-3">
+              <p className="text-xs text-dark-600 leading-relaxed">{alert.message}</p>
             </div>
 
             {/* Departments */}
             <div>
-              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1.5">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-400 mb-1.5">
                 Acknowledgements
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -749,8 +749,8 @@ function AlertRow({
                       className={cn(
                         'text-[10px] font-mono px-2 py-0.5 uppercase tracking-wide',
                         deptAcknowledged
-                          ? 'bg-gray-800 text-white'
-                          : 'bg-gray-100 border border-gray-200 text-gray-600'
+                          ? 'bg-dark-600 text-white'
+                          : 'bg-primary-100 border border-primary-200 text-dark-400'
                       )}
                     >
                       {deptAcknowledged ? '✓ ' : ''}{getDepartmentLabel(dept)}
@@ -759,7 +759,7 @@ function AlertRow({
                 })}
               </div>
               {Array.isArray(alert.acknowledgedBy) && alert.acknowledgedBy.length > 0 && (
-                <div className="mt-1.5 text-[10px] text-gray-400">
+                <div className="mt-1.5 text-[10px] text-primary-400">
                   Acknowledged by: {alert.acknowledgedBy
                     .map((a) => {
                       if (typeof a === 'object' && a !== null && 'name' in a) {
@@ -780,7 +780,7 @@ function AlertRow({
                 <button
                   onClick={(e) => { e.stopPropagation(); onAcknowledge(); }}
                   disabled={actionLoading === alert._id + 'acknowledge'}
-                  className="px-3 py-1.5 text-[11px] font-mono font-bold uppercase border border-black text-black hover:bg-black hover:text-white transition-colors disabled:opacity-50"
+                  className="px-3 py-1.5 text-[11px] font-mono font-bold uppercase border border-dark-500 text-dark-500 hover:bg-dark-500 hover:text-white transition-colors disabled:opacity-50"
                 >
                   {actionLoading === alert._id + 'acknowledge' ? '...' : 'Acknowledge Alert'}
                 </button>
@@ -789,7 +789,7 @@ function AlertRow({
                 <button
                   onClick={(e) => { e.stopPropagation(); onResolve(); }}
                   disabled={actionLoading === alert._id + 'resolve'}
-                  className="px-3 py-1.5 text-[11px] font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 transition-colors disabled:opacity-50"
+                  className="px-3 py-1.5 text-[11px] font-mono font-bold uppercase bg-dark-500 text-white hover:bg-dark-600 transition-colors disabled:opacity-50"
                 >
                   {actionLoading === alert._id + 'resolve' ? '...' : 'Mark Resolved'}
                 </button>
@@ -804,14 +804,14 @@ function AlertRow({
                 </button>
               )}
               {hasAcknowledgedMe && isActive && (
-                <span className="text-[11px] text-gray-500 font-mono italic">
+                <span className="text-[11px] text-primary-500 font-mono italic">
                   ✓ You acknowledged this
                 </span>
               )}
             </div>
 
             {/* Comment thread */}
-            <div className="border border-gray-200 h-72">
+            <div className="border border-primary-200 h-72">
               <CommentThread alertId={alert._id} currentUser={{ _id: currentUserId }} />
             </div>
           </div>

@@ -385,24 +385,24 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="border-b border-gray-200 px-6 py-5">
+      <div className="border-b border-primary-200 px-6 py-5">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div className="min-w-0">
             <Link
               href={project ? `/tasks/project/${project._id}` : `/tasks/departments/${task.department}`}
-              className="inline-flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wide text-gray-500 hover:text-black mb-3"
+              className="inline-flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wide text-primary-500 hover:text-dark-500 mb-3"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               {project ? project.projectTitle : getDepartmentLabel(task.department) + ' Tasks'}
             </Link>
             <div className="flex items-center gap-2 mb-2">
               <TaskStatusBadge status={task.status} />
-              <span className="text-xs font-mono text-gray-400 uppercase tracking-widest">
+              <span className="text-xs font-mono text-primary-400 uppercase tracking-widest">
                 {getDepartmentLabel(task.department)}
               </span>
             </div>
-            <h1 className="text-xl lg:text-2xl font-black text-gray-900 tracking-tight">{task.title}</h1>
-            <p className="text-sm text-gray-600 leading-relaxed mt-3 max-w-3xl">{task.description}</p>
+            <h1 className="text-xl lg:text-2xl font-black text-dark-500 tracking-tight">{task.title}</h1>
+            <p className="text-sm text-dark-400 leading-relaxed mt-3 max-w-3xl">{task.description}</p>
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -450,7 +450,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6 p-6">
         <main className="space-y-6 min-w-0">
           {/* Tab bar */}
-          <div className="flex border-b border-gray-200">
+          <div className="flex border-b border-primary-200">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -461,8 +461,8 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                   className={cn(
                     'flex items-center gap-2 px-4 py-2.5 text-[10px] font-mono font-bold uppercase tracking-widest border-b-2 transition-colors',
                     activeTab === tab.id
-                      ? 'border-black text-black'
-                      : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
+                      ? 'border-dark-500 text-dark-500'
+                      : 'border-transparent text-primary-500 hover:text-dark-600 hover:border-primary-300'
                   )}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -474,9 +474,9 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
 
           {/* Files tab — upload + download only, no inline rendering */}
           {activeTab === 'files' && (
-            <section className="border border-gray-200">
-              <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
-                <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500">
+            <section className="border border-primary-200">
+              <div className="px-4 py-3 border-b border-primary-200 flex items-center justify-between gap-3">
+                <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-primary-500">
                   Attachments ({allFiles.length}/{MAX_FILES})
                 </h2>
                 {canModify && (
@@ -485,7 +485,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                       type="button"
                       onClick={() => cameraInputRef.current?.click()}
                       disabled={fileUploading || allFiles.length >= MAX_FILES}
-                      className="inline-flex items-center gap-2 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide border border-gray-300 text-gray-700 hover:border-black hover:text-black disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className="inline-flex items-center gap-2 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide border border-primary-300 text-dark-600 hover:border-dark-500 hover:text-dark-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       title="Take photo (mobile)"
                     >
                       <Camera className="w-3.5 h-3.5" />
@@ -504,7 +504,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={fileUploading || allFiles.length >= MAX_FILES}
-                      className="inline-flex items-center gap-2 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className="inline-flex items-center gap-2 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide bg-dark-500 text-white hover:bg-dark-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                       {fileUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
                       {fileUploading ? 'Uploading...' : 'Upload'}
@@ -527,9 +527,9 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
 
               {allFiles.length === 0 ? (
                 <div className="p-12 text-center">
-                  <Paperclip className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-                  <p className="text-xs font-mono text-gray-400">No files uploaded for this task.</p>
-                  <p className="text-[10px] font-mono text-gray-400 mt-0.5">
+                  <Paperclip className="w-8 h-8 text-primary-300 mx-auto mb-3" />
+                  <p className="text-xs font-mono text-primary-400">No files uploaded for this task.</p>
+                  <p className="text-[10px] font-mono text-primary-400 mt-0.5">
                     Upload images, PDFs, documents, spreadsheets, or take a photo (max {Math.round(MAX_FILE_SIZE / 1_000_000)} MB each)
                   </p>
                 </div>
@@ -538,13 +538,13 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                   {/* Image gallery */}
                   {imageFiles.length > 0 && (
                     <div>
-                      <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500 mb-3">
+                      <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-primary-500 mb-3">
                         Images ({imageFiles.length})
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {imageFiles.map((file) => (
-                          <figure key={file.id} className="border border-gray-200 bg-white group">
-                            <div className="relative aspect-[4/3] bg-gray-50 overflow-hidden">
+                          <figure key={file.id} className="border border-primary-200 bg-white group">
+                            <div className="relative aspect-[4/3] bg-primary-50 overflow-hidden">
                               <Image
                                 src={file.url}
                                 alt={file.name}
@@ -556,7 +556,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                                 <button
                                   type="button"
                                   onClick={() => removeFile(file.id)}
-                                  className="absolute top-2 right-2 p-1 bg-black/60 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                  className="absolute top-2 right-2 p-1 bg-dark-500/60 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                                   title="Remove"
                                 >
                                   <X className="w-3.5 h-3.5" />
@@ -564,8 +564,8 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                               )}
                             </div>
                             <figcaption className="p-3">
-                              <p className="text-xs font-bold text-gray-900 truncate">{file.name}</p>
-                              <p className="text-[10px] font-mono text-gray-400 mt-0.5">
+                              <p className="text-xs font-bold text-dark-500 truncate">{file.name}</p>
+                              <p className="text-[10px] font-mono text-primary-400 mt-0.5">
                                 {file.size > 1_000_000
                                   ? `${(file.size / 1_000_000).toFixed(1)} MB`
                                   : `${Math.round(file.size / 1024)} KB`}
@@ -590,21 +590,21 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                   {/* Other files (documents, spreadsheets, etc.) */}
                   {otherFiles.length > 0 && (
                     <div>
-                      <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500 mb-3">
+                      <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-primary-500 mb-3">
                         Documents ({otherFiles.length})
                       </h3>
-                      <div className="divide-y divide-gray-100 border border-gray-200">
+                      <div className="divide-y divide-gray-100 border border-primary-200">
                         {otherFiles.map((file) => (
-                          <div key={file.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
+                          <div key={file.id} className="flex items-start gap-3 px-4 py-3 hover:bg-primary-50 transition-colors group">
                             <span className="text-lg flex-shrink-0 mt-0.5">{getFileIcon(file)}</span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <p className="text-xs font-bold text-gray-900 truncate">{file.name}</p>
-                                <span className="text-[10px] font-mono text-gray-400 flex-shrink-0">
+                                <p className="text-xs font-bold text-dark-500 truncate">{file.name}</p>
+                                <span className="text-[10px] font-mono text-primary-400 flex-shrink-0">
                                   ({file.size > 1_000_000 ? `${(file.size / 1_000_000).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`})
                                 </span>
                               </div>
-                              <p className="text-[10px] font-mono text-gray-400 mt-0.5">
+                              <p className="text-[10px] font-mono text-primary-400 mt-0.5">
                                 {formatDateTime(file.uploadedAt)}
                               </p>
                               <div className="flex items-center gap-2 mt-1">
@@ -633,7 +633,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                               <button
                                 type="button"
                                 onClick={() => removeFile(file.id)}
-                                className="p-1 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                                className="p-1 text-primary-400 hover:text-red-600 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
                                 title="Remove file"
                               >
                                 <X className="w-4 h-4" />
@@ -651,12 +651,12 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
 
           {/* Comments tab */}
           {activeTab === 'comments' && (
-            <section className="border border-gray-200 h-[520px] flex flex-col">
+            <section className="border border-primary-200 h-[520px] flex flex-col">
               {task.status === TaskStatus.BLOCKED ? (
                 <div className="flex flex-col items-center justify-center h-full px-6 py-12 text-center">
-                  <Lock className="w-8 h-8 text-gray-300 mb-3" />
-                  <p className="text-sm font-bold text-gray-500 font-mono">Comments Disabled</p>
-                  <p className="text-[11px] text-gray-400 font-mono mt-1 max-w-sm">
+                  <Lock className="w-8 h-8 text-primary-300 mb-3" />
+                  <p className="text-sm font-bold text-primary-500 font-mono">Comments Disabled</p>
+                  <p className="text-[11px] text-primary-400 font-mono mt-1 max-w-sm">
                     This task is currently blocked by an active alert. Comments are unavailable until the alert is resolved.
                   </p>
                   <div className="mt-4 flex items-center gap-2 text-[10px] font-mono text-red-500 bg-red-50 border border-red-200 px-3 py-2">
@@ -673,8 +673,8 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
 
         <aside className="space-y-4">
           {canModify && (
-            <section className="border border-gray-200 p-4">
-              <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500 mb-4">
+            <section className="border border-primary-200 p-4">
+              <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-primary-500 mb-4">
                 Status Actions
               </h2>
               <div className="grid grid-cols-1 gap-2">
@@ -706,8 +706,8 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
             </section>
           )}
 
-          <section className="border border-gray-200 p-4">
-            <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500 mb-4">
+          <section className="border border-primary-200 p-4">
+            <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-primary-500 mb-4">
               Task Details
             </h2>
             <div className="space-y-4">
@@ -716,21 +716,21 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
               {project && (
                 <Link
                   href={`/projects/${project._id}`}
-                  className="flex items-start gap-3 p-3 border border-gray-200 hover:border-black transition-colors"
+                  className="flex items-start gap-3 p-3 border border-primary-200 hover:border-dark-500 transition-colors"
                 >
-                  <ExternalLink className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <ExternalLink className="w-4 h-4 text-primary-400 mt-0.5 flex-shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-[10px] font-mono text-gray-400 uppercase tracking-wide">Project</p>
-                    <p className="text-sm font-bold text-gray-900 truncate">{project.projectTitle}</p>
-                    <p className="text-xs text-gray-500 truncate">{project.clientName}</p>
+                    <p className="text-[10px] font-mono text-primary-400 uppercase tracking-wide">Project</p>
+                    <p className="text-sm font-bold text-dark-500 truncate">{project.projectTitle}</p>
+                    <p className="text-xs text-primary-500 truncate">{project.clientName}</p>
                   </div>
                 </Link>
               )}
               <DetailRow icon={User} label="Assigned To" value={assignedUser?.name ?? 'Unassigned'} />
 
-              <div className="border-t border-gray-100 pt-3 mt-3">
+              <div className="border-t border-primary-100 pt-3 mt-3">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">
                     Timeline
                   </p>
                   {canModify && (
@@ -749,16 +749,16 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                   )}
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[11px] text-gray-700 font-mono">
-                    <Calendar className="w-3 h-3 inline mr-1 text-gray-400" />
-                    Start: {task.startDate ? formatDate(task.startDate) : <span className="text-gray-400 italic">Not set</span>}
+                  <p className="text-[11px] text-dark-600 font-mono">
+                    <Calendar className="w-3 h-3 inline mr-1 text-primary-400" />
+                    Start: {task.startDate ? formatDate(task.startDate) : <span className="text-primary-400 italic">Not set</span>}
                   </p>
                   <p className={cn(
                     'text-[11px] font-mono',
-                    isOverdue ? 'text-red-600 font-bold' : 'text-gray-700'
+                    isOverdue ? 'text-red-600 font-bold' : 'text-dark-600'
                   )}>
-                    <Calendar className="w-3 h-3 inline mr-1 text-gray-400" />
-                    Due: {task.dueDate ? formatDate(task.dueDate) : <span className="text-gray-400 italic">Not set</span>}
+                    <Calendar className="w-3 h-3 inline mr-1 text-primary-400" />
+                    Due: {task.dueDate ? formatDate(task.dueDate) : <span className="text-primary-400 italic">Not set</span>}
                     {isOverdue && <span className="ml-2 text-red-600">(OVERDUE)</span>}
                   </p>
                 </div>
@@ -767,7 +767,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
               {task.completedAt && <DetailRow icon={CheckCircle2} label="Completed At" value={formatDateTime(task.completedAt)} />}
               <DetailRow icon={Calendar} label="Created At" value={formatDateTime(task.createdAt)} />
               {task.isLocked && (
-                <div className="flex items-center gap-2 text-[11px] font-mono text-gray-500">
+                <div className="flex items-center gap-2 text-[11px] font-mono text-primary-500">
                   <Lock className="w-3.5 h-3.5" />
                   Waiting for dependency to complete
                 </div>
@@ -787,20 +787,20 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
       <Modal open={editingDates} onClose={() => { if (!timelineSaving) setEditingDates(false); }} size="sm">
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-900">
+            <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-dark-500">
               Set Task Timeline
             </h2>
             {!timelineSaving && (
               <button
                 type="button"
                 onClick={() => { setEditingDates(false); setTimelineError(null); }}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-primary-400 hover:text-dark-400 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             )}
           </div>
-          <p className="text-[10px] font-mono text-gray-500 mb-4">
+          <p className="text-[10px] font-mono text-primary-500 mb-4">
             Set the start date and expected due date for this task.
           </p>
 
@@ -813,35 +813,35 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
 
           <div className="space-y-4">
             <div>
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-1.5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500 mb-1.5">
                 Start Date
               </label>
               <input
                 type="date"
                 value={editStartDate}
                 onChange={(e) => setEditStartDate(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                className="w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-1.5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500 mb-1.5">
                 End Date
               </label>
               <input
                 type="date"
                 value={editDueDate}
                 onChange={(e) => setEditDueDate(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                className="w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-primary-200">
             <button
               type="button"
               onClick={() => { setEditingDates(false); setTimelineError(null); }}
               disabled={timelineSaving}
-              className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 hover:text-black disabled:opacity-40 transition-colors"
+              className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400 hover:text-dark-500 disabled:opacity-40 transition-colors"
             >
               Cancel
             </button>
@@ -849,7 +849,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
               type="button"
               onClick={handleSaveTimeline}
               disabled={timelineSaving}
-              className="flex items-center gap-2 px-4 py-2 text-[10px] font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 disabled:opacity-40 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-[10px] font-mono font-bold uppercase bg-dark-500 text-white hover:bg-dark-600 disabled:opacity-40 transition-colors"
             >
               {timelineSaving ? (
                 <>
@@ -873,13 +873,13 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
           {noCommentWarning ? (
             <>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-900">
+                <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-dark-500">
                   Comment Required
                 </h2>
                 <button
                   type="button"
                   onClick={() => { setDoneModalOpen(false); setNoCommentWarning(false); }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className="text-primary-400 hover:text-dark-400 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -893,18 +893,18 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                   </p>
                 </div>
               </div>
-              <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-primary-200">
                 <button
                   type="button"
                   onClick={() => { setDoneModalOpen(false); setNoCommentWarning(false); setActiveTab('comments'); }}
-                  className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 hover:text-black transition-colors"
+                  className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400 hover:text-dark-500 transition-colors"
                 >
                   Go to Comments
                 </button>
                 <button
                   type="button"
                   onClick={() => { setDoneModalOpen(false); setNoCommentWarning(false); }}
-                  className="px-4 py-2 text-[10px] font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 transition-colors"
+                  className="px-4 py-2 text-[10px] font-mono font-bold uppercase bg-dark-500 text-white hover:bg-dark-600 transition-colors"
                 >
                   Cancel
                 </button>
@@ -913,14 +913,14 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
           ) : (
             <>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-900">
+                <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-dark-500">
                   Complete Task &mdash; Comment Required
                 </h2>
                 {!submittingDone && (
                   <button
                     type="button"
                     onClick={() => { setDoneModalOpen(false); setDoneComment(''); }}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    className="text-primary-400 hover:text-dark-400 transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -937,15 +937,15 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                 onChange={(e) => setDoneComment(e.target.value)}
                 placeholder="Describe what was completed, any issues encountered, or handover notes..."
                 rows={4}
-                className="w-full text-xs font-mono border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors resize-none placeholder:text-gray-400"
+                className="w-full text-xs font-mono border border-primary-200 px-3 py-2 focus:outline-none focus:border-dark-500 transition-colors resize-none placeholder:text-primary-400"
                 autoFocus
               />
-              <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-primary-200">
                 <button
                   type="button"
                   onClick={() => { setDoneModalOpen(false); setDoneComment(''); }}
                   disabled={submittingDone}
-                  className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 hover:text-black disabled:opacity-40 transition-colors"
+                  className="px-4 py-2 text-[10px] font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400 hover:text-dark-500 disabled:opacity-40 transition-colors"
                 >
                   Cancel
                 </button>
@@ -953,7 +953,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                   type="button"
                   onClick={handleMarkDoneWithComment}
                   disabled={submittingDone || !doneComment.trim()}
-                  className="flex items-center gap-2 px-4 py-2 text-[10px] font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 text-[10px] font-mono font-bold uppercase bg-dark-500 text-white hover:bg-dark-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   {submittingDone ? (
                     <>
@@ -1012,8 +1012,8 @@ function StatusActionButton({
       className={cn(
         'flex items-center justify-between gap-3 px-3 py-3 border text-left transition-colors disabled:cursor-not-allowed',
         active
-          ? 'bg-black text-white border-black'
-          : 'border-gray-200 text-gray-700 hover:border-black disabled:opacity-40'
+          ? 'bg-dark-500 text-white border-dark-500'
+          : 'border-primary-200 text-dark-600 hover:border-dark-500 disabled:opacity-40'
       )}
     >
       <span className="inline-flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wide">
@@ -1036,10 +1036,10 @@ function DetailRow({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <Icon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+      <Icon className="w-4 h-4 text-primary-400 mt-0.5 flex-shrink-0" />
       <div className="min-w-0">
-        <p className="text-[10px] font-mono text-gray-400 uppercase tracking-wide">{label}</p>
-        <p className="text-xs font-mono text-gray-900 break-all">{value}</p>
+        <p className="text-[10px] font-mono text-primary-400 uppercase tracking-wide">{label}</p>
+        <p className="text-xs font-mono text-dark-500 break-all">{value}</p>
       </div>
     </div>
   );

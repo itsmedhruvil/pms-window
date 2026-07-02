@@ -42,8 +42,8 @@ function ExcelUpload({ onUpload, loading = false }: { onUpload: (file: File) => 
     <label className={cn(
       'inline-flex items-center gap-2 px-4 py-2 text-xs font-mono font-bold uppercase tracking-wide border rounded-md cursor-pointer transition-colors',
       loading
-        ? 'border-gray-300 text-gray-400 bg-gray-50 pointer-events-none'
-        : 'border-gray-200 hover:bg-gray-50'
+        ? 'border-primary-300 text-primary-400 bg-primary-50 pointer-events-none'
+        : 'border-primary-200 hover:bg-primary-50'
     )}>
       {loading ? 'Uploading...' : 'Upload Excel'}
       <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileSelect} disabled={loading} />
@@ -364,7 +364,7 @@ export function ProjectDetail({
   const hasActiveAlerts = activeAlerts.length > 0;
 
   return (
-    <div className={cn('min-h-screen bg-gray-50', hasActiveAlerts && 'border-t-4 border-t-red-500')}>
+    <div className={cn('min-h-screen bg-primary-50', hasActiveAlerts && 'border-t-4 border-t-red-500')}>
       {/* Alert banner */}
       {hasActiveAlerts && (
         <div className="bg-red-600 text-white px-8 py-2.5 flex items-center gap-3">
@@ -376,36 +376,36 @@ export function ProjectDetail({
       )}
 
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 lg:px-8 py-6">
+      <div className="bg-white border-b border-primary-200 px-6 lg:px-8 py-6">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 lg:gap-6">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1.5 text-xs font-mono text-gray-400">
+            <div className="flex items-center gap-2 mb-1.5 text-xs font-mono text-primary-400">
               <span className="uppercase tracking-widest">{project.clientName || 'Project'}</span>
               <ChevronRight className="w-3 h-3" />
               <span>Project</span>
             </div>
-            <h1 className="text-xl lg:text-2xl font-black text-gray-900 tracking-tight">
+            <h1 className="text-xl lg:text-2xl font-black text-dark-500 tracking-tight">
               {project.projectTitle}
             </h1>
             <div className="flex flex-wrap items-center gap-2 mt-3">
               <ProjectStatusBadge status={project.status} />
               <PriorityBadge priority={project.priority} />
-              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <div className="flex items-center gap-1.5 text-xs text-primary-500">
                 <Calendar className="w-3.5 h-3.5" />
                 <span className="font-mono">Due {formatDate(project.deadline)}</span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <div className="flex items-center gap-1.5 text-xs text-primary-500">
                 <Package className="w-3.5 h-3.5" />
                 <span className="font-mono">{project.totalWindows} products</span>
               </div>
               {project.productTypes && project.productTypes.length > 0 && (
-                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                <div className="flex items-center gap-1.5 text-xs text-primary-500">
                   <Layers className="w-3.5 h-3.5" />
                   <span className="font-mono">{project.productTypes.join(', ')}</span>
                 </div>
               )}
               {project.tags && project.tags.length > 0 && (
-                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                <div className="flex items-center gap-1.5 text-xs text-primary-500">
                   <Tag className="w-3.5 h-3.5" />
                   <span className="font-mono">{project.tags.slice(0, 3).join(', ')}{project.tags.length > 3 ? ` +${project.tags.length - 3}` : ''}</span>
                 </div>
@@ -416,13 +416,13 @@ export function ProjectDetail({
           {/* Right side stats + actions */}
           <div className="flex-shrink-0 flex flex-row lg:flex-col items-start lg:items-end gap-3">
             <div className="text-left lg:text-right">
-              <div className="text-3xl lg:text-4xl font-black font-mono text-gray-900">
+              <div className="text-3xl lg:text-4xl font-black font-mono text-dark-500">
                 {isAdmin ? project.completionPercentage : visibleCompletionPercentage}%
               </div>
-              <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wide">
+              <div className="text-[10px] text-primary-400 font-mono uppercase tracking-wide">
                 {isAdmin ? 'Complete' : `${getDepartmentLabel(currentUserDepartment)} Complete`}
               </div>
-              <div className="text-xs text-gray-500 mt-0.5 font-mono">
+              <div className="text-xs text-primary-500 mt-0.5 font-mono">
                 {completedTasks}/{tasks.length} tasks done
               </div>
             </div>
@@ -463,9 +463,9 @@ export function ProjectDetail({
         </div>
 
         {/* Progress bar */}
-        <div className="mt-5 h-2 bg-gray-100 w-full rounded-full overflow-hidden">
+        <div className="mt-5 h-2 bg-primary-100 w-full rounded-full overflow-hidden">
           <div
-            className={cn('h-full transition-all duration-700 rounded-full', hasActiveAlerts ? 'bg-red-500' : 'bg-black')}
+            className={cn('h-full transition-all duration-700 rounded-full', hasActiveAlerts ? 'bg-red-500' : 'bg-dark-500')}
             style={{ width: `${isAdmin ? project.completionPercentage : visibleCompletionPercentage}%` }}
           />
         </div>
@@ -474,12 +474,12 @@ export function ProjectDetail({
       {/* Main content */}
       <div className="p-8 space-y-8">
         {/* Project Info Section */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="bg-white border border-primary-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-black uppercase tracking-widest text-gray-700">Project Details</h2>
+            <h2 className="text-sm font-black uppercase tracking-widest text-dark-600">Project Details</h2>
             <button
               onClick={openEditModal}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-800 hover:text-black transition-colors rounded-md"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-600 hover:text-dark-500 transition-colors rounded-md"
             >
               <Edit3 className="w-3 h-3" />
               Edit
@@ -488,46 +488,46 @@ export function ProjectDetail({
 
           {/* Description */}
           {project.description && (
-            <div className="mb-4 pb-4 border-b border-gray-100">
-              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">Description</p>
-              <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{project.description}</p>
+            <div className="mb-4 pb-4 border-b border-primary-100">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-400 mb-1">Description</p>
+              <p className="text-xs text-dark-600 leading-relaxed whitespace-pre-wrap">{project.description}</p>
             </div>
           )}
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">Address</p>
-              <p className="text-xs text-gray-900">{project.address || '—'}</p>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-400 mb-1">Address</p>
+              <p className="text-xs text-dark-500">{project.address || '—'}</p>
             </div>
             <div>
-              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">Contact</p>
-              <p className="text-xs text-gray-900">{project.contactPhone || '—'}</p>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-400 mb-1">Contact</p>
+              <p className="text-xs text-dark-500">{project.contactPhone || '—'}</p>
             </div>
             <div>
-              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">Total Products</p>
-              <p className="text-xs text-gray-900">{project.totalWindows}</p>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-400 mb-1">Total Products</p>
+              <p className="text-xs text-dark-500">{project.totalWindows}</p>
             </div>
             <div>
-              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">Budget</p>
-              <p className="text-xs text-gray-900">{project.budget ? `₹${project.budget.toLocaleString()}` : '—'}</p>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-400 mb-1">Budget</p>
+              <p className="text-xs text-dark-500">{project.budget ? `₹${project.budget.toLocaleString()}` : '—'}</p>
             </div>
             <div>
-              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">Start Date</p>
-              <p className="text-xs text-gray-900">{project.startDate ? formatDate(project.startDate) : '—'}</p>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-400 mb-1">Start Date</p>
+              <p className="text-xs text-dark-500">{project.startDate ? formatDate(project.startDate) : '—'}</p>
             </div>
             <div>
-              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-1">End Date</p>
-              <p className="text-xs text-gray-900">{project.endDate ? formatDate(project.endDate) : '—'}</p>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-400 mb-1">End Date</p>
+              <p className="text-xs text-dark-500">{project.endDate ? formatDate(project.endDate) : '—'}</p>
             </div>
           </div>
 
           {/* Product Types */}
           {project.productTypes && project.productTypes.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-2">Product Types</p>
+            <div className="mt-4 pt-4 border-t border-primary-100">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-400 mb-2">Product Types</p>
               <div className="flex flex-wrap gap-1.5">
                 {project.productTypes.map((pt) => (
-                  <span key={pt} className="px-2 py-0.5 text-[10px] font-mono bg-gray-100 text-gray-700 rounded">
+                  <span key={pt} className="px-2 py-0.5 text-[10px] font-mono bg-primary-100 text-dark-600 rounded">
                     {pt}
                   </span>
                 ))}
@@ -537,11 +537,11 @@ export function ProjectDetail({
 
           {/* Tags */}
           {project.tags && project.tags.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-2">Tags</p>
+            <div className="mt-4 pt-4 border-t border-primary-100">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-400 mb-2">Tags</p>
               <div className="flex flex-wrap gap-1.5">
                 {project.tags.map((tag) => (
-                  <span key={tag} className="px-2 py-0.5 text-[10px] font-mono bg-gray-100 text-gray-700 rounded">
+                  <span key={tag} className="px-2 py-0.5 text-[10px] font-mono bg-primary-100 text-dark-600 rounded">
                     {tag}
                   </span>
                 ))}
@@ -551,26 +551,26 @@ export function ProjectDetail({
 
           {/* Window Specifications */}
           {project.windowSpecifications && project.windowSpecifications.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 mb-2">Window Specifications</p>
+            <div className="mt-4 pt-4 border-t border-primary-100">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-400 mb-2">Window Specifications</p>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left text-xs font-mono">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-primary-50">
                     <tr>
-                      <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">#</th>
-                      <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">Design</th>
-                      <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">Design PDF</th>
-                      <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">Size (mm)</th>
-                      <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">Glass</th>
-                      <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">Qty</th>
-                      <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wider text-[10px]">Notes</th>
+                      <th className="px-3 py-2 font-semibold text-dark-400 uppercase tracking-wider text-[10px]">#</th>
+                      <th className="px-3 py-2 font-semibold text-dark-400 uppercase tracking-wider text-[10px]">Design</th>
+                      <th className="px-3 py-2 font-semibold text-dark-400 uppercase tracking-wider text-[10px]">Design PDF</th>
+                      <th className="px-3 py-2 font-semibold text-dark-400 uppercase tracking-wider text-[10px]">Size (mm)</th>
+                      <th className="px-3 py-2 font-semibold text-dark-400 uppercase tracking-wider text-[10px]">Glass</th>
+                      <th className="px-3 py-2 font-semibold text-dark-400 uppercase tracking-wider text-[10px]">Qty</th>
+                      <th className="px-3 py-2 font-semibold text-dark-400 uppercase tracking-wider text-[10px]">Notes</th>
                     </tr>
                   </thead>
                   <tbody>
                     {project.windowSpecifications.map((spec, i) => (
-                      <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-3 py-2 text-gray-400">{i + 1}</td>
-                        <td className="px-3 py-2 font-bold text-gray-900">{spec.design || '—'}</td>
+                      <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-primary-50'}>
+                        <td className="px-3 py-2 text-primary-400">{i + 1}</td>
+                        <td className="px-3 py-2 font-bold text-dark-500">{spec.design || '—'}</td>
                         <td className="px-3 py-2">
                           {spec.designPdf ? (
                             <div className="flex items-center gap-1">
@@ -587,7 +587,7 @@ export function ProjectDetail({
                                 <button
                                   type="button"
                                   onClick={() => removeDesignPdf(i)}
-                                  className="text-gray-400 hover:text-red-500"
+                                  className="text-primary-400 hover:text-red-500"
                                 >
                                   <X className="w-3 h-3" />
                                 </button>
@@ -595,7 +595,7 @@ export function ProjectDetail({
                             </div>
                           ) : (
                             <div className="flex items-center gap-1">
-                              <span className="text-gray-400">—</span>
+                              <span className="text-primary-400">—</span>
                               <input
                                 type="file"
                                 accept=".pdf"
@@ -609,7 +609,7 @@ export function ProjectDetail({
                               />
                               <label
                                 htmlFor={`spec-design-pdf-${i}`}
-                                className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-mono text-gray-400 border border-dashed border-gray-300 rounded cursor-pointer hover:border-gray-500 hover:text-gray-600"
+                                className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-mono text-primary-400 border border-dashed border-primary-300 rounded cursor-pointer hover:border-primary-500 hover:text-dark-400"
                               >
                                 <Upload className="w-2.5 h-2.5" />
                                 Upload
@@ -617,10 +617,10 @@ export function ProjectDetail({
                             </div>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-gray-700">{spec.width > 0 ? `${spec.width}×${spec.height}` : '—'}</td>
-                        <td className="px-3 py-2 text-gray-700">{spec.glassType || '—'}</td>
+                        <td className="px-3 py-2 text-dark-600">{spec.width > 0 ? `${spec.width}×${spec.height}` : '—'}</td>
+                        <td className="px-3 py-2 text-dark-600">{spec.glassType || '—'}</td>
                         <td className="px-3 py-2 font-bold">×{spec.quantity}</td>
-                        <td className="px-3 py-2 text-gray-500">{spec.notes || '—'}</td>
+                        <td className="px-3 py-2 text-primary-500">{spec.notes || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -631,9 +631,9 @@ export function ProjectDetail({
         </div>
 
         {/* PDF Upload Section */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="bg-white border border-primary-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-black uppercase tracking-widest text-gray-700">PDF Attachments</h2>
+            <h2 className="text-sm font-black uppercase tracking-widest text-dark-600">PDF Attachments</h2>
             <input
               ref={pdfInputRef}
               type="file"
@@ -646,7 +646,7 @@ export function ProjectDetail({
               type="button"
               onClick={() => pdfInputRef.current?.click()}
               disabled={pdfUploading}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-gray-200 text-gray-600 hover:border-black hover:text-black disabled:opacity-50 transition-colors rounded-md"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-primary-200 text-dark-400 hover:border-dark-500 hover:text-dark-500 disabled:opacity-50 transition-colors rounded-md"
             >
               <Upload className="w-3 h-3" />
               {pdfUploading ? 'Uploading...' : 'Upload PDF'}
@@ -663,18 +663,18 @@ export function ProjectDetail({
           {project.pdfAttachments && project.pdfAttachments.length > 0 ? (
             <div className="space-y-2">
               {project.pdfAttachments.map((pdf) => (
-                <div key={pdf.id} className="flex items-center justify-between px-3 py-2 border border-gray-200 hover:border-gray-400 transition-colors rounded-md">
+                <div key={pdf.id} className="flex items-center justify-between px-3 py-2 border border-primary-200 hover:border-primary-400 transition-colors rounded-md">
                   <div className="flex items-center gap-2 min-w-0">
                     <FileText className="w-4 h-4 text-red-500 flex-shrink-0" />
                     <a
                       href={pdf.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs font-mono text-gray-900 hover:underline truncate"
+                      className="text-xs font-mono text-dark-500 hover:underline truncate"
                     >
                       {pdf.name}
                     </a>
-                    <span className="text-[9px] font-mono text-gray-400 flex-shrink-0">
+                    <span className="text-[9px] font-mono text-primary-400 flex-shrink-0">
                       ({(pdf.size / 1024).toFixed(0)} KB)
                     </span>
                   </div>
@@ -682,7 +682,7 @@ export function ProjectDetail({
                     <button
                       type="button"
                       onClick={() => removePdf(pdf.id)}
-                      className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0 ml-2"
+                      className="text-primary-400 hover:text-red-500 transition-colors flex-shrink-0 ml-2"
                       title="Remove PDF"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -692,20 +692,20 @@ export function ProjectDetail({
               ))}
             </div>
           ) : (
-            <div className="border border-dashed border-gray-200 rounded-md p-6 text-center">
-              <FileText className="w-6 h-6 text-gray-300 mx-auto mb-1" />
-              <p className="text-xs text-gray-400 font-mono">No PDF files attached</p>
-              <p className="text-[10px] text-gray-400 font-mono mt-0.5">Upload PDFs like drawings, contracts, or specs</p>
+            <div className="border border-dashed border-primary-200 rounded-md p-6 text-center">
+              <FileText className="w-6 h-6 text-primary-300 mx-auto mb-1" />
+              <p className="text-xs text-primary-400 font-mono">No PDF files attached</p>
+              <p className="text-[10px] text-primary-400 font-mono mt-0.5">Upload PDFs like drawings, contracts, or specs</p>
             </div>
           )}
         </div>
 
         {/* Excel Upload & Download Section */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="bg-white border border-primary-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-sm font-black uppercase tracking-widest text-gray-700">Excel Data</h2>
-              <p className="text-xs text-gray-400 font-mono mt-0.5">
+              <h2 className="text-sm font-black uppercase tracking-widest text-dark-600">Excel Data</h2>
+              <p className="text-xs text-primary-400 font-mono mt-0.5">
                 {project.excelFile ? `${project.excelFile.name}` : 'No spreadsheet uploaded'}
               </p>
             </div>
@@ -714,7 +714,7 @@ export function ProjectDetail({
                 <a
                   href={project.excelFile.data}
                   download={project.excelFile.name}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-gray-200 text-gray-600 hover:border-black hover:text-black transition-colors rounded-md"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-primary-200 text-dark-400 hover:border-dark-500 hover:text-dark-500 transition-colors rounded-md"
                 >
                   <FileText className="w-3 h-3" />
                   Download
@@ -732,26 +732,26 @@ export function ProjectDetail({
           )}
 
           {project.excelFile ? (
-            <div className="border border-dashed border-gray-200 rounded-sm p-8 text-center">
-              <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-900 font-mono font-bold">{project.excelFile.name}</p>
-              <p className="text-xs text-gray-400 font-mono mt-1">
+            <div className="border border-dashed border-primary-200 rounded-sm p-8 text-center">
+              <FileText className="w-8 h-8 text-primary-300 mx-auto mb-2" />
+              <p className="text-sm text-dark-500 font-mono font-bold">{project.excelFile.name}</p>
+              <p className="text-xs text-primary-400 font-mono mt-1">
                 {(project.excelFile.size / 1024).toFixed(0)} KB
               </p>
               <a
                 href={project.excelFile.data}
                 download={project.excelFile.name}
-                className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 text-xs font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 transition-colors rounded-md"
+                className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 text-xs font-mono font-bold uppercase bg-dark-500 text-white hover:bg-dark-600 transition-colors rounded-md"
               >
                 <FileText className="w-3.5 h-3.5" />
                 Download File
               </a>
             </div>
           ) : (
-            <div className="border-2 border-dashed border-gray-200 rounded-sm p-12 text-center">
-              <FileText className="w-10 h-10 text-gray-200 mx-auto mb-2" />
-              <p className="text-sm text-gray-400 font-mono">No spreadsheet uploaded yet</p>
-              <p className="text-xs text-gray-300 font-mono mt-1">Upload an Excel file above to attach it to this project</p>
+            <div className="border-2 border-dashed border-primary-200 rounded-sm p-12 text-center">
+              <FileText className="w-10 h-10 text-primary-200 mx-auto mb-2" />
+              <p className="text-sm text-primary-400 font-mono">No spreadsheet uploaded yet</p>
+              <p className="text-xs text-primary-300 font-mono mt-1">Upload an Excel file above to attach it to this project</p>
             </div>
           )}
         </div>
@@ -761,8 +761,8 @@ export function ProjectDetail({
           {/* Department completion cards */}
           <div className="xl:col-span-2 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-black text-gray-900 uppercase tracking-widest text-gray-700">Department Progress</h2>
-              <span className="text-xs font-mono text-gray-400">{tasks.length} total tasks</span>
+              <h2 className="text-sm font-black text-dark-500 uppercase tracking-widest text-dark-600">Department Progress</h2>
+              <span className="text-xs font-mono text-primary-400">{tasks.length} total tasks</span>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
               {visibleDepartments.map((dept) => {
@@ -776,23 +776,23 @@ export function ProjectDetail({
                   <Link
                     key={dept}
                     href={`/projects/${project._id}/departments/${dept}`}
-                    className="bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-400 hover:shadow-sm transition-all group"
+                    className="bg-white border border-primary-200 rounded-xl p-4 hover:border-primary-400 hover:shadow-sm transition-all group"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-mono uppercase tracking-wider font-bold text-gray-600">
+                      <span className="text-xs font-mono uppercase tracking-wider font-bold text-dark-400">
                         {departments.find((department) => department.name === dept)?.label || getDepartmentLabel(dept)}
                       </span>
-                      <span className="text-sm font-black font-mono text-gray-900">{pct}%</span>
+                      <span className="text-sm font-black font-mono text-dark-500">{pct}%</span>
                     </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-black rounded-full transition-all" style={{ width: `${pct}%` }} />
+                    <div className="h-1.5 bg-primary-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-dark-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
                     </div>
-                    <div className="flex items-center gap-2 mt-2 text-[10px] font-mono text-gray-500">
+                    <div className="flex items-center gap-2 mt-2 text-[10px] font-mono text-primary-500">
                       <span className="text-green-600 font-bold">{done}</span>/<span>{deptTasks.length}</span> done
                       {blocked > 0 && <span className="text-red-500">· {blocked} blocked</span>}
                       {inProgress > 0 && <span className="text-blue-500">· {inProgress} active</span>}
                     </div>
-                    <div className="mt-2 text-[9px] font-mono text-gray-400 group-hover:text-black transition-colors flex items-center gap-1">
+                    <div className="mt-2 text-[9px] font-mono text-primary-400 group-hover:text-dark-500 transition-colors flex items-center gap-1">
                       View tasks <ArrowUpRight className="w-2.5 h-2.5" />
                     </div>
                   </Link>
@@ -804,7 +804,7 @@ export function ProjectDetail({
           {/* Active alerts sidebar */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-black uppercase tracking-widest text-gray-700">
+              <h2 className="text-sm font-black uppercase tracking-widest text-dark-600">
                 {activeAlerts.length > 0 ? `Alerts (${activeAlerts.length})` : 'Alerts'}
               </h2>
             </div>
@@ -814,32 +814,32 @@ export function ProjectDetail({
                   <div key={alert._id} className="bg-white border border-red-200 rounded-xl p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <AlertSeverityBadge severity={alert.severity} />
-                      <span className="text-[10px] font-mono font-bold uppercase text-gray-500">
+                      <span className="text-[10px] font-mono font-bold uppercase text-primary-500">
                         {ALERT_TYPE_LABEL[alert.type]}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-700 line-clamp-2">{alert.message}</p>
+                    <p className="text-xs text-dark-600 line-clamp-2">{alert.message}</p>
                   </div>
                 ))}
                 {activeAlerts.length > 4 && (
-                  <p className="text-xs text-gray-400 font-mono">+{activeAlerts.length - 4} more</p>
+                  <p className="text-xs text-primary-400 font-mono">+{activeAlerts.length - 4} more</p>
                 )}
               </div>
             ) : (
-              <div className="bg-white border border-dashed border-gray-200 rounded-xl p-6 text-center">
-                <CheckCircle2 className="w-6 h-6 text-gray-300 mx-auto mb-1" />
-                <p className="text-xs text-gray-400">No active alerts</p>
+              <div className="bg-white border border-dashed border-primary-200 rounded-xl p-6 text-center">
+                <CheckCircle2 className="w-6 h-6 text-primary-300 mx-auto mb-1" />
+                <p className="text-xs text-primary-400">No active alerts</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Workflow Timeline */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="bg-white border border-primary-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className="text-sm font-black uppercase tracking-widest text-gray-700">Workflow Timeline</h2>
-              <p className="text-xs text-gray-400 font-mono mt-0.5">
+              <h2 className="text-sm font-black uppercase tracking-widest text-dark-600">Workflow Timeline</h2>
+              <p className="text-xs text-primary-400 font-mono mt-0.5">
                 {isAdmin ? 'Task status across all departments' : 'Task status for your department'}
               </p>
             </div>
@@ -847,7 +847,7 @@ export function ProjectDetail({
               href={`/tasks/project/${project._id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-mono text-white bg-black border border-black px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+              className="text-xs font-mono text-white bg-dark-500 border border-dark-500 px-3 py-1.5 rounded-md hover:bg-dark-600 transition-colors flex items-center gap-1.5"
             >
               Open Full View <ArrowUpRight className="w-3 h-3" />
             </a>
@@ -865,25 +865,25 @@ export function ProjectDetail({
               const inProgressCount = deptTasks.filter((t) => t.status === TaskStatus.IN_PROGRESS).length;
 
               return (
-                <div key={dept} className="border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col">
+                <div key={dept} className="border border-primary-200 rounded-lg overflow-hidden bg-white flex flex-col">
                   {/* Header */}
-                  <div className="px-4 py-3 border-b border-gray-100">
+                  <div className="px-4 py-3 border-b border-primary-100">
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700">
+                      <span className="text-xs font-mono font-bold uppercase tracking-widest text-dark-600">
                         {deptIdx + 1}. {departments.find((department) => department.name === dept)?.label || getDepartmentLabel(dept)}
                       </span>
                       <span className="text-[11px] font-black font-mono">{deptPct}%</span>
                     </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-primary-100 rounded-full overflow-hidden">
                       <div
                         className={cn(
                           'h-full rounded-full transition-all duration-500',
-                          blockedCount > 0 ? 'bg-red-500' : 'bg-black'
+                          blockedCount > 0 ? 'bg-red-500' : 'bg-dark-500'
                         )}
                         style={{ width: `${deptPct}%` }}
                       />
                     </div>
-                    <div className="flex items-center gap-2.5 mt-1.5 text-[10px] font-mono text-gray-400">
+                    <div className="flex items-center gap-2.5 mt-1.5 text-[10px] font-mono text-primary-400">
                       <span className="text-green-600 font-bold">{deptDone}</span>/<span>{deptTotal}</span> done
                       {inProgressCount > 0 && (
                         <span className="flex items-center gap-1">
@@ -907,7 +907,7 @@ export function ProjectDetail({
                         key={task._id}
                         href={`/tasks/${task._id}`}
                         className={cn(
-                          'flex items-start gap-2.5 px-4 py-2.5 hover:bg-gray-50 transition-colors group',
+                          'flex items-start gap-2.5 px-4 py-2.5 hover:bg-primary-50 transition-colors group',
                           task.isLocked && 'opacity-40'
                         )}
                       >
@@ -918,7 +918,7 @@ export function ProjectDetail({
                             task.status === TaskStatus.DONE ? 'bg-green-500 border-green-500' :
                             task.status === TaskStatus.IN_PROGRESS ? 'bg-blue-500 border-blue-500' :
                             task.status === TaskStatus.BLOCKED ? 'bg-red-500 border-red-500' :
-                            'border-gray-300'
+                            'border-primary-300'
                           )} />
                         </div>
 
@@ -927,19 +927,19 @@ export function ProjectDetail({
                           <div className="flex items-center gap-2">
                             <span className={cn(
                               'text-xs font-medium leading-tight',
-                              task.status === TaskStatus.DONE ? 'text-gray-400 line-through' :
+                              task.status === TaskStatus.DONE ? 'text-primary-400 line-through' :
                               task.status === TaskStatus.BLOCKED ? 'text-red-600' :
-                              'text-gray-900'
+                              'text-dark-500'
                             )}>
                               {task.title}
                             </span>
                             {task.isLocked && (
-                              <span className="text-[9px] font-mono text-gray-300 uppercase tracking-wider">Locked</span>
+                              <span className="text-[9px] font-mono text-primary-300 uppercase tracking-wider">Locked</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 mt-1">
                             {task.assignedUser && typeof task.assignedUser === 'object' && (
-                              <span className="text-[9px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                              <span className="text-[9px] font-mono text-primary-400 bg-primary-100 px-1.5 py-0.5 rounded">
                                 {(task.assignedUser as IUser).name?.split(' ')[0]}
                               </span>
                             )}
@@ -947,7 +947,7 @@ export function ProjectDetail({
                           </div>
                         </div>
 
-                        <ArrowUpRight className="w-3 h-3 text-gray-300 group-hover:text-gray-600 transition-colors flex-shrink-0 mt-0.5" />
+                        <ArrowUpRight className="w-3 h-3 text-primary-300 group-hover:text-dark-400 transition-colors flex-shrink-0 mt-0.5" />
                       </Link>
                     ))}
                   </div>
@@ -995,88 +995,88 @@ export function ProjectDetail({
 
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Person Name</label>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">Person Name</label>
               <input
                 type="text"
                 value={editForm.clientName}
                 onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
-                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                className="w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Project Title</label>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">Project Title</label>
               <input
                 type="text"
                 value={editForm.projectTitle}
                 onChange={(e) => setEditForm({ ...editForm, projectTitle: e.target.value })}
-                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                className="w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Description</label>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">Description</label>
               <textarea
                 value={editForm.description}
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                 rows={3}
-                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors resize-none"
+                className="w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors resize-none"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Address</label>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">Address</label>
               <input
                 type="text"
                 value={editForm.address}
                 onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                className="w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Contact Phone</label>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">Contact Phone</label>
               <input
                 type="tel"
                 value={editForm.contactPhone}
                 onChange={(e) => setEditForm({ ...editForm, contactPhone: e.target.value })}
-                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                className="w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Total Products</label>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">Total Products</label>
               <input
                 type="number"
                 value={editForm.totalWindows}
                 min={1}
                 onChange={(e) => setEditForm({ ...editForm, totalWindows: Number(e.target.value) })}
-                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                className="w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Start Date</label>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">Start Date</label>
               <input
                 type="date"
                 value={editForm.startDate}
                 onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
-                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                className="w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Deadline</label>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">Deadline</label>
               <input
                 type="date"
                 value={editForm.deadline}
                 onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })}
-                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                className="w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Priority</label>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">Priority</label>
               <div className="grid grid-cols-2 gap-2">
                 {([ProjectPriority.STANDARD, ProjectPriority.NECESSARY, ProjectPriority.PRIORITY, ProjectPriority.URGENT] as const).map((p) => (
                   <button
@@ -1088,8 +1088,8 @@ export function ProjectDetail({
                       editForm.priority === p
                         ? p === ProjectPriority.URGENT
                           ? 'border-red-500 bg-red-50 text-red-700'
-                          : 'border-black bg-black text-white'
-                        : 'border-gray-200 hover:border-gray-400 text-gray-600'
+                          : 'border-dark-500 bg-dark-500 text-white'
+                        : 'border-primary-200 hover:border-primary-400 text-dark-400'
                     )}
                   >
                     {p}
@@ -1100,7 +1100,7 @@ export function ProjectDetail({
 
             {/* Product Types */}
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Product Types</label>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">Product Types</label>
               <div className="flex flex-wrap gap-2">
                 {PRODUCT_TYPE_OPTIONS.map((type) => (
                   <button
@@ -1117,8 +1117,8 @@ export function ProjectDetail({
                     className={cn(
                       'px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-wide border transition-colors rounded',
                       editForm.productTypes.includes(type)
-                        ? 'bg-black text-white border-black'
-                        : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                        ? 'bg-dark-500 text-white border-dark-500'
+                        : 'border-primary-200 text-primary-500 hover:border-primary-400'
                     )}
                   >
                     {type}
@@ -1126,7 +1126,7 @@ export function ProjectDetail({
                 ))}
               </div>
               {editForm.productTypes.length > 0 && (
-                <p className="mt-1 text-[10px] font-mono text-gray-400">
+                <p className="mt-1 text-[10px] font-mono text-primary-400">
                   Selected: {editForm.productTypes.join(', ')}
                 </p>
               )}
@@ -1134,7 +1134,7 @@ export function ProjectDetail({
 
             {/* Tags */}
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Tags</label>
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">Tags</label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -1151,7 +1151,7 @@ export function ProjectDetail({
                     }
                   }}
                   placeholder="Type a tag and press Enter"
-                  className="flex-1 px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                  className="flex-1 px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors"
                 />
                 <button
                   type="button"
@@ -1162,7 +1162,7 @@ export function ProjectDetail({
                     }
                     setEditTagInput('');
                   }}
-                  className="px-3 py-2 text-xs font-mono font-bold uppercase border border-gray-200 text-gray-600 hover:border-black hover:text-black transition-colors"
+                  className="px-3 py-2 text-xs font-mono font-bold uppercase border border-primary-200 text-dark-400 hover:border-dark-500 hover:text-dark-500 transition-colors"
                 >
                   Add
                 </button>
@@ -1172,13 +1172,13 @@ export function ProjectDetail({
                   {editForm.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono bg-gray-100 text-gray-700 rounded"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono bg-primary-100 text-dark-600 rounded"
                     >
                       {tag}
                       <button
                         type="button"
                         onClick={() => setEditForm({ ...editForm, tags: editForm.tags.filter((t) => t !== tag) })}
-                        className="text-gray-400 hover:text-red-500"
+                        className="text-primary-400 hover:text-red-500"
                       >
                         <X className="w-2.5 h-2.5" />
                       </button>
@@ -1189,11 +1189,11 @@ export function ProjectDetail({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 mt-6 pt-5 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-3 mt-6 pt-5 border-t border-primary-200">
             <button
               type="button"
               onClick={() => setEditModalOpen(false)}
-              className="px-4 py-2 text-xs font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 hover:text-black transition-colors"
+              className="px-4 py-2 text-xs font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400 hover:text-dark-500 transition-colors"
             >
               Cancel
             </button>
@@ -1201,7 +1201,7 @@ export function ProjectDetail({
               type="button"
               onClick={handleSaveEdit}
               disabled={saving}
-              className="flex items-center gap-2 px-5 py-2 text-xs font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 disabled:opacity-60 transition-colors"
+              className="flex items-center gap-2 px-5 py-2 text-xs font-mono font-bold uppercase bg-dark-500 text-white hover:bg-dark-600 disabled:opacity-60 transition-colors"
             >
               {saving ? (
                 <>

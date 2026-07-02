@@ -156,17 +156,17 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+      <div className="flex items-center justify-between mb-6 pb-4 border-b border-primary-200">
         <div>
-          <h1 className="text-xl font-black text-gray-900">Departments</h1>
-          <p className="text-xs text-gray-500 font-mono mt-0.5">
+          <h1 className="text-xl font-black text-dark-500">Departments</h1>
+          <p className="text-xs text-primary-500 font-mono mt-0.5">
             {departments.length} department{departments.length !== 1 ? 's' : ''}
           </p>
         </div>
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-dark-500 text-white hover:bg-dark-600 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
           Add Department
@@ -180,7 +180,7 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
       )}
 
       {/* Departments table */}
-      <div className="erp-table-wrap border border-gray-200">
+      <div className="erp-table-wrap border border-primary-200">
         <table className="erp-table">
           <thead>
             <tr>
@@ -196,7 +196,7 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
           <tbody>
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-gray-400 text-xs font-mono">
+                <td colSpan={7} className="text-center py-8 text-primary-400 text-xs font-mono">
                   {EMPTY_ROW_TEXT}
                 </td>
               </tr>
@@ -206,9 +206,9 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
 
               return (
                 <tr key={dept._id} className={cn(!dept.isActive && 'opacity-50')}>
-                  <td className="text-[10px] font-mono text-gray-400">{index + 1}</td>
+                  <td className="text-[10px] font-mono text-primary-400">{index + 1}</td>
                   <td>
-                    <span className="text-[11px] font-mono text-gray-900 font-medium">
+                    <span className="text-[11px] font-mono text-dark-500 font-medium">
                       {dept.name}
                     </span>
                   </td>
@@ -217,10 +217,10 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
                       <input
                         value={editForm.label}
                         onChange={(e) => setEditForm({ ...editForm, label: e.target.value })}
-                        className="text-[10px] font-mono border border-gray-300 px-1.5 py-1 w-28 focus:outline-none focus:border-black"
+                        className="text-[10px] font-mono border border-primary-300 px-1.5 py-1 w-28 focus:outline-none focus:border-dark-500"
                       />
                     ) : (
-                      <span className="text-[11px] font-mono text-gray-600">
+                      <span className="text-[11px] font-mono text-dark-400">
                         {dept.label}
                       </span>
                     )}
@@ -230,11 +230,11 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
                       <input
                         value={editForm.abbreviation}
                         onChange={(e) => setEditForm({ ...editForm, abbreviation: e.target.value })}
-                        className="text-[10px] font-mono border border-gray-300 px-1.5 py-1 w-16 uppercase focus:outline-none focus:border-black"
+                        className="text-[10px] font-mono border border-primary-300 px-1.5 py-1 w-16 uppercase focus:outline-none focus:border-dark-500"
                         maxLength={6}
                       />
                     ) : (
-                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 border border-gray-300 uppercase">
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 border border-primary-300 uppercase">
                         {dept.abbreviation}
                       </span>
                     )}
@@ -244,10 +244,10 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
                       <input
                         value={editForm.description}
                         onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                        className="text-[10px] font-mono border border-gray-300 px-1.5 py-1 w-40 focus:outline-none focus:border-black"
+                        className="text-[10px] font-mono border border-primary-300 px-1.5 py-1 w-40 focus:outline-none focus:border-dark-500"
                       />
                     ) : (
-                      <span className="text-[10px] font-mono text-gray-400">
+                      <span className="text-[10px] font-mono text-primary-400">
                         {dept.description || '\u2014'}
                       </span>
                     )}
@@ -260,7 +260,7 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
                         'text-[10px] font-mono font-bold px-2 py-0.5 border transition-colors disabled:opacity-50',
                         dept.isActive
                           ? 'border-green-300 text-green-700 bg-green-50 hover:bg-green-100'
-                          : 'border-gray-200 text-gray-400 hover:border-gray-400'
+                          : 'border-primary-200 text-primary-400 hover:border-primary-400'
                       )}
                     >
                       {dept.isActive ? 'Active' : 'Inactive'}
@@ -273,7 +273,7 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
                         <button
                           onClick={() => moveDepartment(dept._id, 'up')}
                           disabled={index === 0}
-                          className="text-gray-300 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="text-primary-300 hover:text-dark-600 disabled:opacity-30 disabled:cursor-not-allowed"
                           title="Move up"
                         >
                           <ChevronUp className="w-3 h-3" />
@@ -281,7 +281,7 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
                         <button
                           onClick={() => moveDepartment(dept._id, 'down')}
                           disabled={index === sorted.length - 1}
-                          className="text-gray-300 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="text-primary-300 hover:text-dark-600 disabled:opacity-30 disabled:cursor-not-allowed"
                           title="Move down"
                         >
                           <ChevronDown className="w-3 h-3" />
@@ -293,13 +293,13 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
                           <button
                             onClick={() => saveEdit(dept._id)}
                             disabled={loading === dept._id}
-                            className="text-[10px] font-mono font-bold px-2 py-1 bg-black text-white hover:bg-gray-800 disabled:opacity-50"
+                            className="text-[10px] font-mono font-bold px-2 py-1 bg-dark-500 text-white hover:bg-dark-600 disabled:opacity-50"
                           >
                             {loading === dept._id ? '...' : 'Save'}
                           </button>
                           <button
                             onClick={() => setEditingId(null)}
-                            className="text-[10px] font-mono text-gray-500 hover:text-black px-2 py-1 border border-gray-200"
+                            className="text-[10px] font-mono text-primary-500 hover:text-dark-500 px-2 py-1 border border-primary-200"
                           >
                             Cancel
                           </button>
@@ -308,14 +308,14 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
                         <>
                           <button
                             onClick={() => startEdit(dept)}
-                            className="text-[10px] font-mono text-gray-500 hover:text-black underline"
+                            className="text-[10px] font-mono text-primary-500 hover:text-dark-500 underline"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => deleteDepartment(dept._id)}
                             disabled={loading === dept._id + 'del'}
-                            className="text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                            className="text-primary-400 hover:text-red-600 transition-colors disabled:opacity-50"
                             title="Delete department"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -335,8 +335,8 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setError(null); setForm(emptyForm); }} size="lg">
         <div className="space-y-6 p-6">
           <div>
-            <h2 className="text-lg font-black text-gray-900">Add New Department</h2>
-            <p className="text-xs text-gray-500 font-mono">Create a new department for the organization.</p>
+            <h2 className="text-lg font-black text-dark-500">Add New Department</h2>
+            <p className="text-xs text-primary-500 font-mono">Create a new department for the organization.</p>
           </div>
 
           {error && (
@@ -347,56 +347,56 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
 
           <div className="grid gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+              <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
                 Name (slug)
                 <input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="e.g. quality_assurance"
-                  className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+                  className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
                 />
               </label>
 
-              <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+              <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
                 Label
                 <input
                   value={form.label}
                   onChange={(e) => setForm({ ...form, label: e.target.value })}
                   placeholder="e.g. Quality Assurance"
-                  className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+                  className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
                 />
               </label>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+              <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
                 Abbreviation
                 <input
                   value={form.abbreviation}
                   onChange={(e) => setForm({ ...form, abbreviation: e.target.value })}
                   placeholder="e.g. QA"
                   maxLength={6}
-                  className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black uppercase"
+                  className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500 uppercase"
                 />
               </label>
 
-              <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+              <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
                 Description
                 <input
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   placeholder="Brief description of the department"
-                  className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+                  className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
                 />
               </label>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-primary-200">
             <button
               type="button"
               onClick={() => { setModalOpen(false); setError(null); setForm(emptyForm); }}
-              className="px-4 py-2 text-xs font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600"
+              className="px-4 py-2 text-xs font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400"
             >
               Cancel
             </button>
@@ -406,7 +406,7 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
               onClick={handleCreate}
               className={cn(
                 'px-4 py-2 text-xs font-mono font-bold uppercase transition-colors disabled:opacity-50',
-                'bg-black text-white hover:bg-gray-800'
+                'bg-dark-500 text-white hover:bg-dark-600'
               )}
             >
               {submitting ? 'Creating...' : 'Create Department'}

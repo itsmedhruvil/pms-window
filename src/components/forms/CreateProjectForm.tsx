@@ -292,16 +292,16 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               <div className={cn(
                 'w-7 h-7 flex items-center justify-center border-2 font-mono font-bold text-xs flex-shrink-0',
                 step > n
-                  ? 'bg-black border-black text-white'
+                  ? 'bg-dark-500 border-dark-500 text-white'
                   : step === n
-                  ? 'border-black text-black'
-                  : 'border-gray-300 text-gray-400'
+                  ? 'border-dark-500 text-dark-500'
+                  : 'border-primary-300 text-primary-400'
               )}>
                 {step > n ? <Check className="w-3.5 h-3.5" /> : n}
               </div>
               <span className={cn(
                 'text-[11px] font-mono uppercase tracking-wide whitespace-nowrap',
-                step === n ? 'text-black font-bold' : 'text-gray-400'
+                step === n ? 'text-dark-500 font-bold' : 'text-primary-400'
               )}>
                 {label}
               </span>
@@ -309,7 +309,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             {i < arr.length - 1 && (
               <div className={cn(
                 'h-px flex-1 mx-3',
-                step > n ? 'bg-black' : 'bg-gray-200'
+                step > n ? 'bg-dark-500' : 'bg-primary-200'
               )} />
             )}
           </div>
@@ -337,7 +337,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               placeholder="e.g. Sharma Residencies Pvt Ltd"
               className={inputClass}
             />
-            <p className="mt-1 text-[10px] font-mono text-gray-400">Client/person name (optional)</p>
+            <p className="mt-1 text-[10px] font-mono text-primary-400">Client/person name (optional)</p>
           </Field>
 
           <Field label="Project Title" required>
@@ -363,7 +363,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder="Brief description of the project scope, requirements, or special instructions..."
               rows={3}
-              className="w-full text-xs font-mono border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors resize-none placeholder:text-gray-400"
+              className="w-full text-xs font-mono border border-primary-200 px-3 py-2 focus:outline-none focus:border-dark-500 transition-colors resize-none placeholder:text-primary-400"
             />
           </Field>
 
@@ -421,9 +421,9 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
 
           {/* Window Designs Section */}
           {form.totalWindows > 0 && (
-            <div className="border border-gray-200 p-4 bg-gray-50">
+            <div className="border border-primary-200 p-4 bg-primary-50">
               <SectionHeader title="Window Designs (Optional)" />
-              <p className="text-[10px] font-mono text-gray-400 mt-1 mb-3">
+              <p className="text-[10px] font-mono text-primary-400 mt-1 mb-3">
                 Optionally specify up to {windowDesignCount} design names.
               </p>
               <div className="space-y-3">
@@ -434,7 +434,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
                       value={data.design}
                       onChange={(e) => updateWindowDesign(index, e.target.value)}
                       placeholder={`${label} name`}
-                      className="flex-1 px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                      className="flex-1 px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors"
                     />
                   </div>
                 ))}
@@ -486,14 +486,14 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
                     form.priority === p.value
                       ? p.value === ProjectPriority.URGENT
                         ? 'border-red-500 bg-red-50 text-red-700'
-                        : 'border-black bg-black text-white'
-                      : 'border-gray-200 hover:border-gray-400'
+                        : 'border-dark-500 bg-dark-500 text-white'
+                      : 'border-primary-200 hover:border-primary-400'
                   )}
                 >
                   <p className="font-mono font-bold uppercase tracking-wide">{p.label}</p>
                   <p className={cn(
                     'text-[10px] mt-0.5',
-                    form.priority === p.value ? 'opacity-70' : 'text-gray-500'
+                    form.priority === p.value ? 'opacity-70' : 'text-primary-500'
                   )}>
                     {p.desc}
                   </p>
@@ -513,8 +513,8 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
                   className={cn(
                     'px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-wide border transition-colors rounded',
                     form.productTypes.includes(type)
-                      ? 'bg-black text-white border-black'
-                      : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                      ? 'bg-dark-500 text-white border-dark-500'
+                      : 'border-primary-200 text-primary-500 hover:border-primary-400'
                   )}
                 >
                   {type}
@@ -522,7 +522,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               ))}
             </div>
             {form.productTypes.length > 0 && (
-              <p className="mt-1 text-[10px] font-mono text-gray-400">
+              <p className="mt-1 text-[10px] font-mono text-primary-400">
                 Selected: {form.productTypes.join(', ')}
               </p>
             )}
@@ -537,12 +537,12 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={handleTagKeyDown}
                 placeholder="Type a tag and press Enter"
-                className="flex-1 px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors"
+                className="flex-1 px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors"
               />
               <button
                 type="button"
                 onClick={addTag}
-                className="px-3 py-2 text-xs font-mono font-bold uppercase border border-gray-200 text-gray-600 hover:border-black hover:text-black transition-colors"
+                className="px-3 py-2 text-xs font-mono font-bold uppercase border border-primary-200 text-dark-400 hover:border-dark-500 hover:text-dark-500 transition-colors"
               >
                 Add
               </button>
@@ -552,10 +552,10 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
                 {form.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono bg-gray-100 text-gray-700 rounded"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono bg-primary-100 text-dark-600 rounded"
                   >
                     {tag}
-                    <button type="button" onClick={() => removeTag(tag)} className="text-gray-400 hover:text-red-500">
+                    <button type="button" onClick={() => removeTag(tag)} className="text-primary-400 hover:text-red-500">
                       <X className="w-2.5 h-2.5" />
                     </button>
                   </span>
@@ -565,20 +565,20 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
           </Field>
 
           {/* Task Template Group */}
-          <div className="border border-gray-200 p-4 bg-blue-50">
+          <div className="border border-primary-200 p-4 bg-blue-50">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-700">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-dark-600">
                 Task Template Group (optional)
               </span>
-              {loadingGroups && <span className="text-[10px] text-gray-400 font-mono">Loading...</span>}
+              {loadingGroups && <span className="text-[10px] text-primary-400 font-mono">Loading...</span>}
             </div>
-            <p className="text-xs text-gray-600 font-mono mb-3">
+            <p className="text-xs text-dark-400 font-mono mb-3">
               Select a template group to automatically generate department tasks.
             </p>
             <select
               value={form.templateGroupId || ''}
               onChange={(e) => setForm({ ...form, templateGroupId: e.target.value || undefined })}
-              className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white"
+              className="w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors bg-white"
             >
               <option value="">No template group (use default tasks)</option>
               {templateGroups.map((g) => (
@@ -588,7 +588,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               ))}
             </select>
             {selectedGroup && (
-              <div className="mt-2 text-[10px] text-gray-600 font-mono">
+              <div className="mt-2 text-[10px] text-dark-400 font-mono">
                 ✓ {selectedGroup.tasks.length} tasks across{' '}
                 {new Set(selectedGroup.tasks.map((t) => t.department)).size} departments will be created
               </div>
@@ -608,7 +608,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
           <ReviewBlock label="Project">{form.projectTitle}</ReviewBlock>
           {form.description && (
             <ReviewBlock label="Description">
-              <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{form.description}</p>
+              <p className="text-xs text-dark-600 leading-relaxed whitespace-pre-wrap">{form.description}</p>
             </ReviewBlock>
           )}
           <ReviewBlock label="Address">{form.address}</ReviewBlock>
@@ -651,7 +651,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             <ReviewBlock label="Products">
               <div className="flex flex-wrap gap-1">
                 {form.productTypes.map((pt) => (
-                  <span key={pt} className="px-2 py-0.5 text-[10px] font-mono bg-gray-100 text-gray-700 rounded">
+                  <span key={pt} className="px-2 py-0.5 text-[10px] font-mono bg-primary-100 text-dark-600 rounded">
                     {pt}
                   </span>
                 ))}
@@ -663,7 +663,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             <ReviewBlock label="Tags">
               <div className="flex flex-wrap gap-1">
                 {form.tags.map((tag) => (
-                  <span key={tag} className="px-2 py-0.5 text-[10px] font-mono bg-gray-100 text-gray-700 rounded">
+                  <span key={tag} className="px-2 py-0.5 text-[10px] font-mono bg-primary-100 text-dark-600 rounded">
                     {tag}
                   </span>
                 ))}
@@ -672,18 +672,18 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
           )}
 
           {selectedGroup && (
-            <div className="border border-gray-200 bg-gray-50 p-4">
-              <p className="text-xs text-gray-600 font-mono">
-                <span className="font-bold text-gray-900">After creation:</span> {' '}
+            <div className="border border-primary-200 bg-primary-50 p-4">
+              <p className="text-xs text-dark-400 font-mono">
+                <span className="font-bold text-dark-500">After creation:</span> {' '}
                 tasks from &ldquo;{selectedGroup.name}&rdquo; template group will be generated across departments.
               </p>
             </div>
           )}
 
           {!selectedGroup && (
-            <div className="border border-gray-200 bg-gray-50 p-4">
-              <p className="text-xs text-gray-600 font-mono">
-                <span className="font-bold text-gray-900">After creation:</span> {' '}
+            <div className="border border-primary-200 bg-primary-50 p-4">
+              <p className="text-xs text-dark-400 font-mono">
+                <span className="font-bold text-dark-500">After creation:</span> {' '}
                 active task templates will be copied department-wise into this project.
               </p>
             </div>
@@ -692,13 +692,13 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
       )}
 
       {/* Navigation */}
-      <div className="flex items-center justify-between mt-8 pt-5 border-t border-gray-200">
+      <div className="flex items-center justify-between mt-8 pt-5 border-t border-primary-200">
         <div className="flex items-center gap-2">
           {onCancel && (
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 text-xs font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 hover:text-black transition-colors"
+              className="px-4 py-2 text-xs font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400 hover:text-dark-500 transition-colors"
             >
               Cancel
             </button>
@@ -707,7 +707,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             type="button"
             onClick={() => setStep((s) => s - 1)}
             disabled={step === 1}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-xs font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400 hover:text-dark-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
             Back
@@ -719,7 +719,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             type="button"
             onClick={() => setStep((s) => s + 1)}
             disabled={!step1Valid}
-            className="flex items-center gap-2 px-5 py-2 text-xs font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-5 py-2 text-xs font-mono font-bold uppercase bg-dark-500 text-white hover:bg-dark-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Continue
             <ChevronRight className="w-3.5 h-3.5" />
@@ -729,7 +729,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
             type="button"
             onClick={handleSubmit}
             disabled={loading}
-            className="flex items-center gap-2 px-5 py-2 text-xs font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 disabled:opacity-60 transition-colors"
+            className="flex items-center gap-2 px-5 py-2 text-xs font-mono font-bold uppercase bg-dark-500 text-white hover:bg-dark-600 disabled:opacity-60 transition-colors"
           >
             {loading ? (
               <>
@@ -760,7 +760,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
+      <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
@@ -771,22 +771,22 @@ function Field({
 
 function SectionHeader({ title }: { title: string }) {
   return (
-    <div className="pb-2 border-b border-gray-200">
-      <h2 className="text-sm font-black text-gray-900">{title}</h2>
+    <div className="pb-2 border-b border-primary-200">
+      <h2 className="text-sm font-black text-dark-500">{title}</h2>
     </div>
   );
 }
 
 function ReviewBlock({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-4 py-2 border-b border-gray-100 last:border-0">
-      <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 w-28 flex-shrink-0 pt-0.5">
+    <div className="flex items-start gap-4 py-2 border-b border-primary-100 last:border-0">
+      <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary-400 w-28 flex-shrink-0 pt-0.5">
         {label}
       </span>
-      <span className="text-xs text-gray-900">{children}</span>
+      <span className="text-xs text-dark-500">{children}</span>
     </div>
   );
 }
 
 const inputClass =
-  'w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white placeholder:text-gray-400';
+  'w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors bg-white placeholder:text-primary-400';

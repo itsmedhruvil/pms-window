@@ -152,13 +152,13 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
   return (
     <>
       {/* Logo */}
-      <div className="h-14 lg:h-16 px-4 lg:px-5 flex items-center gap-3 border-b border-gray-200">
-        <div className="w-7 h-7 bg-black flex items-center justify-center flex-shrink-0">
+      <div className="h-14 lg:h-16 px-4 lg:px-5 flex items-center gap-3 border-b border-primary-200">
+        <div className="w-7 h-7 bg-dark-500 flex items-center justify-center flex-shrink-0">
           <Factory className="w-4 h-4 text-white" />
         </div>
         <div>
-          <p className="text-xs font-black text-gray-900 tracking-tight leading-none">UNIQUE ARTS</p>
-          <p className="text-[9px] font-mono text-gray-500 tracking-widest uppercase leading-none mt-0.5">PMS System</p>
+          <p className="text-xs font-black text-dark-500 tracking-tight leading-none">UNIQUE ARTS</p>
+          <p className="text-[9px] font-mono text-primary-500 tracking-widest uppercase leading-none mt-0.5">PMS System</p>
         </div>
       </div>
 
@@ -175,7 +175,7 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-bold bg-black text-white hover:bg-gray-900 transition-colors uppercase tracking-wide rounded-sm"
+                className="flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-bold bg-dark-500 text-white hover:bg-dark-500 transition-colors uppercase tracking-wide rounded-sm"
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
                 <span>{item.label}</span>
@@ -190,8 +190,8 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',
                 isActive
-                  ? 'bg-black text-white'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  ? 'bg-dark-500 text-white'
+                  : 'text-dark-400 hover:text-dark-500 hover:bg-primary-50'
               )}
             >
               <Icon className={cn('w-4 h-4 flex-shrink-0', isAlert && activeAlertCount > 0 && !isActive && 'text-red-500')} />
@@ -211,8 +211,8 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
         })}
 
         {visibleDepartments.length > 0 && (
-          <div className="pt-3 mt-3 border-t border-gray-100">
-            <p className="px-3 pb-2 text-[9px] font-mono font-bold uppercase tracking-widest text-gray-400">
+          <div className="pt-3 mt-3 border-t border-primary-100">
+            <p className="px-3 pb-2 text-[9px] font-mono font-bold uppercase tracking-widest text-primary-400">
               {isAdmin ? 'Department Tasks' : 'My Tasks'}
             </p>
             <div className="space-y-0.5">
@@ -227,8 +227,8 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
                     className={cn(
                       'flex items-center gap-3 px-3 py-2 text-xs font-mono font-medium transition-colors rounded-sm',
                       isActive
-                        ? 'bg-black text-white'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                        ? 'bg-dark-500 text-white'
+                        : 'text-dark-400 hover:text-dark-500 hover:bg-primary-50'
                     )}
                   >
                     <ClipboardList className="w-4 h-4 flex-shrink-0" />
@@ -242,14 +242,14 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
       </nav>
 
       {isAdmin && (
-        <div className="px-3 lg:px-4 py-3 border-t border-gray-200 space-y-0.5">
+        <div className="px-3 lg:px-4 py-3 border-t border-primary-200 space-y-0.5">
           <Link
             href="/template-groups"
             className={cn(
               'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',
               pathname.startsWith('/template-groups')
-                ? 'bg-black text-white'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                ? 'bg-dark-500 text-white'
+                : 'text-dark-400 hover:text-dark-500 hover:bg-primary-50'
             )}
           >
             <ClipboardList className="w-4 h-4 flex-shrink-0" />
@@ -260,8 +260,8 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
             className={cn(
               'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',
               pathname === '/users'
-                ? 'bg-black text-white'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                ? 'bg-dark-500 text-white'
+                : 'text-dark-400 hover:text-dark-500 hover:bg-primary-50'
             )}
           >
             <Users className="w-4 h-4 flex-shrink-0" />
@@ -272,8 +272,8 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
             className={cn(
               'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',
               pathname === '/departments'
-                ? 'bg-black text-white'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                ? 'bg-dark-500 text-white'
+                : 'text-dark-400 hover:text-dark-500 hover:bg-primary-50'
             )}
           >
             <Building2 className="w-4 h-4 flex-shrink-0" />
@@ -283,12 +283,12 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
       )}
 
       {/* User */}
-      <div className="p-3 lg:p-4 border-t border-gray-200" suppressHydrationWarning>
+      <div className="p-3 lg:p-4 border-t border-primary-200" suppressHydrationWarning>
         <div className="flex items-center gap-3">
           <UserButton />
           <div className="min-w-0">
-            <p className="text-xs font-medium text-gray-900 truncate">Account</p>
-            <p className="text-[10px] text-gray-500 font-mono truncate">Settings</p>
+            <p className="text-xs font-medium text-dark-500 truncate">Account</p>
+            <p className="text-[10px] text-primary-500 font-mono truncate">Settings</p>
           </div>
         </div>
       </div>
@@ -344,14 +344,14 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+          className="fixed inset-0 bg-dark-500/40 z-30 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar — memo'ed and self-contained with Clerk hooks */}
       <aside className={cn(
-        'w-56 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white z-40 transition-transform duration-200',
+        'w-56 flex-shrink-0 border-r border-primary-200 flex flex-col bg-white z-40 transition-transform duration-200',
         'fixed lg:static inset-y-0 left-0',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       )}>
@@ -359,23 +359,23 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
       </aside>
 
       {/* Mobile header bar */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white/95 backdrop-blur-sm border-b border-gray-200 z-20 flex items-center justify-between px-3 safe-area-top">
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white/95 backdrop-blur-sm border-b border-primary-200 z-20 flex items-center justify-between px-3 safe-area-top">
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="p-2 text-gray-600 hover:text-black active:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 text-dark-400 hover:text-dark-500 active:bg-primary-100 rounded-lg transition-colors"
             aria-label="Open menu"
           >
             <Menu className="w-5 h-5" />
           </button>
           <Link href="/dashboard" className="flex items-center gap-2 ml-1">
-            <div className="w-7 h-7 bg-black flex items-center justify-center rounded-sm">
+            <div className="w-7 h-7 bg-dark-500 flex items-center justify-center rounded-sm">
               <Factory className="w-4 h-4 text-white" />
             </div>
             <div className="flex flex-col leading-none">
-              <p className="text-[11px] font-black text-gray-900 tracking-tight">UNIQUE ARTS</p>
-              <p className="text-[8px] font-mono text-gray-400 tracking-widest uppercase">PMS</p>
+              <p className="text-[11px] font-black text-dark-500 tracking-tight">UNIQUE ARTS</p>
+              <p className="text-[8px] font-mono text-primary-400 tracking-widest uppercase">PMS</p>
             </div>
           </Link>
         </div>
@@ -389,13 +389,13 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
       {/* Main content — isolated from Sidebar Clerk re-renders */}
       <main className="min-w-0 flex-1 overflow-auto pt-14 lg:pt-0">
         {/* Desktop top bar */}
-        <div className="hidden lg:flex items-center justify-between px-6 h-12 border-b border-gray-200 bg-white sticky top-0 z-10">
+        <div className="hidden lg:flex items-center justify-between px-6 h-12 border-b border-primary-200 bg-white sticky top-0 z-10">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-black flex items-center justify-center rounded-sm">
+            <div className="w-6 h-6 bg-dark-500 flex items-center justify-center rounded-sm">
               <Factory className="w-3.5 h-3.5 text-white" />
             </div>
-            <p className="text-[11px] font-black text-gray-900 tracking-tight">UNIQUE ARTS</p>
-            <p className="text-[8px] font-mono text-gray-400 tracking-widest uppercase ml-1">PMS</p>
+            <p className="text-[11px] font-black text-dark-500 tracking-tight">UNIQUE ARTS</p>
+            <p className="text-[8px] font-mono text-primary-400 tracking-widest uppercase ml-1">PMS</p>
           </div>
           <div className="flex items-center gap-2">
             {/* In-app notification bell dropdown (desktop) — includes both in-app + alert badge */}

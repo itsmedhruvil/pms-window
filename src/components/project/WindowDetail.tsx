@@ -103,46 +103,46 @@ export function WindowDetail({ project, tasks: initialTasks, windowIndex, isAdmi
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="border-b border-gray-200 px-6 py-4">
+      <div className="border-b border-primary-200 px-6 py-4">
         <div className="flex items-center gap-4 mb-3">
           <Link
             href={`/projects/${project._id}`}
-            className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors"
+            className="flex items-center gap-2 text-primary-500 hover:text-dark-600 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="text-sm font-mono">Back to Project</span>
           </Link>
-          <ChevronRight className="w-4 h-4 text-gray-300" />
-          <span className="text-sm font-mono text-gray-400">Window {windowIndex + 1}</span>
+          <ChevronRight className="w-4 h-4 text-primary-300" />
+          <span className="text-sm font-mono text-primary-400">Window {windowIndex + 1}</span>
         </div>
 
         <div className="flex items-start justify-between gap-6">
           <div>
-            <h1 className="text-2xl font-black text-gray-900">
+            <h1 className="text-2xl font-black text-dark-500">
               {windowSpec.design} #{windowIndex + 1}
             </h1>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-dark-400 mt-1">
               {windowSpec.width}×{windowSpec.height}mm • {windowSpec.glassType} • Quantity: {windowSpec.quantity}
             </p>
             {windowSpec.notes && (
-              <p className="text-sm text-gray-500 mt-2 italic">{windowSpec.notes}</p>
+              <p className="text-sm text-primary-500 mt-2 italic">{windowSpec.notes}</p>
             )}
           </div>
 
           <div className="text-right">
-            <div className="text-3xl font-black font-mono text-gray-900">
+            <div className="text-3xl font-black font-mono text-dark-500">
               {progress}%
             </div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-primary-500">
               {completedTasks}/{totalTasks} tasks completed
             </div>
           </div>
         </div>
 
         {/* Progress bar */}
-        <div className="mt-4 h-2 bg-gray-100 rounded-full">
+        <div className="mt-4 h-2 bg-primary-100 rounded-full">
           <div
-            className="h-full bg-black rounded-full transition-all duration-500"
+            className="h-full bg-dark-500 rounded-full transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -150,10 +150,10 @@ export function WindowDetail({ project, tasks: initialTasks, windowIndex, isAdmi
 
       {/* Bulk actions */}
       {isAdmin && (
-        <div className="border-b border-gray-200 px-6 py-3 bg-gray-50">
+        <div className="border-b border-primary-200 px-6 py-3 bg-primary-50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <span className="text-sm font-mono text-gray-600">
+              <span className="text-sm font-mono text-dark-400">
                 {selectedTasks.size} task{selectedTasks.size !== 1 ? 's' : ''} selected
               </span>
               <button
@@ -166,7 +166,7 @@ export function WindowDetail({ project, tasks: initialTasks, windowIndex, isAdmi
             {selectedTasks.size > 0 && (
               <button
                 onClick={handleBulkMarkDone}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-mono font-bold uppercase bg-dark-500 text-white hover:bg-dark-600 transition-colors"
               >
                 <CheckSquare className="w-4 h-4" />
                 Mark as Done
@@ -186,23 +186,23 @@ export function WindowDetail({ project, tasks: initialTasks, windowIndex, isAdmi
           const deptProgress = Math.round((deptCompleted / deptTasks.length) * 100);
 
           return (
-            <div key={department} className="border border-gray-200 rounded-lg overflow-hidden">
-              <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+            <div key={department} className="border border-primary-200 rounded-lg overflow-hidden">
+              <div className="bg-primary-50 px-4 py-3 border-b border-primary-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Users className="w-4 h-4 text-gray-500" />
-                    <h3 className="font-bold text-gray-900">{getDepartmentLabel(department)}</h3>
-                    <span className="text-sm text-gray-500 font-mono">
+                    <Users className="w-4 h-4 text-primary-500" />
+                    <h3 className="font-bold text-dark-500">{getDepartmentLabel(department)}</h3>
+                    <span className="text-sm text-primary-500 font-mono">
                       {deptCompleted}/{deptTasks.length} tasks
                     </span>
                   </div>
-                  <div className="text-sm font-mono text-gray-600">
+                  <div className="text-sm font-mono text-dark-400">
                     {deptProgress}% complete
                   </div>
                 </div>
-                <div className="mt-2 h-1.5 bg-gray-200 rounded-full">
+                <div className="mt-2 h-1.5 bg-primary-200 rounded-full">
                   <div
-                    className="h-full bg-black rounded-full transition-all duration-500"
+                    className="h-full bg-dark-500 rounded-full transition-all duration-500"
                     style={{ width: `${deptProgress}%` }}
                   />
                 </div>
@@ -210,7 +210,7 @@ export function WindowDetail({ project, tasks: initialTasks, windowIndex, isAdmi
 
               <div className="divide-y divide-gray-100">
                 {deptTasks.map(task => (
-                  <div key={task._id} className="p-4 hover:bg-gray-50">
+                  <div key={task._id} className="p-4 hover:bg-primary-50">
                     <div className="flex items-start gap-3">
                       {isAdmin && (
                         <button
@@ -220,21 +220,21 @@ export function WindowDetail({ project, tasks: initialTasks, windowIndex, isAdmi
                           {selectedTasks.has(task._id) ? (
                             <CheckSquare className="w-4 h-4 text-blue-600" />
                           ) : (
-                            <Square className="w-4 h-4 text-gray-300" />
+                            <Square className="w-4 h-4 text-primary-300" />
                           )}
                         </button>
                       )}
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-medium text-gray-900 truncate">{task.title}</h4>
+                          <h4 className="font-medium text-dark-500 truncate">{task.title}</h4>
                           <TaskStatusBadge status={task.status} />
                           {task.isLocked && <AlertTriangle className="w-3 h-3 text-orange-500" />}
                         </div>
 
-                        <p className="text-sm text-gray-600 mb-2">{task.description}</p>
+                        <p className="text-sm text-dark-400 mb-2">{task.description}</p>
 
-                        <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <div className="flex items-center gap-4 text-xs text-primary-500">
                           {task.assignedUser && (
                             <span>Assigned to: {typeof task.assignedUser === 'object' ? task.assignedUser.name : 'Unknown'}</span>
                           )}
@@ -249,7 +249,7 @@ export function WindowDetail({ project, tasks: initialTasks, windowIndex, isAdmi
 
                       <Link
                         href={`/tasks/${task._id}`}
-                        className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                        className="flex-shrink-0 p-2 text-primary-400 hover:text-dark-400 transition-colors"
                       >
                         <ChevronRight className="w-4 h-4" />
                       </Link>

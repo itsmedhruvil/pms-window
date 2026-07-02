@@ -21,7 +21,7 @@
     line-height: 1.65;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    @apply text-gray-900 bg-white;
+    @apply text-dark-500 bg-white;
   }
 
   .font-mono {
@@ -32,7 +32,7 @@
 @layer components {
   /* ERP dense card style */
   .erp-card {
-    @apply border border-gray-200 bg-white;
+    @apply border border-primary-200 bg-white;
   }
 
   /* Status pulse for alerts */
@@ -57,15 +57,15 @@
   }
 
   .erp-table th {
-    @apply whitespace-nowrap px-3 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-gray-500 border-b border-gray-200 bg-gray-50;
+    @apply whitespace-nowrap px-3 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-primary-500 border-b border-primary-200 bg-primary-50;
   }
 
   .erp-table td {
-    @apply px-3 py-2.5 border-b border-gray-100 align-middle;
+    @apply px-3 py-2.5 border-b border-primary-100 align-middle;
   }
 
   .erp-table tr:hover td {
-    @apply bg-gray-50;
+    @apply bg-primary-50;
   }
 
   /* Scrollbar */
@@ -79,11 +79,11 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-gray-200 rounded-full;
+    @apply bg-primary-200 rounded-full;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-400;
+    @apply bg-primary-400;
   }
 }
 

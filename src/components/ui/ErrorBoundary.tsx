@@ -60,14 +60,14 @@ export function ErrorFallback({
   return (
     <div className="flex flex-col items-center justify-center min-h-[200px] border border-red-200 bg-red-50/30 p-8 text-center">
       <AlertTriangle className="w-8 h-8 text-red-500 mb-3" />
-      <h3 className="text-sm font-bold text-gray-900 mb-1">{title}</h3>
+      <h3 className="text-sm font-bold text-dark-500 mb-1">{title}</h3>
       {error?.message && (
-        <p className="text-xs text-gray-500 font-mono mb-4 max-w-sm">{error.message}</p>
+        <p className="text-xs text-primary-500 font-mono mb-4 max-w-sm">{error.message}</p>
       )}
       {onReset && (
         <button
           onClick={onReset}
-          className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono font-bold uppercase border border-gray-300 text-gray-700 hover:border-black hover:text-black transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono font-bold uppercase border border-primary-300 text-dark-600 hover:border-dark-500 hover:text-dark-500 transition-colors"
         >
           <RefreshCw className="w-3 h-3" />
           Try Again

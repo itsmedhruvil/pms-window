@@ -37,7 +37,7 @@ export function FilterDrawer({ open, onClose, title = 'Filters', children }: Fil
       {/* Overlay */}
       {open && (
         <div
-          className="fixed inset-0 bg-black/40 z-50 lg:hidden"
+          className="fixed inset-0 bg-dark-500/40 z-50 lg:hidden"
           onClick={onClose}
         />
       )}
@@ -46,18 +46,18 @@ export function FilterDrawer({ open, onClose, title = 'Filters', children }: Fil
       <div
         ref={drawerRef}
         className={cn(
-          'fixed top-0 right-0 h-full w-72 max-w-[85vw] bg-white border-l border-gray-200 shadow-2xl z-[60] transform transition-transform duration-200 lg:hidden',
+          'fixed top-0 right-0 h-full w-72 max-w-[85vw] bg-white border-l border-primary-200 shadow-2xl z-[60] transform transition-transform duration-200 lg:hidden',
           open ? 'translate-x-0' : 'translate-x-full'
         )}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-          <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-primary-200">
+          <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-dark-600">
             {title}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-black transition-colors"
+            className="p-1 text-primary-400 hover:text-dark-500 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -81,12 +81,12 @@ export function MobileFilterButton({
     <button
       type="button"
       onClick={onClick}
-      className="lg:hidden inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide border border-gray-200 text-gray-600 hover:border-gray-400 transition-colors relative"
+      className="lg:hidden inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide border border-primary-200 text-dark-400 hover:border-primary-400 transition-colors relative"
     >
       <Filter className="w-3 h-3" />
       Filters
       {activeCount > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-black text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-dark-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
           {activeCount}
         </span>
       )}

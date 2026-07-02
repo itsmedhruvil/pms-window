@@ -147,7 +147,7 @@ export function CreateAlertForm({
                   'text-left px-3 py-2.5 border text-xs font-mono transition-colors',
                   form.type === type
                     ? 'border-red-500 bg-red-50 text-red-700 font-bold'
-                    : 'border-gray-200 text-gray-700 hover:border-gray-400'
+                    : 'border-primary-200 text-dark-600 hover:border-primary-400'
                 )}
               >
                 {ALERT_TYPE_LABEL[type]}
@@ -171,7 +171,7 @@ export function CreateAlertForm({
                     ? sev === AlertSeverity.CRITICAL
                       ? 'border-red-700 bg-red-600 text-white'
                       : 'border-red-400 bg-red-50 text-red-700'
-                    : 'border-gray-200 text-gray-600 hover:border-gray-400'
+                    : 'border-primary-200 text-dark-400 hover:border-primary-400'
                 )}
               >
                 {sev === AlertSeverity.CRITICAL ? '▲ CRITICAL' : '▲ HIGH'}
@@ -194,18 +194,18 @@ export function CreateAlertForm({
                 className={cn(
                   'flex items-center gap-2 px-3 py-2 border text-[11px] font-mono transition-colors',
                   form.affectedDepartments.includes(dept)
-                    ? 'border-black bg-black text-white'
-                    : 'border-gray-200 text-gray-600 hover:border-gray-400'
+                    ? 'border-dark-500 bg-dark-500 text-white'
+                    : 'border-primary-200 text-dark-400 hover:border-primary-400'
                 )}
               >
                 <div className={cn(
                   'w-3.5 h-3.5 border flex items-center justify-center flex-shrink-0',
                   form.affectedDepartments.includes(dept)
                     ? 'border-white bg-white'
-                    : 'border-gray-400'
+                    : 'border-primary-400'
                 )}>
                   {form.affectedDepartments.includes(dept) && (
-                    <Check className="w-2.5 h-2.5 text-black" />
+                    <Check className="w-2.5 h-2.5 text-dark-500" />
                   )}
                 </div>
                 {label}
@@ -223,7 +223,7 @@ export function CreateAlertForm({
                     : departments.map((department) => department.name),
               })
             }
-            className="text-[10px] font-mono text-gray-500 hover:text-black underline"
+            className="text-[10px] font-mono text-primary-500 hover:text-dark-500 underline"
           >
             {form.affectedDepartments.length === departments.length
               ? 'Deselect all'
@@ -235,17 +235,17 @@ export function CreateAlertForm({
         <div className="space-y-2">
           <label className={labelClass}>
             Alert Message <span className="text-red-500">*</span>
-            <span className="normal-case font-normal text-gray-400 ml-2">(min 10 characters)</span>
+            <span className="normal-case font-normal text-primary-400 ml-2">(min 10 characters)</span>
           </label>
           <textarea
             value={form.message}
             onChange={(e) => setForm({ ...form, message: e.target.value })}
             rows={4}
             placeholder="Describe the issue in detail. Include what happened, impact, and any immediate actions required..."
-            className="w-full px-3 py-2.5 text-xs font-mono border border-gray-200 focus:outline-none focus:border-red-400 transition-colors resize-none placeholder:text-gray-400"
+            className="w-full px-3 py-2.5 text-xs font-mono border border-primary-200 focus:outline-none focus:border-red-400 transition-colors resize-none placeholder:text-primary-400"
           />
           <div className="flex justify-between">
-            <span className="text-[10px] text-gray-400 font-mono">
+            <span className="text-[10px] text-primary-400 font-mono">
               {form.message.length} chars
             </span>
             {form.message.length < 10 && form.message.length > 0 && (
@@ -257,12 +257,12 @@ export function CreateAlertForm({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-primary-100">
           {onCancel && (
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 text-xs font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 transition-colors"
+              className="px-4 py-2 text-xs font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400 transition-colors"
             >
               Cancel
             </button>
@@ -275,7 +275,7 @@ export function CreateAlertForm({
               'flex items-center gap-2 px-5 py-2 text-xs font-mono font-bold uppercase transition-colors',
               isValid && !loading
                 ? 'bg-red-600 text-white hover:bg-red-700'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-primary-200 text-primary-400 cursor-not-allowed'
             )}
           >
             {loading ? (
@@ -296,4 +296,4 @@ export function CreateAlertForm({
   );
 }
 
-const labelClass = 'block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500';
+const labelClass = 'block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500';

@@ -95,8 +95,8 @@ export function CreateTaskForm({ onSuccess, onCancel, department, task }: Create
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-black text-gray-900">{task ? 'Edit Task' : 'Create New Task'}</h2>
-          <p className="text-xs text-gray-500 font-mono">Add a task and assign it to a project and department.</p>
+          <h2 className="text-lg font-black text-dark-500">{task ? 'Edit Task' : 'Create New Task'}</h2>
+          <p className="text-xs text-primary-500 font-mono">Add a task and assign it to a project and department.</p>
         </div>
       </div>
 
@@ -108,34 +108,34 @@ export function CreateTaskForm({ onSuccess, onCancel, department, task }: Create
       )}
 
       <div className="grid gap-4">
-        <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+        <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
           Task Title
           <input
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+            className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
             placeholder="E.g. Review window specs for Block C"
           />
         </label>
 
-        <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+        <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
           Description
           <textarea
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             rows={4}
-            className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+            className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
             placeholder="Describe the task and expected outcome"
           />
         </label>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+          <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
             Project
             <select
               value={form.projectId}
               onChange={(e) => setForm({ ...form, projectId: e.target.value })}
-              className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+              className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
             >
               {projects.map((project) => (
                 <option key={project._id} value={project._id}>
@@ -145,12 +145,12 @@ export function CreateTaskForm({ onSuccess, onCancel, department, task }: Create
             </select>
           </label>
 
-          <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+          <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
             Department
             <select
               value={form.department}
               onChange={(e) => setForm({ ...form, department: e.target.value as Department })}
-              className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+              className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
             >
               {departments.map((department) => (
                 <option key={department.name} value={department.name}>
@@ -162,33 +162,33 @@ export function CreateTaskForm({ onSuccess, onCancel, department, task }: Create
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+          <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
             Start Date
             <input
               type="date"
               value={form.startDate}
               onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-              className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+              className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
             />
           </label>
 
-          <label className="block text-[11px] uppercase tracking-[0.2em] text-gray-500 font-bold">
+          <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
             Due Date
             <input
               type="date"
               value={form.dueDate}
               onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-              className="mt-2 w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black"
+              className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
             />
           </label>
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-200">
+      <div className="flex items-center justify-end gap-2 pt-4 border-t border-primary-200">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-xs font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600"
+          className="px-4 py-2 text-xs font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400"
         >
           Cancel
         </button>
@@ -198,7 +198,7 @@ export function CreateTaskForm({ onSuccess, onCancel, department, task }: Create
           onClick={handleSubmit}
           className={cn(
             'px-4 py-2 text-xs font-mono font-bold uppercase transition-colors disabled:opacity-50',
-            'bg-black text-white hover:bg-gray-800'
+            'bg-dark-500 text-white hover:bg-dark-600'
           )}
         >
           {loading ? 'Creating\u2026' : 'Create Task'}

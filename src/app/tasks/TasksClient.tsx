@@ -199,13 +199,13 @@ export function TasksClient({
     <div className="flex min-h-[640px] overflow-hidden">
       {/* Main panel */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200">
+        <div className="flex-shrink-0 px-6 py-4 border-b border-primary-200">
           <div className="flex items-center justify-between mb-3 gap-3">
             <div>
-              <h1 className="text-xl font-black text-gray-900">
+              <h1 className="text-xl font-black text-dark-500">
                 {title}
               </h1>
-              <p className="text-xs text-gray-500 font-mono mt-0.5">
+              <p className="text-xs text-primary-500 font-mono mt-0.5">
                 {filtered.length} task{filtered.length === 1 ? '' : 's'} in list view
               </p>
             </div>
@@ -215,7 +215,7 @@ export function TasksClient({
                 <>
                   <button
                     onClick={handleBulkMarkDone}
-                    className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-dark-500 text-white hover:bg-dark-600 transition-colors"
                   >
                     <CheckSquare className="w-3.5 h-3.5" />
                     Mark Done ({selectedTasks.size})
@@ -235,7 +235,7 @@ export function TasksClient({
                 <button
                   type="button"
                   onClick={() => setTaskModalOpen(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-dark-500 text-white hover:bg-dark-600 transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   New Task
@@ -247,10 +247,10 @@ export function TasksClient({
           {/* Stats row */}
           <div className="flex gap-4 text-[11px] font-mono">
             {[
-              { label: 'TODO', count: counts.todo, color: 'text-gray-600' },
-              { label: 'IN PROGRESS', count: counts.inProgress, color: 'text-black font-bold' },
-              { label: 'BLOCKED', count: counts.blocked, color: counts.blocked > 0 ? 'text-red-600 font-bold' : 'text-gray-400' },
-              { label: 'DONE', count: counts.done, color: 'text-gray-500' },
+              { label: 'TODO', count: counts.todo, color: 'text-dark-400' },
+              { label: 'IN PROGRESS', count: counts.inProgress, color: 'text-dark-500 font-bold' },
+              { label: 'BLOCKED', count: counts.blocked, color: counts.blocked > 0 ? 'text-red-600 font-bold' : 'text-primary-400' },
+              { label: 'DONE', count: counts.done, color: 'text-primary-500' },
             ].map(({ label, count, color }) => (
               <span key={label} className={color}>
                 {count} {label}
@@ -259,17 +259,17 @@ export function TasksClient({
           </div>
         </div>
 
-        <div className="flex-shrink-0 px-4 sm:px-6 py-2.5 border-b border-gray-100 flex flex-col gap-3 bg-gray-50">
+        <div className="flex-shrink-0 px-4 sm:px-6 py-2.5 border-b border-primary-100 flex flex-col gap-3 bg-primary-50">
           {/* Search + Mobile Filter button row */}
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <Search className="w-4 h-4 text-primary-400 flex-shrink-0" />
               <input
                 type="search"
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 placeholder="Search tasks..."
-                className="text-[10px] font-mono border border-gray-200 px-2 py-1 bg-white focus:outline-none focus:border-black w-full sm:w-64"
+                className="text-[10px] font-mono border border-primary-200 px-2 py-1 bg-white focus:outline-none focus:border-dark-500 w-full sm:w-64"
               />
             </div>
 
@@ -281,18 +281,18 @@ export function TasksClient({
                   <button
                     type="button"
                     onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
-                    className="flex items-center gap-2 text-[10px] font-mono border border-gray-200 px-2 py-1 bg-white focus:outline-none focus:border-black whitespace-nowrap"
+                    className="flex items-center gap-2 text-[10px] font-mono border border-primary-200 px-2 py-1 bg-white focus:outline-none focus:border-dark-500 whitespace-nowrap"
                   >
                     <span className="max-w-[140px] truncate">{selectedProjectName}</span>
-                    <ChevronDown className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                    <ChevronDown className="w-3 h-3 text-primary-400 flex-shrink-0" />
                   </button>
 
                   {projectDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-gray-200 shadow-lg z-50">
+                    <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-primary-200 shadow-lg z-50">
                       {/* Search within projects */}
-                      <div className="p-2 border-b border-gray-100">
+                      <div className="p-2 border-b border-primary-100">
                         <div className="flex items-center gap-1.5">
-                          <Search className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                          <Search className="w-3 h-3 text-primary-400 flex-shrink-0" />
                           <input
                             type="text"
                             value={projectSearch}
@@ -313,8 +313,8 @@ export function TasksClient({
                             setProjectSearch('');
                           }}
                           className={cn(
-                            'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-gray-50 transition-colors',
-                            projectFilter === 'all' ? 'bg-gray-100 font-bold' : ''
+                            'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-primary-50 transition-colors',
+                            projectFilter === 'all' ? 'bg-primary-100 font-bold' : ''
                           )}
                         >
                           All Projects
@@ -329,16 +329,16 @@ export function TasksClient({
                               setProjectSearch('');
                             }}
                             className={cn(
-                              'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-gray-50 transition-colors',
-                              projectFilter === project._id ? 'bg-gray-100 font-bold' : ''
+                              'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-primary-50 transition-colors',
+                              projectFilter === project._id ? 'bg-primary-100 font-bold' : ''
                             )}
                           >
                             <span className="block truncate">{project.projectTitle}</span>
-                            <span className="block text-[9px] text-gray-400 truncate">{project.clientName}</span>
+                            <span className="block text-[9px] text-primary-400 truncate">{project.clientName}</span>
                           </button>
                         ))}
                         {filteredProjects.length === 0 && (
-                          <p className="px-3 py-3 text-[10px] text-gray-400 font-mono text-center">
+                          <p className="px-3 py-3 text-[10px] text-primary-400 font-mono text-center">
                             No projects found
                           </p>
                         )}
@@ -351,7 +351,7 @@ export function TasksClient({
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as TaskStatus | 'all')}
-                className="text-[10px] font-mono border border-gray-200 px-2 py-1 bg-white focus:outline-none focus:border-black"
+                className="text-[10px] font-mono border border-primary-200 px-2 py-1 bg-white focus:outline-none focus:border-dark-500"
               >
                 <option value="all">All Statuses</option>
                 {Object.values(TaskStatus).map((s) => (
@@ -374,7 +374,7 @@ export function TasksClient({
             >
               {selectedTasks.size === filtered.length && filtered.length > 0 ? 'Deselect all' : 'Select all'}
             </button>
-            <span className="text-[10px] text-gray-500 font-mono">
+            <span className="text-[10px] text-primary-500 font-mono">
               {selectedTasks.size > 0 ? `${selectedTasks.size} selected • ` : ''}{filtered.length} tasks
             </span>
           </div>
@@ -384,7 +384,7 @@ export function TasksClient({
         <FilterDrawer open={mobileFilterOpen} onClose={() => setMobileFilterOpen(false)} title="Task Filters">
           {/* Status filter */}
           <div className="mb-5">
-            <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
+            <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500 mb-2">
               Status
             </label>
             <div className="flex flex-wrap gap-1.5">
@@ -395,8 +395,8 @@ export function TasksClient({
                   className={cn(
                     'px-2.5 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide border transition-colors',
                     statusFilter === s
-                      ? 'bg-black text-white border-black'
-                      : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                      ? 'bg-dark-500 text-white border-dark-500'
+                      : 'border-primary-200 text-primary-500 hover:border-primary-400'
                   )}
                 >
                   {s === 'all' ? 'All' : s.replace('_', ' ')}
@@ -408,15 +408,15 @@ export function TasksClient({
           {/* Project filter */}
           {allProjects.length > 0 && (
             <div className="mb-5">
-              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500 mb-2">
                 Project
               </label>
               <div className="max-h-48 overflow-y-auto space-y-0.5">
                 <button
                   onClick={() => { setProjectFilter('all'); setMobileFilterOpen(false); }}
                   className={cn(
-                    'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-gray-50 transition-colors',
-                    projectFilter === 'all' ? 'bg-gray-100 font-bold' : ''
+                    'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-primary-50 transition-colors',
+                    projectFilter === 'all' ? 'bg-primary-100 font-bold' : ''
                   )}
                 >
                   All Projects
@@ -426,8 +426,8 @@ export function TasksClient({
                     key={project._id}
                     onClick={() => { setProjectFilter(project._id); setMobileFilterOpen(false); }}
                     className={cn(
-                      'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-gray-50 transition-colors',
-                      projectFilter === project._id ? 'bg-gray-100 font-bold' : ''
+                      'w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-primary-50 transition-colors',
+                      projectFilter === project._id ? 'bg-primary-100 font-bold' : ''
                     )}
                   >
                     <span className="block truncate">{project.projectTitle}</span>
@@ -490,14 +490,14 @@ function TaskListView({
 }) {
   if (tasks.length === 0) {
     return (
-      <div className="border border-dashed border-gray-200 p-16 text-center">
-        <p className="text-sm text-gray-400 font-mono">No tasks found</p>
+      <div className="border border-dashed border-primary-200 p-16 text-center">
+        <p className="text-sm text-primary-400 font-mono">No tasks found</p>
       </div>
     );
   }
 
   return (
-    <div className="erp-table-wrap border border-gray-200">
+    <div className="erp-table-wrap border border-primary-200">
           <table className="erp-table">
         <thead>
           <tr>
@@ -540,19 +540,19 @@ function TaskListView({
                     {selectedTasks.has(task._id) ? (
                       <CheckSquare className="w-4 h-4 text-blue-600" />
                     ) : (
-                      <Square className="w-4 h-4 text-gray-300" />
+                      <Square className="w-4 h-4 text-primary-300" />
                     )}
                   </button>
                 </td>
                 <td>
                   <div className="flex items-center gap-2">
-                    {task.isLocked && <Lock className="w-3 h-3 text-gray-400 flex-shrink-0" />}
+                    {task.isLocked && <Lock className="w-3 h-3 text-primary-400 flex-shrink-0" />}
                     {task.status === TaskStatus.BLOCKED && (
                       <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0 animate-pulse" />
                     )}
                     <span className={cn(
-                      'font-medium text-gray-900',
-                      task.isLocked && 'text-gray-500',
+                      'font-medium text-dark-500',
+                      task.isLocked && 'text-primary-500',
                       task.status === TaskStatus.BLOCKED && 'text-red-700'
                     )}>
                       {task.title}
@@ -561,7 +561,7 @@ function TaskListView({
                 </td>
                 {showDepartmentColumn && (
                   <td>
-                    <span className="font-mono text-gray-500 uppercase text-[10px] tracking-wide">
+                    <span className="font-mono text-primary-500 uppercase text-[10px] tracking-wide">
                       {getDepartmentLabel(task.department)}
                     </span>
                   </td>
@@ -575,21 +575,21 @@ function TaskListView({
                       'font-mono text-[11px]',
                       new Date(task.dueDate) < new Date()
                         ? 'text-red-600 font-bold'
-                        : 'text-gray-600'
+                        : 'text-dark-400'
                     )}>
                       {formatDate(task.dueDate)}
                     </span>
                   ) : (
-                    <span className="text-gray-300">—</span>
+                    <span className="text-primary-300">—</span>
                   )}
                 </td>
                 <td>
                   {project ? (
-                    <span className="text-[11px] text-gray-500 truncate max-w-[120px] block">
+                    <span className="text-[11px] text-primary-500 truncate max-w-[120px] block">
                       {project.projectTitle}
                     </span>
                   ) : (
-                    <span className="text-gray-300">—</span>
+                    <span className="text-primary-300">—</span>
                   )}
                 </td>
               </tr>

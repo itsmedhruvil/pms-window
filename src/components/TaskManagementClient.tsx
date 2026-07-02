@@ -92,12 +92,12 @@ export default function TaskManagementClient() {
           <div
             key={dept}
             className={`cursor-pointer border rounded p-4 transition-colors ${
-              selectedDepartment === dept ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+              selectedDepartment === dept ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-primary-50'
             }`}
             onClick={() => setSelectedDepartment(dept)}
           >
             <h3 className="font-semibold">{dept}</h3>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-dark-400">
               {tasks.filter(t => t.department === dept).length} tasks
             </p>
           </div>
@@ -110,7 +110,7 @@ export default function TaskManagementClient() {
             <h2 className="text-lg font-bold">{selectedDepartment} Tasks</h2>
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-black text-white rounded text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-dark-500 text-white rounded text-sm"
             >
               <Plus className="w-4 h-4" />
               Add Task
@@ -121,19 +121,19 @@ export default function TaskManagementClient() {
               <div key={task._id} className="flex items-center justify-between p-3 border rounded">
                 <div>
                   <h3 className="font-medium">{task.title}</h3>
-                  <p className="text-sm text-gray-600">{task.description}</p>
+                  <p className="text-sm text-dark-400">{task.description}</p>
                 </div>
                 <div className="flex space-x-2">
                   <button
                     onClick={() => handleDuplicateTask(task._id)}
-                    className="p-2 border rounded hover:bg-gray-50"
+                    className="p-2 border rounded hover:bg-primary-50"
                     title="Duplicate"
                   >
                     <Copy className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setEditingTask(task)}
-                    className="p-2 border rounded hover:bg-gray-50"
+                    className="p-2 border rounded hover:bg-primary-50"
                     title="Edit"
                   >
                     <Edit className="w-4 h-4" />

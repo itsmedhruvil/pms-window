@@ -11,25 +11,25 @@ const TRANSITIONS: Record<ProjectStatus, { to: ProjectStatus; label: string; ico
     to: ProjectStatus.IN_PRODUCTION,
     label: 'Start Production',
     icon: <Play className="w-3.5 h-3.5" />,
-    style: 'bg-black text-white hover:bg-gray-800',
+    style: 'bg-dark-500 text-white hover:bg-dark-600',
   },
   [ProjectStatus.IN_PRODUCTION]: {
     to: ProjectStatus.COMPLETED,
     label: 'Mark Complete',
     icon: <CheckCircle2 className="w-3.5 h-3.5" />,
-    style: 'bg-black text-white hover:bg-gray-800',
+    style: 'bg-dark-500 text-white hover:bg-dark-600',
   },
   [ProjectStatus.ON_HOLD]: {
     to: ProjectStatus.IN_PRODUCTION,
     label: 'Resume Production',
     icon: <Play className="w-3.5 h-3.5" />,
-    style: 'border border-black text-black hover:bg-black hover:text-white',
+    style: 'border border-dark-500 text-dark-500 hover:bg-dark-500 hover:text-white',
   },
   [ProjectStatus.COMPLETED]: {
     to: ProjectStatus.DISPATCHED,
     label: 'Mark Dispatched',
     icon: <Truck className="w-3.5 h-3.5" />,
-    style: 'bg-gray-800 text-white hover:bg-gray-700',
+    style: 'bg-dark-600 text-white hover:bg-dark-600',
   },
   [ProjectStatus.DISPATCHED]: null,
 };
@@ -90,9 +90,9 @@ export function ProjectStatusControl({
       )}
 
       {isBlocked && (
-        <div className="flex items-start gap-2 p-2.5 border border-gray-200 bg-gray-50">
-          <AlertTriangle className="w-3.5 h-3.5 text-gray-500 flex-shrink-0 mt-0.5" />
-          <p className="text-[11px] text-gray-600 font-mono">
+        <div className="flex items-start gap-2 p-2.5 border border-primary-200 bg-primary-50">
+          <AlertTriangle className="w-3.5 h-3.5 text-primary-500 flex-shrink-0 mt-0.5" />
+          <p className="text-[11px] text-dark-400 font-mono">
             {hasActiveAlerts
               ? 'Resolve all active alerts before resuming production'
               : `${100 - project.completionPercentage}% of tasks remaining — complete all tasks first`}
@@ -107,7 +107,7 @@ export function ProjectStatusControl({
             onChange={(e) => setNote(e.target.value)}
             placeholder={`Optional note for "${transition.label}"...`}
             rows={2}
-            className="w-full text-xs font-mono border border-gray-200 px-2.5 py-2 focus:outline-none focus:border-black resize-none placeholder:text-gray-400"
+            className="w-full text-xs font-mono border border-primary-200 px-2.5 py-2 focus:outline-none focus:border-dark-500 resize-none placeholder:text-primary-400"
           />
           <div className="flex gap-2">
             <button
@@ -128,7 +128,7 @@ export function ProjectStatusControl({
             </button>
             <button
               onClick={() => { setNoteMode(false); setNote(''); }}
-              className="px-3 py-1.5 text-[11px] font-mono border border-gray-200 text-gray-600 hover:border-gray-400 transition-colors"
+              className="px-3 py-1.5 text-[11px] font-mono border border-primary-200 text-dark-400 hover:border-primary-400 transition-colors"
             >
               Cancel
             </button>
@@ -155,7 +155,7 @@ export function ProjectStatusControl({
           <button
             onClick={() => setNoteMode(true)}
             disabled={isBlocked}
-            className="text-[10px] font-mono text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors"
+            className="text-[10px] font-mono text-primary-400 hover:text-dark-600 disabled:opacity-30 transition-colors"
             title="Add a note to this status change"
           >
             + Note

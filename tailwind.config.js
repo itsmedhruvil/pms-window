@@ -46,6 +46,34 @@ module.exports = {
           blocked: '#ef4444',
           done: '#10b981',
         },
+        // ===== NEW THEME COLORS =====
+        // #71BBE1 light blue — accent, hover states, light backgrounds
+        // #43476F dark purple — primary text, dark backgrounds, buttons (replaces black)
+        // #2865C1 dark blue — secondary text, borders, links, brand elements
+        primary: {
+          50:  '#e8f4fa',
+          100: '#c5e3f2',
+          200: '#9ecfe8',
+          300: '#71BBE1',  // light blue accent
+          400: '#4a8fd0',
+          500: '#2865C1',  // dark blue
+          600: '#2355a8',
+          700: '#1d4590',
+          800: '#173578',
+          900: '#112560',
+        },
+        dark: {
+          50:  '#e8e8ef',
+          100: '#c5c6d6',
+          200: '#9ea0ba',
+          300: '#777aa0',
+          400: '#5d6089',
+          500: '#43476F',  // dark purple — primary replacement for black
+          600: '#3a3e62',
+          700: '#313455',
+          800: '#282b48',
+          900: '#1f223b',
+        },
       },
       animation: {
         'pulse-slow': 'pulse 3s ease-in-out infinite',

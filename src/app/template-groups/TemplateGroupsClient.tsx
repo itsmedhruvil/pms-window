@@ -36,8 +36,8 @@ const FREQUENCY_BADGES: Record<string, string> = {
   weekly: 'bg-purple-100 text-purple-800',
   monthly: 'bg-orange-100 text-orange-800',
   project: 'bg-green-100 text-green-800',
-  need_basis: 'bg-gray-100 text-gray-800',
-  project_recurring: 'bg-indigo-100 text-indigo-800',
+  need_basis: 'bg-primary-100 text-dark-600',
+  project_recurring: 'bg-primary-100 text-primary-600',
 };
 
 const emptyTaskDraft: TaskDraft = {
@@ -84,7 +84,7 @@ function DepartmentTabs({
   }, {} as Record<string, number>);
 
   return (
-    <div className="flex border-b border-gray-200 overflow-x-auto">
+    <div className="flex border-b border-primary-200 overflow-x-auto">
       {departments.map(({ name: dept, label }) => {
         const count = counts[dept] || 0;
         const isActive = activeTab === dept;
@@ -96,15 +96,15 @@ function DepartmentTabs({
             className={cn(
               'flex items-center gap-2 px-4 py-2.5 text-[11px] font-mono whitespace-nowrap border-b-2 transition-colors',
               isActive
-                ? 'border-black text-black font-bold'
-                : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
+                ? 'border-dark-500 text-dark-500 font-bold'
+                : 'border-transparent text-primary-500 hover:text-dark-600 hover:border-primary-300'
             )}
           >
             {label}
             {count > 0 && (
               <span className={cn(
                 'px-1.5 py-0.5 text-[9px] rounded-sm font-bold',
-                isActive ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'
+                isActive ? 'bg-dark-500 text-white' : 'bg-primary-100 text-dark-400'
               )}>
                 {count}
               </span>
@@ -140,9 +140,9 @@ function TaskTable({
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
 
   return (
-    <div className="border border-gray-200 overflow-x-auto">
+    <div className="border border-primary-200 overflow-x-auto">
       {/* Table header */}
-      <div className="grid grid-cols-[36px_64px_1fr_1fr_130px_90px_70px_90px_36px] min-w-[900px] bg-gray-50 border-b border-gray-200 text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
+      <div className="grid grid-cols-[36px_64px_1fr_1fr_130px_90px_70px_90px_36px] min-w-[900px] bg-primary-50 border-b border-primary-200 text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">
         <div className="px-2 py-2 text-center">#</div>
         <div className="px-1 py-2 text-center">Move</div>
         <div className="px-3 py-2">Task Title</div>
@@ -157,7 +157,7 @@ function TaskTable({
       {/* Table rows */}
       <div className="divide-y divide-gray-100 min-w-[700px]">
         {tasks.length === 0 && (
-          <div className="px-4 py-8 text-center text-xs font-mono text-gray-400">
+          <div className="px-4 py-8 text-center text-xs font-mono text-primary-400">
             No tasks in this view.
           </div>
         )}
@@ -176,10 +176,10 @@ function TaskTable({
             }}
             className={cn(
               'grid grid-cols-[36px_64px_1fr_1fr_130px_90px_70px_90px_36px] gap-0 items-start group transition-colors',
-              draggedIdx === idx && 'bg-gray-50 opacity-60'
+              draggedIdx === idx && 'bg-primary-50 opacity-60'
             )}
           >
-            <div className="px-2 py-2.5 text-[10px] font-mono text-gray-400 text-center pt-3.5">
+            <div className="px-2 py-2.5 text-[10px] font-mono text-primary-400 text-center pt-3.5">
               {idx + 1}
             </div>
             {/* Reorder buttons */}
@@ -194,7 +194,7 @@ function TaskTable({
                     event.dataTransfer.setData('text/plain', String(idx));
                   }}
                   onDragEnd={() => setDraggedIdx(null)}
-                  className="p-1 text-gray-300 hover:text-gray-900 cursor-grab active:cursor-grabbing transition-colors"
+                  className="p-1 text-primary-300 hover:text-dark-500 cursor-grab active:cursor-grabbing transition-colors"
                   title="Drag to reorder"
                 >
                   <GripVertical className="w-3.5 h-3.5" />
@@ -206,7 +206,7 @@ function TaskTable({
                     type="button"
                     onClick={() => onMove(idx, 'up')}
                     disabled={idx === 0}
-                    className="p-0.5 text-gray-400 hover:text-gray-900 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                    className="p-0.5 text-primary-400 hover:text-dark-500 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                     title="Move up"
                   >
                     <ArrowUp className="w-3.5 h-3.5" />
@@ -215,7 +215,7 @@ function TaskTable({
                     type="button"
                     onClick={() => onMove(idx, 'down')}
                     disabled={idx === tasks.length - 1}
-                    className="p-0.5 text-gray-400 hover:text-gray-900 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                    className="p-0.5 text-primary-400 hover:text-dark-500 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                     title="Move down"
                   >
                     <ArrowDown className="w-3.5 h-3.5" />
@@ -229,8 +229,8 @@ function TaskTable({
                 onChange={(e) => onUpdate(idx, 'title', e.target.value)}
                 disabled={readOnly}
                 className={cn(
-                  'w-full px-2 py-1.5 text-[10px] font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white',
-                  readOnly && 'bg-gray-50 cursor-default'
+                  'w-full px-2 py-1.5 text-[10px] font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors bg-white',
+                  readOnly && 'bg-primary-50 cursor-default'
                 )}
                 placeholder="Task title"
               />
@@ -241,8 +241,8 @@ function TaskTable({
                 onChange={(e) => onUpdate(idx, 'description', e.target.value)}
                 disabled={readOnly}
                 className={cn(
-                  'w-full px-2 py-1.5 text-[10px] font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white',
-                  readOnly && 'bg-gray-50 cursor-default'
+                  'w-full px-2 py-1.5 text-[10px] font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors bg-white',
+                  readOnly && 'bg-primary-50 cursor-default'
                 )}
                 placeholder="Description"
               />
@@ -253,8 +253,8 @@ function TaskTable({
                 onChange={(e) => onUpdate(idx, 'department', e.target.value)}
                 disabled={readOnly}
                 className={cn(
-                  'w-full px-2 py-1.5 text-[10px] font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white',
-                  readOnly && 'bg-gray-50 cursor-default'
+                  'w-full px-2 py-1.5 text-[10px] font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors bg-white',
+                  readOnly && 'bg-primary-50 cursor-default'
                 )}
               >
                 {departments.map((d) => (
@@ -269,8 +269,8 @@ function TaskTable({
                 onChange={(e) => onUpdate(idx, 'type', e.target.value)}
                 disabled={readOnly}
                 className={cn(
-                  'w-full px-2 py-1.5 text-[10px] font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white',
-                  readOnly && 'bg-gray-50 cursor-default'
+                  'w-full px-2 py-1.5 text-[10px] font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors bg-white',
+                  readOnly && 'bg-primary-50 cursor-default'
                 )}
               >
                 <option value="project">Project</option>
@@ -288,8 +288,8 @@ function TaskTable({
                     className="sr-only peer"
                   />
                   <div className={cn(
-                    'w-7 h-4 rounded-full transition-colors peer-checked:bg-indigo-600 bg-gray-300',
-                    'peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-indigo-300'
+                    'w-7 h-4 rounded-full transition-colors peer-checked:bg-primary-500 bg-primary-300',
+                    'peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-primary-300'
                   )}>
                     <div className={cn(
                       'w-3 h-3 bg-white rounded-full shadow-sm transition-transform mt-0.5',
@@ -300,7 +300,7 @@ function TaskTable({
               ) : (
                 <span className={cn(
                   'text-[9px] font-mono uppercase',
-                  task.linkedToProduct === true ? 'text-indigo-600 font-bold' : 'text-gray-400'
+                  task.linkedToProduct === true ? 'text-primary-500 font-bold' : 'text-primary-400'
                 )}>
                   {task.linkedToProduct === true ? 'Yes' : 'No'}
                 </span>
@@ -312,8 +312,8 @@ function TaskTable({
                 onChange={(e) => onUpdate(idx, 'frequency', e.target.value)}
                 disabled={readOnly}
                 className={cn(
-                  'w-full px-2 py-1.5 text-[10px] font-mono border border-gray-200 focus:outline-none focus:border-black transition-colors bg-white',
-                  readOnly && 'bg-gray-50 cursor-default'
+                  'w-full px-2 py-1.5 text-[10px] font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors bg-white',
+                  readOnly && 'bg-primary-50 cursor-default'
                 )}
               >
                 {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
@@ -326,7 +326,7 @@ function TaskTable({
                 <button
                   type="button"
                   onClick={() => onRemove(idx)}
-                  className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
+                  className="p-1.5 text-primary-400 hover:text-red-600 transition-colors"
                   title="Remove task"
                 >
                   <X className="w-3 h-3" />
@@ -339,11 +339,11 @@ function TaskTable({
 
       {/* Add row button */}
       {!readOnly && (
-        <div className="px-3 py-2 border-t border-gray-100 bg-gray-50/50">
+        <div className="px-3 py-2 border-t border-primary-100 bg-primary-50/50">
           <button
             type="button"
             onClick={onAdd}
-            className="text-[10px] font-mono text-gray-500 hover:text-black flex items-center gap-1 transition-colors"
+            className="text-[10px] font-mono text-primary-500 hover:text-dark-500 flex items-center gap-1 transition-colors"
           >
             <Plus className="w-3 h-3" />
             {addLabel}
@@ -356,9 +356,9 @@ function TaskTable({
 
 function ViewTaskTable({ tasks }: { tasks: ITemplateGroup['tasks'] }) {
   return (
-    <div className="erp-table-wrap border border-gray-200">
+    <div className="erp-table-wrap border border-primary-200">
       <div className="min-w-[640px]">
-        <div className="grid grid-cols-[32px_1fr_1fr_90px] bg-gray-50 border-b border-gray-200 text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
+        <div className="grid grid-cols-[32px_1fr_1fr_90px] bg-primary-50 border-b border-primary-200 text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">
           <div className="px-2 py-2 text-center">#</div>
           <div className="px-3 py-2">Task</div>
           <div className="px-3 py-2">Description</div>
@@ -366,18 +366,18 @@ function ViewTaskTable({ tasks }: { tasks: ITemplateGroup['tasks'] }) {
         </div>
         <div className="divide-y divide-gray-100">
           {tasks.map((task, idx) => (
-            <div key={idx} className="grid grid-cols-[32px_1fr_1fr_90px] gap-0 items-center px-2 py-2 hover:bg-gray-50/50">
-              <div className="text-[10px] font-mono text-gray-400 text-center">{idx + 1}</div>
+            <div key={idx} className="grid grid-cols-[32px_1fr_1fr_90px] gap-0 items-center px-2 py-2 hover:bg-primary-50/50">
+              <div className="text-[10px] font-mono text-primary-400 text-center">{idx + 1}</div>
               <div className="min-w-0 px-1">
-                <p className="text-[11px] font-medium text-gray-900 truncate">{task.title}</p>
+                <p className="text-[11px] font-medium text-dark-500 truncate">{task.title}</p>
               </div>
               <div className="min-w-0 px-1">
-                <p className="text-[10px] text-gray-500 truncate">{task.description}</p>
+                <p className="text-[10px] text-primary-500 truncate">{task.description}</p>
               </div>
               <div className="px-1">
                 <span className={cn(
                   'inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider rounded-sm',
-                  FREQUENCY_BADGES[task.frequency || 'project'] || 'bg-gray-100 text-gray-800'
+                  FREQUENCY_BADGES[task.frequency || 'project'] || 'bg-primary-100 text-dark-600'
                 )}>
                   {FREQUENCY_LABELS[task.frequency || 'project'] || task.frequency}
                 </span>
@@ -394,7 +394,7 @@ function FrequencyBadge({ freq }: { freq: string }) {
   return (
     <span className={cn(
       'inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider rounded-sm',
-      FREQUENCY_BADGES[freq] || 'bg-gray-100 text-gray-800'
+      FREQUENCY_BADGES[freq] || 'bg-primary-100 text-dark-600'
     )}>
       {FREQUENCY_LABELS[freq] || freq}
     </span>
@@ -634,17 +634,17 @@ export function TemplateGroupsClient() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="border-b border-gray-200 px-6 py-5">
+      <div className="border-b border-primary-200 px-6 py-5">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-black text-gray-900">Template Groups</h1>
-            <p className="text-xs font-mono text-gray-500 mt-1">
+            <h1 className="text-xl font-black text-dark-500">Template Groups</h1>
+            <p className="text-xs font-mono text-primary-500 mt-1">
               Groups of department-wise tasks assigned to window specifications when creating a project.
             </p>
           </div>
           <div className="text-right font-mono">
-            <p className="text-2xl font-black text-gray-900">{groups.length}</p>
-            <p className="text-[10px] uppercase tracking-widest text-gray-400">Groups</p>
+            <p className="text-2xl font-black text-dark-500">{groups.length}</p>
+            <p className="text-[10px] uppercase tracking-widest text-primary-400">Groups</p>
           </div>
         </div>
       </div>
@@ -658,10 +658,10 @@ export function TemplateGroupsClient() {
 
         {/* Existing groups */}
         {loading ? (
-          <div className="text-xs text-gray-400 font-mono">Loading...</div>
+          <div className="text-xs text-primary-400 font-mono">Loading...</div>
         ) : groups.length === 0 ? (
-          <div className="border border-dashed border-gray-200 p-12 text-center">
-            <p className="text-sm font-mono text-gray-400">No template groups yet. Create one below.</p>
+          <div className="border border-dashed border-primary-200 p-12 text-center">
+            <p className="text-sm font-mono text-primary-400">No template groups yet. Create one below.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -689,26 +689,26 @@ export function TemplateGroupsClient() {
               }, {} as Record<string, number>);
 
               return (
-                <div key={group._id} className="border border-gray-200">
+                <div key={group._id} className="border border-primary-200">
                   {/* Group header — always visible */}
-                  <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+                  <div className="flex items-center justify-between px-5 py-3.5 border-b border-primary-100">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <button
                         type="button"
                         onClick={() => toggleExpand(group._id)}
-                        className="p-0.5 text-gray-400 hover:text-gray-700"
+                        className="p-0.5 text-primary-400 hover:text-dark-600"
                       >
                         {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                       </button>
                       <div className="min-w-0">
-                        <h3 className="text-sm font-bold text-gray-900 truncate">{group.name}</h3>
+                        <h3 className="text-sm font-bold text-dark-500 truncate">{group.name}</h3>
                         {group.description && (
-                          <p className="text-[11px] text-gray-500 font-mono truncate">{group.description}</p>
+                          <p className="text-[11px] text-primary-500 font-mono truncate">{group.description}</p>
                         )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-                      <span className="text-[10px] font-mono text-gray-400 whitespace-nowrap">
+                      <span className="text-[10px] font-mono text-primary-400 whitespace-nowrap">
                         {group.tasks.length} tasks · {depCount} dept
                       </span>
                       {!isEditing && (
@@ -716,7 +716,7 @@ export function TemplateGroupsClient() {
                           <button
                             type="button"
                             onClick={() => startEditing(group)}
-                            className="p-1.5 text-gray-400 hover:text-black"
+                            className="p-1.5 text-primary-400 hover:text-dark-500"
                             title="Edit"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
@@ -724,7 +724,7 @@ export function TemplateGroupsClient() {
                           <button
                             type="button"
                             onClick={() => deleteGroup(group)}
-                            className="p-1.5 text-gray-400 hover:text-red-600"
+                            className="p-1.5 text-primary-400 hover:text-red-600"
                             title="Delete"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -736,12 +736,12 @@ export function TemplateGroupsClient() {
 
                   {/* Frequency summary chips */}
                   {!isEditing && isExpanded && (
-                    <div className="px-5 py-2 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2 flex-wrap">
-                      <span className="text-[9px] font-mono uppercase tracking-wider text-gray-500 font-bold">Frequency:</span>
+                    <div className="px-5 py-2 border-b border-primary-100 bg-primary-50/50 flex items-center gap-2 flex-wrap">
+                      <span className="text-[9px] font-mono uppercase tracking-wider text-primary-500 font-bold">Frequency:</span>
                       {Object.keys(freqCounts).map((freq) => (
                         <FrequencyBadge key={freq} freq={freq} />
                       ))}
-                      <span className="text-[9px] text-gray-400 font-mono ml-1">({Object.keys(freqCounts).length} types)</span>
+                      <span className="text-[9px] text-primary-400 font-mono ml-1">({Object.keys(freqCounts).length} types)</span>
                     </div>
                   )}
 
@@ -750,15 +750,15 @@ export function TemplateGroupsClient() {
                     <div>
                       {/* Department tabs for view mode */}
                       {deptGroups.length > 1 && (
-                        <div className="flex border-b border-gray-100 bg-gray-50/30 overflow-x-auto">
+                        <div className="flex border-b border-primary-100 bg-primary-50/30 overflow-x-auto">
                           <button
                             type="button"
                             onClick={() => setViewDepartmentTab(null)}
                             className={cn(
                               'px-4 py-2 text-[10px] font-mono whitespace-nowrap border-b-2 transition-colors',
                               viewDepartmentTab === null
-                                ? 'border-black text-black font-bold'
-                                : 'border-transparent text-gray-500 hover:text-gray-800'
+                                ? 'border-dark-500 text-dark-500 font-bold'
+                                : 'border-transparent text-primary-500 hover:text-dark-600'
                             )}
                           >
                             All ({group.tasks.length})
@@ -771,8 +771,8 @@ export function TemplateGroupsClient() {
                               className={cn(
                                 'px-4 py-2 text-[10px] font-mono whitespace-nowrap border-b-2 transition-colors',
                                 viewDepartmentTab === g.department
-                                  ? 'border-black text-black font-bold'
-                                  : 'border-transparent text-gray-500 hover:text-gray-800'
+                                  ? 'border-dark-500 text-dark-500 font-bold'
+                                  : 'border-transparent text-primary-500 hover:text-dark-600'
                               )}
                             >
                               {g.label} ({g.tasks.length})
@@ -799,13 +799,13 @@ export function TemplateGroupsClient() {
                         <input
                           value={editDraft.name}
                           onChange={(e) => setEditDraft((prev) => ({ ...prev, name: e.target.value }))}
-                          className="w-full px-3 py-2 text-sm font-mono border border-gray-200 focus:outline-none focus:border-black"
+                          className="w-full px-3 py-2 text-sm font-mono border border-primary-200 focus:outline-none focus:border-dark-500"
                           placeholder="Group name"
                         />
                         <input
                           value={editDraft.description}
                           onChange={(e) => setEditDraft((prev) => ({ ...prev, description: e.target.value }))}
-                          className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black"
+                          className="w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500"
                           placeholder="Description (optional)"
                         />
                       </div>
@@ -845,7 +845,7 @@ export function TemplateGroupsClient() {
                       />
 
                       <div className="flex items-center justify-between">
-                        <div className="text-[10px] font-mono text-gray-400">
+                        <div className="text-[10px] font-mono text-primary-400">
                           {editDraft.tasks.filter((t) => t.title.trim()).length} tasks defined across{' '}
                           {new Set(editDraft.tasks.map((t) => t.department)).size} departments
                         </div>
@@ -853,7 +853,7 @@ export function TemplateGroupsClient() {
                           <button
                             type="button"
                             onClick={() => setEditingId(null)}
-                            className="px-3 py-1.5 text-[10px] font-mono border border-gray-300 text-gray-600 hover:border-gray-600"
+                            className="px-3 py-1.5 text-[10px] font-mono border border-primary-300 text-dark-400 hover:border-dark-400"
                           >
                             Cancel
                           </button>
@@ -861,7 +861,7 @@ export function TemplateGroupsClient() {
                             type="button"
                             onClick={() => saveEdit(group._id)}
                             disabled={saving}
-                            className="px-3 py-1.5 text-[10px] font-mono bg-black text-white hover:bg-gray-800 disabled:opacity-50 flex items-center gap-1"
+                            className="px-3 py-1.5 text-[10px] font-mono bg-dark-500 text-white hover:bg-dark-600 disabled:opacity-50 flex items-center gap-1"
                           >
                             <Save className="w-3 h-3" />
                             Save
@@ -877,10 +877,10 @@ export function TemplateGroupsClient() {
         )}
 
         {/* Create new group */}
-        <div className="border-2 border-dashed border-gray-300 p-5">
+        <div className="border-2 border-dashed border-primary-300 p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Plus className="w-4 h-4 text-gray-500" />
-            <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-500">
+            <Plus className="w-4 h-4 text-primary-500" />
+            <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-primary-500">
               Create Template Group
             </h2>
           </div>
@@ -891,13 +891,13 @@ export function TemplateGroupsClient() {
                 value={draft.name}
                 onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))}
                 placeholder="Group name (e.g. Standard Window)"
-                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black"
+                className="w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500"
               />
               <input
                 value={draft.description}
                 onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
                 placeholder="Description (optional)"
-                className="w-full px-3 py-2 text-xs font-mono border border-gray-200 focus:outline-none focus:border-black"
+                className="w-full px-3 py-2 text-xs font-mono border border-primary-200 focus:outline-none focus:border-dark-500"
               />
             </div>
 
@@ -912,14 +912,14 @@ export function TemplateGroupsClient() {
             />
 
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono text-gray-400">
+              <span className="text-[10px] font-mono text-primary-400">
                 {draft.tasks.filter((t) => t.title.trim()).length} tasks defined
               </span>
               <button
                 type="button"
                 onClick={createGroup}
                 disabled={saving}
-                className="px-4 py-2 text-[10px] font-mono font-bold uppercase bg-black text-white hover:bg-gray-800 disabled:opacity-50 flex items-center gap-1"
+                className="px-4 py-2 text-[10px] font-mono font-bold uppercase bg-dark-500 text-white hover:bg-dark-600 disabled:opacity-50 flex items-center gap-1"
               >
                 <Save className="w-3.5 h-3.5" />
                 {saving ? 'Saving...' : 'Create Group'}

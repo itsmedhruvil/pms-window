@@ -76,7 +76,7 @@ export function AlertStatusBadge({ status, className }: { status: AlertStatus } 
   const styles: Record<AlertStatus, string> = {
     [AlertStatus.ACTIVE]: 'bg-red-600 text-white border-red-700',
     [AlertStatus.ACKNOWLEDGED]: 'bg-yellow-50 text-yellow-800 border-yellow-400',
-    [AlertStatus.RESOLVED]: 'bg-gray-100 text-gray-600 border-gray-300',
+    [AlertStatus.RESOLVED]: 'bg-primary-100 text-dark-400 border-primary-300',
   };
   return (
     <span className={cn(

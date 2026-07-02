@@ -27,18 +27,18 @@ export default async function NewProjectPage() {
         <div className="flex items-center gap-2 mb-6">
           <Link
             href="/projects"
-            className="flex items-center gap-1 text-xs font-mono text-gray-500 hover:text-black transition-colors"
+            className="flex items-center gap-1 text-xs font-mono text-primary-500 hover:text-dark-500 transition-colors"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
             Projects
           </Link>
-          <span className="text-gray-300">/</span>
-          <span className="text-xs font-mono text-gray-900 font-bold">New Order</span>
+          <span className="text-primary-300">/</span>
+          <span className="text-xs font-mono text-dark-500 font-bold">New Order</span>
         </div>
 
-        <div className="mb-8 pb-4 border-b border-gray-200">
-          <h1 className="text-xl font-black text-gray-900">Create Client Order</h1>
-          <p className="text-xs text-gray-500 font-mono mt-1">
+        <div className="mb-8 pb-4 border-b border-primary-200">
+          <h1 className="text-xl font-black text-dark-500">Create Client Order</h1>
+          <p className="text-xs text-primary-500 font-mono mt-1">
             A complete workflow will be auto-generated across all departments upon creation.
           </p>
         </div>

@@ -129,10 +129,10 @@ export function InternalTasksPageClient({
   return (
     <AppLayout activeAlertCount={activeAlertCount}>
       <div className="p-6">
-        <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-6 pb-4 border-b border-primary-200">
           <div>
-            <h1 className="text-xl font-black text-gray-900">Internal Tasks</h1>
-            <p className="text-xs text-gray-500 font-mono mt-0.5">
+            <h1 className="text-xl font-black text-dark-500">Internal Tasks</h1>
+            <p className="text-xs text-primary-500 font-mono mt-0.5">
               Department-wise internal tasks assigned by admin
             </p>
           </div>
@@ -141,7 +141,7 @@ export function InternalTasksPageClient({
             {isAdmin && selectedTasks.size > 0 && (
               <button
                 onClick={handleBulkMarkDone}
-                className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-dark-500 text-white hover:bg-dark-600 transition-colors"
               >
                 <CheckSquare className="w-3.5 h-3.5" />
                 Mark Done ({selectedTasks.size})
@@ -151,7 +151,7 @@ export function InternalTasksPageClient({
               <button
                 type="button"
                 onClick={() => setTaskModalOpen(true)}
-                className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-dark-500 text-white hover:bg-dark-600 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 New Task
@@ -161,19 +161,19 @@ export function InternalTasksPageClient({
         </div>
 
         {Object.keys(tasksByDepartment).length === 0 ? (
-          <div className="border border-dashed border-gray-200 p-16 text-center">
-            <ClipboardList className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm font-mono text-gray-400">No internal tasks</p>
+          <div className="border border-dashed border-primary-200 p-16 text-center">
+            <ClipboardList className="w-8 h-8 text-primary-300 mx-auto mb-3" />
+            <p className="text-sm font-mono text-primary-400">No internal tasks</p>
           </div>
         ) : (
           <div className="space-y-8">
             {Object.entries(tasksByDepartment).map(([department, deptTasks]) => (
-              <div key={department} className="border border-gray-200 rounded-lg overflow-hidden">
-                <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                  <h2 className="text-sm font-bold text-gray-900">
+              <div key={department} className="border border-primary-200 rounded-lg overflow-hidden">
+                <div className="px-4 py-3 bg-primary-50 border-b border-primary-200">
+                  <h2 className="text-sm font-bold text-dark-500">
                     {getDepartmentLabel(department)}
                   </h2>
-                  <p className="text-xs text-gray-500 font-mono mt-0.5">
+                  <p className="text-xs text-primary-500 font-mono mt-0.5">
                     {deptTasks.length} task{deptTasks.length !== 1 ? 's' : ''}
                   </p>
                 </div>
@@ -221,7 +221,7 @@ export function InternalTasksPageClient({
                                   {selectedTasks.has(task._id) ? (
                                     <CheckSquare className="w-4 h-4 text-blue-600" />
                                   ) : (
-                                    <Square className="w-4 h-4 text-gray-300" />
+                                    <Square className="w-4 h-4 text-primary-300" />
                                   )}
                                 </button>
                               </td>
@@ -232,14 +232,14 @@ export function InternalTasksPageClient({
                                   <AlertTriangle className="w-3 h-3 text-red-500 animate-pulse flex-shrink-0" />
                                 )}
                                 <span className={cn(
-                                  'font-medium text-gray-900',
+                                  'font-medium text-dark-500',
                                   task.status === TaskStatus.BLOCKED && 'text-red-700'
                                 )}>
                                   {task.title}
                                 </span>
                               </div>
                               {task.description && (
-                                <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                <p className="text-xs text-primary-500 mt-1 line-clamp-2">
                                   {task.description}
                                 </p>
                               )}
@@ -248,7 +248,7 @@ export function InternalTasksPageClient({
                               <TaskStatusBadge status={task.status} size="sm" />
                             </td>
                             <td>
-                              <span className="text-[11px] font-mono text-gray-500 uppercase">
+                              <span className="text-[11px] font-mono text-primary-500 uppercase">
                                 {task.frequency?.replace('_', ' ')}
                               </span>
                             </td>
@@ -258,25 +258,25 @@ export function InternalTasksPageClient({
                                   'font-mono text-[11px]',
                                   new Date(task.dueDate) < new Date()
                                     ? 'text-red-600 font-bold'
-                                    : 'text-gray-600'
+                                    : 'text-dark-400'
                                 )}>
                                   {formatDate(task.dueDate)}
                                 </span>
                               ) : (
-                                <span className="text-gray-300">—</span>
+                                <span className="text-primary-300">—</span>
                               )}
                             </td>
                             <td>
                               {assignedUser ? (
-                                <span className="text-[11px] text-gray-500">
+                                <span className="text-[11px] text-primary-500">
                                   {assignedUser.name}
                                 </span>
                               ) : (
-                                <span className="text-gray-300">Unassigned</span>
+                                <span className="text-primary-300">Unassigned</span>
                               )}
                             </td>
                             <td>
-                              <span className="text-[10px] font-mono text-gray-400">View →</span>
+                              <span className="text-[10px] font-mono text-primary-400">View →</span>
                             </td>
                           </tr>
                         );

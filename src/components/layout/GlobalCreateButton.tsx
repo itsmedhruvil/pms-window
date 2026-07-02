@@ -28,7 +28,7 @@ export function GlobalCreateButton() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex items-center gap-2 rounded-full bg-black px-4 py-3 text-xs font-mono font-bold uppercase tracking-wide text-white shadow-2xl hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-2 rounded-full bg-dark-500 px-4 py-3 text-xs font-mono font-bold uppercase tracking-wide text-white shadow-2xl hover:bg-dark-600 transition-colors"
         >
           <Plus className="w-4 h-4" />
           Create
@@ -39,13 +39,13 @@ export function GlobalCreateButton() {
         <div className="p-6">
           <div className="flex items-center justify-between gap-4 mb-6">
             <div>
-              <p className="text-xs font-mono uppercase text-gray-500">Global create</p>
-              <h2 className="text-2xl font-black text-gray-900">Create project or task</h2>
+              <p className="text-xs font-mono uppercase text-primary-500">Global create</p>
+              <h2 className="text-2xl font-black text-dark-500">Create project or task</h2>
             </div>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
-            <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+            <div className="rounded-3xl border border-primary-200 bg-primary-50 p-4">
               <div className="space-y-2">
                 {SECTIONS.map(({ id, label, icon: Icon }) => (
                   <button
@@ -55,8 +55,8 @@ export function GlobalCreateButton() {
                     className={cn(
                       'w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition-colors',
                       section === id
-                        ? 'bg-black text-white'
-                        : 'text-gray-700 hover:bg-white hover:border hover:border-gray-200'
+                        ? 'bg-dark-500 text-white'
+                        : 'text-dark-600 hover:bg-white hover:border hover:border-primary-200'
                     )}
                   >
                     <Icon className="w-4 h-4" />
@@ -66,7 +66,7 @@ export function GlobalCreateButton() {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-gray-200 bg-white p-4">
+            <div className="rounded-3xl border border-primary-200 bg-white p-4">
               {section === 'project' && (
                 <CreateProjectForm onSuccess={closeAll} onCancel={closeAll} />
               )}

@@ -17,9 +17,9 @@ const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 const ROLE_STYLE: Record<UserRole, string> = {
-  [UserRole.SUPER_ADMIN]: 'bg-black text-white border-black',
-  [UserRole.ADMIN]: 'bg-gray-800 text-white border-gray-800',
-  [UserRole.DEPARTMENT_USER]: 'border-gray-300 text-gray-700',
+  [UserRole.SUPER_ADMIN]: 'bg-dark-500 text-white border-dark-500',
+  [UserRole.ADMIN]: 'bg-dark-600 text-white border-dark-600',
+  [UserRole.DEPARTMENT_USER]: 'border-primary-300 text-dark-600',
 };
 
 export function UsersClient({
@@ -114,11 +114,11 @@ export function UsersClient({
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="mb-6 pb-4 border-b border-gray-200">
+      <div className="mb-6 pb-4 border-b border-primary-200">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-black text-gray-900">Users</h1>
-            <p className="text-xs text-gray-500 font-mono mt-0.5">
+            <h1 className="text-xl font-black text-dark-500">Users</h1>
+            <p className="text-xs text-primary-500 font-mono mt-0.5">
               {users.length} team member{users.length !== 1 ? 's' : ''}
             </p>
           </div>
@@ -128,7 +128,7 @@ export function UsersClient({
                 type="button"
                 onClick={syncFromClerk}
                 disabled={syncing}
-                className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide border border-gray-300 text-gray-700 hover:border-gray-500 hover:text-black transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide border border-primary-300 text-dark-600 hover:border-primary-500 hover:text-dark-500 transition-colors disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
                 {syncing ? 'Syncing...' : 'Sync from Clerk'}
@@ -137,7 +137,7 @@ export function UsersClient({
             <button
               type="button"
               onClick={() => setUserModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-black text-white hover:bg-gray-800 transition-colors"
+              className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-dark-500 text-white hover:bg-dark-600 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
               New User
@@ -149,11 +149,11 @@ export function UsersClient({
           {departments.map(({ name: dept, label }) => {
             const count = users.filter((u) => u.department === dept).length;
             return (
-              <div key={dept} className="text-center px-3 py-2 border border-gray-200">
-                <p className="text-[10px] font-mono text-gray-400 uppercase tracking-wide truncate">
+              <div key={dept} className="text-center px-3 py-2 border border-primary-200">
+                <p className="text-[10px] font-mono text-primary-400 uppercase tracking-wide truncate">
                   {label}
                 </p>
-                <p className="text-sm font-black text-gray-900">{count}</p>
+                <p className="text-sm font-black text-dark-500">{count}</p>
               </div>
             );
           })}
@@ -183,8 +183,8 @@ export function UsersClient({
             className={cn(
               'px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wide border transition-colors',
               deptFilter === d
-                ? 'bg-black text-white border-black'
-                : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                ? 'bg-dark-500 text-white border-dark-500'
+                : 'border-primary-200 text-primary-500 hover:border-primary-400'
             )}
           >
             {d === 'all' ? 'All' : departments.find((department) => department.name === d)?.label.split(' ')[0] || getDepartmentLabel(d)}
@@ -201,7 +201,7 @@ export function UsersClient({
       </div>
       <FilterDrawer open={mobileFilterOpen} onClose={() => setMobileFilterOpen(false)} title="User Filters">
         <div className="mb-5">
-          <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 mb-2">
+          <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500 mb-2">
             Department
           </label>
           <div className="flex flex-wrap gap-1.5">
@@ -212,8 +212,8 @@ export function UsersClient({
                 className={cn(
                   'px-2.5 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide border transition-colors',
                   deptFilter === d
-                    ? 'bg-black text-white border-black'
-                    : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                    ? 'bg-dark-500 text-white border-dark-500'
+                    : 'border-primary-200 text-primary-500 hover:border-primary-400'
                 )}
               >
                 {d === 'all' ? 'All' : departments.find((department) => department.name === d)?.label.split(' ')[0] || getDepartmentLabel(d)}
@@ -232,7 +232,7 @@ export function UsersClient({
       </FilterDrawer>
 
       {/* Users table */}
-      <div className="erp-table-wrap border border-gray-200">
+      <div className="erp-table-wrap border border-primary-200">
         <table className="erp-table">
           <thead>
             <tr>
@@ -252,19 +252,19 @@ export function UsersClient({
                 <tr key={user._id} className={cn(!user.isActive && 'opacity-50')}>
                   <td>
                     <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 bg-gray-900 flex items-center justify-center flex-shrink-0">
+                      <div className="w-7 h-7 bg-dark-500 flex items-center justify-center flex-shrink-0">
                         <span className="text-[11px] text-white font-bold">
                           {user.name?.charAt(0).toUpperCase()}
                         </span>
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900 text-xs flex items-center gap-1.5">
+                        <p className="font-medium text-dark-500 text-xs flex items-center gap-1.5">
                           {user.name}
                           {isCurrentUser && (
-                            <span className="text-[9px] font-mono text-gray-400 uppercase tracking-wide">(you)</span>
+                            <span className="text-[9px] font-mono text-primary-400 uppercase tracking-wide">(you)</span>
                           )}
                         </p>
-                        <p className="text-[10px] text-gray-500 font-mono">{user.email}</p>
+                        <p className="text-[10px] text-primary-500 font-mono">{user.email}</p>
                       </div>
                     </div>
                   </td>
@@ -273,14 +273,14 @@ export function UsersClient({
                       <select
                         value={editForm.department}
                         onChange={(e) => setEditForm({ ...editForm, department: e.target.value as Department })}
-                        className="text-[10px] font-mono border border-gray-300 px-1.5 py-1 focus:outline-none focus:border-black"
+                        className="text-[10px] font-mono border border-primary-300 px-1.5 py-1 focus:outline-none focus:border-dark-500"
                       >
                         {departments.map((d) => (
                           <option key={d.name} value={d.name}>{d.label}</option>
                         ))}
                       </select>
                     ) : (
-                      <span className="text-[11px] font-mono text-gray-600 uppercase tracking-wide">
+                      <span className="text-[11px] font-mono text-dark-400 uppercase tracking-wide">
                         {departments.find((department) => department.name === user.department)?.label || getDepartmentLabel(user.department)}
                       </span>
                     )}
@@ -290,7 +290,7 @@ export function UsersClient({
                       <select
                         value={editForm.role}
                         onChange={(e) => setEditForm({ ...editForm, role: e.target.value as UserRole })}
-                        className="text-[10px] font-mono border border-gray-300 px-1.5 py-1 focus:outline-none focus:border-black"
+                        className="text-[10px] font-mono border border-primary-300 px-1.5 py-1 focus:outline-none focus:border-dark-500"
                       >
                         {Object.values(UserRole).map((r) => (
                           <option key={r} value={r}>{ROLE_LABELS[r]}</option>
@@ -308,7 +308,7 @@ export function UsersClient({
                   <td>
                     <span className={cn(
                       'text-[10px] font-mono uppercase',
-                      user.isActive ? 'text-gray-600' : 'text-gray-400'
+                      user.isActive ? 'text-dark-400' : 'text-primary-400'
                     )}>
                       {user.isActive ? 'Active' : 'Inactive'}
                     </span>
@@ -321,13 +321,13 @@ export function UsersClient({
                             <button
                               onClick={() => saveEdit(user._id)}
                               disabled={loading === user._id}
-                              className="text-[10px] font-mono font-bold px-2 py-1 bg-black text-white hover:bg-gray-800 disabled:opacity-50"
+                              className="text-[10px] font-mono font-bold px-2 py-1 bg-dark-500 text-white hover:bg-dark-600 disabled:opacity-50"
                             >
                               {loading === user._id ? '...' : 'Save'}
                             </button>
                             <button
                               onClick={() => setEditingId(null)}
-                              className="text-[10px] font-mono text-gray-500 hover:text-black px-2 py-1 border border-gray-200"
+                              className="text-[10px] font-mono text-primary-500 hover:text-dark-500 px-2 py-1 border border-primary-200"
                             >
                               Cancel
                             </button>
@@ -337,7 +337,7 @@ export function UsersClient({
                             {!isCurrentUser && (
                               <button
                                 onClick={() => startEdit(user)}
-                                className="text-[10px] font-mono text-gray-500 hover:text-black underline"
+                                className="text-[10px] font-mono text-primary-500 hover:text-dark-500 underline"
                               >
                                 Edit
                               </button>
@@ -346,7 +346,7 @@ export function UsersClient({
                               <button
                                 onClick={() => deactivateUser(user._id)}
                                 disabled={loading === user._id + 'del'}
-                                className="text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                                className="text-primary-400 hover:text-red-600 transition-colors disabled:opacity-50"
                                 title="Deactivate user"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />

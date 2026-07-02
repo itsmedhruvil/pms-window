@@ -6,7 +6,7 @@ function Skeleton({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'animate-pulse bg-gray-100',
+        'animate-pulse bg-primary-100',
         className
       )}
     />
@@ -15,7 +15,7 @@ function Skeleton({ className }: { className?: string }) {
 
 export function ProjectCardSkeleton() {
   return (
-    <div className="border border-gray-200 p-4 space-y-3">
+    <div className="border border-primary-200 p-4 space-y-3">
       <div className="flex items-center justify-between">
         <Skeleton className="h-4 w-48" />
         <Skeleton className="h-5 w-20" />
@@ -32,10 +32,10 @@ export function ProjectCardSkeleton() {
 
 export function TableSkeleton({ rows = 5, cols = 5 }: { rows?: number; cols?: number }) {
   return (
-    <div className="erp-table-wrap border border-gray-200">
+    <div className="erp-table-wrap border border-primary-200">
       <div className="min-w-[720px] md:min-w-full">
       {/* Header */}
-      <div className="flex gap-4 px-3 py-2 bg-gray-50 border-b border-gray-200">
+      <div className="flex gap-4 px-3 py-2 bg-primary-50 border-b border-primary-200">
         {Array.from({ length: cols }).map((_, i) => (
           <Skeleton key={i} className="h-3 flex-1" />
         ))}
@@ -44,7 +44,7 @@ export function TableSkeleton({ rows = 5, cols = 5 }: { rows?: number; cols?: nu
       {Array.from({ length: rows }).map((_, rowIdx) => (
         <div
           key={rowIdx}
-          className="flex gap-4 px-3 py-3 border-b border-gray-100 last:border-0"
+          className="flex gap-4 px-3 py-3 border-b border-primary-100 last:border-0"
         >
           {Array.from({ length: cols }).map((_, colIdx) => (
             <Skeleton
@@ -63,14 +63,14 @@ export function KanbanSkeleton() {
   return (
     <div className="grid grid-cols-4 gap-4">
       {['To Do', 'In Progress', 'Blocked', 'Done'].map((col) => (
-        <div key={col} className="border border-gray-200">
-          <div className="px-3 py-2.5 bg-gray-100 border-b border-gray-200">
+        <div key={col} className="border border-primary-200">
+          <div className="px-3 py-2.5 bg-primary-100 border-b border-primary-200">
             <Skeleton className="h-3 w-20" />
           </div>
           <div className="p-2 space-y-2">
             {Array.from({ length: col === 'In Progress' ? 3 : col === 'Done' ? 4 : 2 }).map(
               (_, i) => (
-                <div key={i} className="border border-gray-200 p-3 space-y-2">
+                <div key={i} className="border border-primary-200 p-3 space-y-2">
                   <Skeleton className="h-3 w-full" />
                   <Skeleton className="h-3 w-2/3" />
                   <div className="flex justify-between">
@@ -93,7 +93,7 @@ export function DashboardSkeleton() {
       {/* KPI row */}
       <div className="grid grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="border border-gray-200 p-4 space-y-2">
+          <div key={i} className="border border-primary-200 p-4 space-y-2">
             <Skeleton className="h-3 w-24" />
             <Skeleton className="h-8 w-16" />
           </div>
@@ -102,7 +102,7 @@ export function DashboardSkeleton() {
       {/* Charts row */}
       <div className="grid grid-cols-2 gap-6">
         {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="border border-gray-200 p-4 space-y-3">
+          <div key={i} className="border border-primary-200 p-4 space-y-3">
             <Skeleton className="h-4 w-40" />
             <Skeleton className="h-[220px] w-full" />
           </div>
@@ -111,7 +111,7 @@ export function DashboardSkeleton() {
       {/* Dept rates */}
       <div className="grid grid-cols-4 gap-3">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="border border-gray-200 p-3 space-y-2">
+          <div key={i} className="border border-primary-200 p-3 space-y-2">
             <Skeleton className="h-2.5 w-20" />
             <Skeleton className="h-7 w-14" />
             <Skeleton className="h-1.5 w-full" />

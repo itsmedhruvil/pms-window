@@ -56,20 +56,20 @@ export default async function ProjectDepartmentTasksPage(
 
   return (
     <AppLayout activeAlertCount={activeAlertCount}>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-primary-50">
         {/* Breadcrumb header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center gap-2 text-xs font-mono text-gray-400 mb-1">
-            <Link href="/projects" className="hover:text-black transition-colors">Projects</Link>
+        <div className="bg-white border-b border-primary-200 px-6 py-4">
+          <div className="flex items-center gap-2 text-xs font-mono text-primary-400 mb-1">
+            <Link href="/projects" className="hover:text-dark-500 transition-colors">Projects</Link>
             <span>/</span>
-            <Link href={`/projects/${projectId}`} className="hover:text-black transition-colors truncate max-w-[200px]">{project.projectTitle}</Link>
+            <Link href={`/projects/${projectId}`} className="hover:text-dark-500 transition-colors truncate max-w-[200px]">{project.projectTitle}</Link>
             <span>/</span>
-            <span className="text-gray-700 font-bold uppercase">{department}</span>
+            <span className="text-dark-600 font-bold uppercase">{department}</span>
           </div>
-          <h1 className="text-xl font-black text-gray-900 tracking-tight">
+          <h1 className="text-xl font-black text-dark-500 tracking-tight">
             {project.projectTitle} — {formatDepartmentName(department)} Tasks
           </h1>
-          <p className="text-xs text-gray-500 font-mono mt-0.5">
+          <p className="text-xs text-primary-500 font-mono mt-0.5">
             {deptTasks.length} task{deptTasks.length === 1 ? '' : 's'} in this department
           </p>
         </div>

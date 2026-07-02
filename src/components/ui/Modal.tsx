@@ -49,7 +49,7 @@ export function Modal({ open, onClose, title, children, size = 'md', className }
       }}
     >
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0 bg-dark-500/40" />
 
       {/* Panel */}
       <div
@@ -60,11 +60,11 @@ export function Modal({ open, onClose, title, children, size = 'md', className }
         )}
       >
         {title && (
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-200">
-            <h2 className="text-sm font-bold text-gray-900 font-mono">{title}</h2>
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-primary-200">
+            <h2 className="text-sm font-bold text-dark-500 font-mono">{title}</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-black transition-colors"
+              className="text-primary-400 hover:text-dark-500 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -101,12 +101,12 @@ export function ConfirmModal({
   return (
     <Modal open={open} onClose={onClose} size="sm">
       <div className="p-5 space-y-4">
-        <h3 className="text-sm font-bold text-gray-900">{title}</h3>
-        <p className="text-xs text-gray-600 leading-relaxed">{message}</p>
+        <h3 className="text-sm font-bold text-dark-500">{title}</h3>
+        <p className="text-xs text-dark-400 leading-relaxed">{message}</p>
         <div className="flex gap-3 justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-xs font-mono font-bold uppercase border border-gray-300 text-gray-600 hover:border-gray-600 transition-colors"
+            className="px-4 py-2 text-xs font-mono font-bold uppercase border border-primary-300 text-dark-400 hover:border-dark-400 transition-colors"
           >
             Cancel
           </button>
@@ -117,7 +117,7 @@ export function ConfirmModal({
               'flex items-center gap-2 px-4 py-2 text-xs font-mono font-bold uppercase transition-colors disabled:opacity-50',
               danger
                 ? 'bg-red-600 text-white hover:bg-red-700'
-                : 'bg-black text-white hover:bg-gray-800'
+                : 'bg-dark-500 text-white hover:bg-dark-600'
             )}
           >
             {loading && (

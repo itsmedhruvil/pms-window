@@ -114,36 +114,36 @@ export function DashboardMetrics({
     <div className="space-y-6">
       {/* KPI Row — 4 compact cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="border border-gray-200 p-3">
-          <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+        <div className="border border-primary-200 p-3">
+          <div className="flex items-center gap-1.5 text-primary-500 mb-1">
             <Layers className="w-3 h-3" />
             <span className="text-[9px] font-mono uppercase tracking-widest">Active</span>
           </div>
-          <p className="text-2xl font-black font-mono text-gray-900">{metrics.totalActiveProjects}</p>
+          <p className="text-2xl font-black font-mono text-dark-500">{metrics.totalActiveProjects}</p>
         </div>
-        <div className="border border-gray-200 p-3">
+        <div className="border border-primary-200 p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <Clock className="w-3 h-3 text-red-500" />
             <span className="text-[9px] font-mono uppercase tracking-widest text-red-600">Overdue</span>
           </div>
           <p className="text-2xl font-black font-mono text-red-600">{metrics.overdueProjects}</p>
         </div>
-        <div className="border border-gray-200 p-3">
-          <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+        <div className="border border-primary-200 p-3">
+          <div className="flex items-center gap-1.5 text-primary-500 mb-1">
             <TrendingUp className="w-3 h-3" />
             <span className="text-[9px] font-mono uppercase tracking-widest">Avg Time</span>
           </div>
-          <p className="text-2xl font-black font-mono text-gray-900">{metrics.avgTaskCompletionTime}<span className="text-sm text-gray-400">h</span></p>
+          <p className="text-2xl font-black font-mono text-dark-500">{metrics.avgTaskCompletionTime}<span className="text-sm text-primary-400">h</span></p>
         </div>
         <div className={cn(
           'border p-3',
-          metrics.activeAlertCount > 0 ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
+          metrics.activeAlertCount > 0 ? 'border-red-300 bg-red-50/50' : 'border-primary-200'
         )}>
           <div className="flex items-center gap-1.5 mb-1">
-            <AlertTriangle className={cn('w-3 h-3', metrics.activeAlertCount > 0 ? 'text-red-500' : 'text-gray-300')} />
-            <span className={cn('text-[9px] font-mono uppercase tracking-widest', metrics.activeAlertCount > 0 ? 'text-red-600' : 'text-gray-400')}>Alerts</span>
+            <AlertTriangle className={cn('w-3 h-3', metrics.activeAlertCount > 0 ? 'text-red-500' : 'text-primary-300')} />
+            <span className={cn('text-[9px] font-mono uppercase tracking-widest', metrics.activeAlertCount > 0 ? 'text-red-600' : 'text-primary-400')}>Alerts</span>
           </div>
-          <p className={cn('text-2xl font-black font-mono', metrics.activeAlertCount > 0 ? 'text-red-600' : 'text-gray-300')}>
+          <p className={cn('text-2xl font-black font-mono', metrics.activeAlertCount > 0 ? 'text-red-600' : 'text-primary-300')}>
             {metrics.activeAlertCount}
           </p>
         </div>
@@ -182,7 +182,7 @@ export function DashboardMetrics({
                       isCurrent ? 'border-red-400 bg-red-100' : 'border-red-200 bg-white'
                     )}
                   >
-                    <span className={isCurrent ? 'font-bold text-red-800' : 'text-gray-700'}>
+                    <span className={isCurrent ? 'font-bold text-red-800' : 'text-dark-600'}>
                       {getDepartmentLabel(dept)}
                     </span>
                     <span className="text-red-600 font-bold">{count}</span>
@@ -195,50 +195,50 @@ export function DashboardMetrics({
       )}
 
       {/* Full-width Calendar */}
-      <div className="border border-gray-200 p-3">
+      <div className="border border-primary-200 p-3">
         {/* Month navigation header */}
         <div className="flex items-center gap-2 mb-3">
-          <CalendarIcon className="w-4 h-4 text-gray-500" />
+          <CalendarIcon className="w-4 h-4 text-primary-500" />
           <button
             type="button"
             onClick={goToPrevMonth}
-            className="p-1 hover:bg-gray-100 transition-colors"
+            className="p-1 hover:bg-primary-100 transition-colors"
             title="Previous month"
           >
-            <ChevronLeft className="w-4 h-4 text-gray-500" />
+            <ChevronLeft className="w-4 h-4 text-primary-500" />
           </button>
           <button
             type="button"
             onClick={goToCurrentMonth}
-            className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700 hover:text-black transition-colors"
+            className="text-xs font-mono font-bold uppercase tracking-widest text-dark-600 hover:text-dark-500 transition-colors"
           >
             {currentMonthLabel}
           </button>
           <button
             type="button"
             onClick={goToNextMonth}
-            className="p-1 hover:bg-gray-100 transition-colors"
+            className="p-1 hover:bg-primary-100 transition-colors"
             title="Next month"
           >
-            <ChevronRight className="w-4 h-4 text-gray-500" />
+            <ChevronRight className="w-4 h-4 text-primary-500" />
           </button>
-          <span className="text-[10px] font-mono text-gray-400 ml-auto">Darker = more completions</span>
+          <span className="text-[10px] font-mono text-primary-400 ml-auto">Darker = more completions</span>
         </div>
 
         {/* Day headers */}
         <div className="grid grid-cols-7 mb-1">
           {dayNames.map(d => (
-            <div key={d} className="text-[8px] font-mono text-gray-400 text-center py-1 uppercase tracking-wider">
+            <div key={d} className="text-[8px] font-mono text-primary-400 text-center py-1 uppercase tracking-wider">
               {d}
             </div>
           ))}
         </div>
 
         {/* Calendar grid */}
-        <div className="grid grid-cols-7 gap-px bg-gray-100">
+        <div className="grid grid-cols-7 gap-px bg-primary-100">
           {calendarDays.map((day, i) => {
             if (day.day === 0) {
-              return <div key={`pad-${i}`} className="bg-gray-50 min-h-[48px]" />;
+              return <div key={`pad-${i}`} className="bg-primary-50 min-h-[48px]" />;
             }
             const intensity = day.completed && maxTrendCompleted > 0 ? day.completed / maxTrendCompleted : 0;
 
@@ -252,21 +252,21 @@ export function DashboardMetrics({
               >
                 <span className={cn(
                   'text-[10px] font-mono',
-                  day.isToday ? 'font-black text-black' : 'text-gray-700'
+                  day.isToday ? 'font-black text-dark-500' : 'text-dark-600'
                 )}>
                   {day.day}
                 </span>
                 {day.completed !== undefined && day.completed > 0 && (
                   <div className={cn(
                     'w-full mt-0.5 rounded-sm h-1',
-                    intensity < 0.25 ? 'bg-gray-200' :
-                    intensity < 0.5 ? 'bg-gray-400' :
-                    intensity < 0.75 ? 'bg-gray-600' :
-                    'bg-black'
+                    intensity < 0.25 ? 'bg-primary-200' :
+                    intensity < 0.5 ? 'bg-primary-400' :
+                    intensity < 0.75 ? 'bg-dark-400' :
+                    'bg-dark-500'
                   )} />
                 )}
                 {day.completed !== undefined && day.completed > 0 && (
-                  <span className="text-[7px] font-mono text-gray-400 mt-0.5">{day.completed}</span>
+                  <span className="text-[7px] font-mono text-primary-400 mt-0.5">{day.completed}</span>
                 )}
               </div>
             );
@@ -274,11 +274,11 @@ export function DashboardMetrics({
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-3 mt-2 text-[8px] font-mono text-gray-400">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gray-200 rounded-sm" /> Light</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gray-400 rounded-sm" /> Medium</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gray-600 rounded-sm" /> Heavy</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-black rounded-sm" /> Most</span>
+        <div className="flex items-center gap-3 mt-2 text-[8px] font-mono text-primary-400">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-primary-200 rounded-sm" /> Light</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-primary-400 rounded-sm" /> Medium</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-dark-400 rounded-sm" /> Heavy</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-dark-500 rounded-sm" /> Most</span>
           <span className="ml-auto">
             {charts.completionTrend
               .filter(t => t.date.startsWith(ymPrefix))

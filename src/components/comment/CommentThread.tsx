@@ -143,10 +143,10 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
 
   return (
     <>
-      <div className="flex flex-col h-full border-t border-gray-100">
+      <div className="flex flex-col h-full border-t border-primary-100">
         {/* Thread header */}
-        <div className="px-4 py-2 border-b border-gray-100 bg-gray-50">
-          <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-gray-500">
+        <div className="px-4 py-2 border-b border-primary-100 bg-primary-50">
+          <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-primary-500">
             Discussion Thread · {comments.length} messages
           </span>
         </div>
@@ -155,13 +155,13 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {fetching && (
             <div className="flex items-center justify-center h-16">
-              <span className="text-xs text-gray-400 font-mono">Loading...</span>
+              <span className="text-xs text-primary-400 font-mono">Loading...</span>
             </div>
           )}
 
           {!fetching && comments.length === 0 && (
             <div className="text-center py-8">
-              <p className="text-xs text-gray-400 font-mono">No messages yet. Start the discussion.</p>
+              <p className="text-xs text-primary-400 font-mono">No messages yet. Start the discussion.</p>
             </div>
           )}
 
@@ -172,17 +172,17 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
         </div>
 
         {/* Input */}
-        <div className="border-t border-gray-200 p-3 bg-white relative">
+        <div className="border-t border-primary-200 p-3 bg-white relative">
           {showMentionDropdown && filteredUsers.length > 0 && (
-            <div className="absolute bottom-full left-3 right-3 mb-1 bg-white border border-gray-200 shadow-lg z-10 max-h-32 overflow-y-auto">
+            <div className="absolute bottom-full left-3 right-3 mb-1 bg-white border border-primary-200 shadow-lg z-10 max-h-32 overflow-y-auto">
               {filteredUsers.map((user) => (
                 <button
                   key={user._id}
                   onClick={() => insertMention(user)}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 border-b border-gray-100 last:border-0"
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-primary-50 flex items-center gap-2 border-b border-primary-100 last:border-0"
                 >
-                  <span className="font-medium text-gray-900">{user.name}</span>
-                  <span className="text-gray-400 font-mono text-[10px] uppercase">{user.department}</span>
+                  <span className="font-medium text-dark-500">{user.name}</span>
+                  <span className="text-primary-400 font-mono text-[10px] uppercase">{user.department}</span>
                 </button>
               ))}
             </div>
@@ -192,14 +192,14 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
           {uploadedFiles.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
               {uploadedFiles.map((f) => (
-                <span key={f.id} className="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-mono bg-gray-50 border border-gray-200 text-gray-700">
+                <span key={f.id} className="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-mono bg-primary-50 border border-primary-200 text-dark-600">
                   {f.type.startsWith('image/') ? (
                     <img src={f.url} alt={f.name} className="w-5 h-5 object-cover rounded" />
                   ) : (
                     <Paperclip className="w-3 h-3" />
                   )}
                   {f.name}
-                  <button type="button" onClick={() => removeFile(f.id)} className="text-gray-400 hover:text-red-500"><X className="w-3 h-3" /></button>
+                  <button type="button" onClick={() => removeFile(f.id)} className="text-primary-400 hover:text-red-500"><X className="w-3 h-3" /></button>
                 </span>
               ))}
             </div>
@@ -213,7 +213,7 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
                 onChange={handleContentChange}
                 placeholder="Add a comment... Use @name to mention"
                 rows={2}
-                className="w-full text-sm resize-none border border-gray-200 px-3 py-2 focus:outline-none focus:border-black transition-colors placeholder:text-gray-400 font-mono"
+                className="w-full text-sm resize-none border border-primary-200 px-3 py-2 focus:outline-none focus:border-dark-500 transition-colors placeholder:text-primary-400 font-mono"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && e.metaKey) handleSubmit();
                 }}
@@ -231,7 +231,7 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingFile}
-              className="flex-shrink-0 p-2.5 text-gray-400 hover:text-black border border-gray-200 hover:border-black transition-colors disabled:opacity-40"
+              className="flex-shrink-0 p-2.5 text-primary-400 hover:text-dark-500 border border-primary-200 hover:border-dark-500 transition-colors disabled:opacity-40"
               title="Attach file"
             >
               {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
@@ -239,24 +239,24 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
             <button
               onClick={handleSubmit}
               disabled={loading || (!content.trim() && uploadedFiles.length === 0)}
-              className="flex-shrink-0 p-2.5 bg-black text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="flex-shrink-0 p-2.5 bg-dark-500 text-white hover:bg-dark-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
           </div>
-          <p className="text-[10px] text-gray-400 mt-1 font-mono">⌘+Enter to send · @name to mention · Attach files</p>
+          <p className="text-[10px] text-primary-400 mt-1 font-mono">⌘+Enter to send · @name to mention · Attach files</p>
         </div>
       </div>
 
       {/* Image Preview Modal */}
       {previewImage && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-dark-500/80 flex items-center justify-center p-4"
           onClick={() => setPreviewImage(null)}
         >
           <div className="relative max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between bg-white px-4 py-2 border-b border-gray-200">
-              <span className="text-xs font-mono font-bold text-gray-900 truncate max-w-[300px]">{previewImage.name}</span>
+            <div className="flex items-center justify-between bg-white px-4 py-2 border-b border-primary-200">
+              <span className="text-xs font-mono font-bold text-dark-500 truncate max-w-[300px]">{previewImage.name}</span>
               <div className="flex items-center gap-2">
                 <a
                   href={previewImage.url}
@@ -266,7 +266,7 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
                   <Download className="w-3.5 h-3.5" />
                   Download
                 </a>
-                <button onClick={() => setPreviewImage(null)} className="text-gray-400 hover:text-white ml-2">
+                <button onClick={() => setPreviewImage(null)} className="text-primary-400 hover:text-white ml-2">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -290,12 +290,12 @@ function CommentItem({ comment, onImagePreview }: { comment: IComment; onImagePr
   if (isSystemLog) {
     return (
       <div className="flex items-start gap-2 py-1">
-        <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-          <Bot className="w-3 h-3 text-gray-500" />
+        <div className="w-5 h-5 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <Bot className="w-3 h-3 text-primary-500" />
         </div>
         <div className="flex-1">
-          <p className="text-[11px] text-gray-500 italic font-mono">{comment.content}</p>
-          <span className="text-[10px] text-gray-400">{timeAgo(comment.createdAt)}</span>
+          <p className="text-[11px] text-primary-500 italic font-mono">{comment.content}</p>
+          <span className="text-[10px] text-primary-400">{timeAgo(comment.createdAt)}</span>
         </div>
       </div>
     );
@@ -303,20 +303,20 @@ function CommentItem({ comment, onImagePreview }: { comment: IComment; onImagePr
 
   return (
     <div className="flex items-start gap-2.5">
-      <div className="w-6 h-6 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0 mt-0.5">
+      <div className="w-6 h-6 rounded-full bg-dark-500 flex items-center justify-center flex-shrink-0 mt-0.5">
         <span className="text-[10px] text-white font-bold">
           {author?.name?.charAt(0).toUpperCase() || '?'}
         </span>
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 mb-1">
-          <span className="text-xs font-bold text-gray-900">{author?.name || 'Unknown'}</span>
-          <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wide">
+          <span className="text-xs font-bold text-dark-500">{author?.name || 'Unknown'}</span>
+          <span className="text-[10px] font-mono text-primary-400 uppercase tracking-wide">
             {author?.department?.replace('_', ' ')}
           </span>
-          <span className="text-[10px] text-gray-400 ml-auto">{timeAgo(comment.createdAt)}</span>
+          <span className="text-[10px] text-primary-400 ml-auto">{timeAgo(comment.createdAt)}</span>
         </div>
-        <div className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">
+        <div className="text-xs text-dark-600 leading-relaxed whitespace-pre-wrap">
           {renderContentWithMentions(comment.content)}
         </div>
 
@@ -329,12 +329,12 @@ function CommentItem({ comment, onImagePreview }: { comment: IComment; onImagePr
                   <div className="inline-flex flex-col items-start">
                     <button
                       onClick={() => onImagePreview(att.url, att.name)}
-                      className="border border-gray-200 hover:border-black transition-colors overflow-hidden"
+                      className="border border-primary-200 hover:border-dark-500 transition-colors overflow-hidden"
                     >
                       <img src={att.url} alt={att.name} className="w-20 h-20 object-cover" />
                     </button>
                     <div className="flex items-center gap-1 mt-1">
-                      <span className="text-[9px] font-mono text-gray-400 truncate max-w-[80px]">{att.name}</span>
+                      <span className="text-[9px] font-mono text-primary-400 truncate max-w-[80px]">{att.name}</span>
                       <a
                         href={att.url}
                         download={att.name}
@@ -350,11 +350,11 @@ function CommentItem({ comment, onImagePreview }: { comment: IComment; onImagePr
                     href={att.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-mono bg-gray-50 border border-gray-200 text-gray-600 hover:border-black transition-colors"
+                    className="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-mono bg-primary-50 border border-primary-200 text-dark-400 hover:border-dark-500 transition-colors"
                   >
                     <Paperclip className="w-3 h-3" />
                     <span className="truncate max-w-[100px]">{att.name}</span>
-                    <Download className="w-2.5 h-2.5 text-gray-400 ml-1" />
+                    <Download className="w-2.5 h-2.5 text-primary-400 ml-1" />
                   </a>
                 )}
               </div>
@@ -370,7 +370,7 @@ function renderContentWithMentions(content: string) {
   const parts = content.split(/(@\w+\s*\w*)/g);
   return parts.map((part, i) =>
     part.startsWith('@') ? (
-      <span key={i} className="text-black font-bold">
+      <span key={i} className="text-dark-500 font-bold">
         {part}
       </span>
     ) : (
