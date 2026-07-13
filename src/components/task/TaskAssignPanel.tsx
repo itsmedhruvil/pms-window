@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { mutate as swrMutate } from 'swr';
 import { User, X, Check, Search } from 'lucide-react';
 import { cn, getDepartmentLabel, apiFetch } from '@/lib/utils';
 import type { ITask, IUser } from '@/types';
@@ -57,6 +58,18 @@ export function TaskAssignPanel({ task, onAssigned, onClose }: TaskAssignPanelPr
     }
 
     if (result.data) {
+      // INSTANT: update SWR cache with the returned task data
+      void swrMutate(`/api/tasks/${task._id}`, result.data, { revalidate: false });
+      // Trigger background revalidation on task lists
+      void swrMutate(
+        (key: unknown) => typeof key === 'string' && key.startsWith('/api/tasks') && !key.includes(task._id),
+        undefined,
+        { revalidate: true }
+      );
+      // Dispatch events for other pages
+      window.dispatchEvent(new CustomEvent('app-data-changed', {
+        detail: { entity: 'task', action: 'updated', data: result.data },
+      }));
       onAssigned?.(result.data);
       onClose?.();
     }

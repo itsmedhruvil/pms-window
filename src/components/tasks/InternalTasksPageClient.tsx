@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { mutate as swrMutate } from 'swr';
 import { ClipboardList, AlertTriangle, CheckSquare, Square, Plus } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TaskStatusBadge } from '@/components/ui/badges';
@@ -27,10 +28,15 @@ export function InternalTasksPageClient({
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [templateGroups, setTemplateGroups] = useState<ITemplateGroup[]>([]);
 
-  // Auto-refresh list when tasks are created/updated via events
+  // Auto-refresh list when tasks are created/updated via events (no full reload)
   useEffect(() => {
     const handleTaskUpdate = () => {
-      window.location.reload();
+      // INSTANT: revalidate task & project caches in background (no full page reload)
+      void swrMutate(
+        (key: unknown) => typeof key === 'string' && (key.startsWith('/api/tasks') || key.startsWith('/api/projects')),
+        undefined,
+        { revalidate: true }
+      );
     };
     window.addEventListener('erp-task-updated', handleTaskUpdate);
     window.addEventListener('app-data-changed', handleTaskUpdate);
@@ -296,7 +302,15 @@ export function InternalTasksPageClient({
           templateGroups={templateGroups}
           onSuccess={() => {
             setTaskModalOpen(false);
-            window.location.reload();
+            // INSTANT: revalidate caches in background
+            void swrMutate(
+              (key: unknown) => typeof key === 'string' && (key.startsWith('/api/tasks') || key.startsWith('/api/projects')),
+              undefined,
+              { revalidate: true }
+            );
+            window.dispatchEvent(new CustomEvent('app-data-changed', {
+              detail: { entity: 'task', action: 'created' },
+            }));
           }}
           onCancel={() => setTaskModalOpen(false)}
         />

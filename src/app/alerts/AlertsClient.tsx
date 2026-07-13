@@ -106,6 +106,8 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
       setAlerts((prev) =>
         prev.map((a) => (a._id === alertId ? updatedAlert : a))
       );
+      // INSTANT: notify other pages
+      dispatchDataChange('alert', 'updated', updatedAlert);
       if (updatedAlert.status === AlertStatus.RESOLVED) {
         window.dispatchEvent(new CustomEvent('erp-alert-resolved', { detail: updatedAlert }));
       }
@@ -124,6 +126,8 @@ export function AlertsClient({ initialAlerts, isAdmin, currentUserId, currentUse
     if (result.success) {
       const deletedAlert = alerts.find((a) => a._id === alertId);
       setAlerts((prev) => prev.filter((a) => a._id !== alertId));
+      // INSTANT: notify other pages
+      dispatchDataChange('alert', 'deleted', deletedAlert);
       if (deletedAlert?.status !== AlertStatus.RESOLVED) {
         window.dispatchEvent(new CustomEvent('erp-alert-deleted', { detail: deletedAlert }));
       }

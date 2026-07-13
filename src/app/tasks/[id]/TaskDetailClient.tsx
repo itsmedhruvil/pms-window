@@ -1,8 +1,9 @@
 'use client';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
-import useSWR from 'swr';
+import useSWR, { mutate as swrMutate } from 'swr';
 import { invalidateTasks } from '@/lib/client-data';
+import { dispatchDataChange } from '@/hooks/useRealtime';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -193,8 +194,10 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
       setNoCommentWarning(false);
       setDoneComment('');
       setActiveTab('comments');
-      await mutateTask();
-      invalidateTasks();
+      // INSTANT: update SWR cache & dispatch events — no waiting for re-fetch
+      void mutateTask(undefined, { revalidate: false });
+      void swrMutate((key: unknown) => typeof key === 'string' && key.startsWith('/api/tasks'), undefined, { revalidate: true });
+      dispatchDataChange('task', 'updated', result.data);
       router.refresh();
     } else {
       setStatusError(typeof result.error === 'string' ? result.error : 'Could not update task status.');
@@ -237,8 +240,10 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
       setNoCommentWarning(false);
       setDoneComment('');
       setActiveTab('comments');
-      await mutateTask();
-      invalidateTasks();
+      // INSTANT: update SWR cache & dispatch events
+      void mutateTask(undefined, { revalidate: false });
+      void swrMutate((key: unknown) => typeof key === 'string' && key.startsWith('/api/tasks'), undefined, { revalidate: true });
+      dispatchDataChange('task', 'updated', result.data);
       router.refresh();
     } else {
       setStatusError(typeof result.error === 'string' ? result.error : 'Could not update task status.');
@@ -258,7 +263,10 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
 
     if (result.success && result.data) {
       setTask(result.data);
-      await mutateTask();
+      // INSTANT: update SWR cache & dispatch events
+      void mutateTask(undefined, { revalidate: false });
+      void swrMutate((key: unknown) => typeof key === 'string' && key.startsWith('/api/tasks'), undefined, { revalidate: true });
+      dispatchDataChange('task', 'updated', result.data);
       router.refresh();
     } else if (patch.status) {
       setStatusError(typeof result.error === 'string' ? result.error : 'Could not update task status.');

@@ -61,7 +61,9 @@
   }
 
   .erp-table td {
-    @apply px-3 py-2.5 border-b border-primary-100 align-middle;
+    @apply px-3 py-2.5 border-b border-primary-100 align-middle word-break overflow-wrap-break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   .erp-table tr:hover td {

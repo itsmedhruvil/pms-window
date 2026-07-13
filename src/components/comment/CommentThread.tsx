@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Bot, Upload, Paperclip, X, Loader2, Download, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import { timeAgo, apiFetch } from '@/lib/utils';
+import { dispatchDataChange } from '@/hooks/useRealtime';
 import type { IComment, IUser, ICommentAttachment } from '@/types';
 
 interface CommentThreadProps {
@@ -132,6 +133,12 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
       setContent('');
       setMentions([]);
       setUploadedFiles([]);
+      // INSTANT: notify other pages of the new comment
+      dispatchDataChange('comment', 'added', {
+        comment: result.data,
+        taskId,
+        alertId,
+      });
     }
 
     setLoading(false);

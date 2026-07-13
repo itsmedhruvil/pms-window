@@ -183,15 +183,16 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     setLoadingProjects(false);
   }, []);
 
-  // Fetch discussions on mount + poll every 10 seconds for hot reload
+  // Fetch discussions on mount + poll every 30 seconds (reduced from 10s for better performance)
   useEffect(() => {
     setLoading(true);
     fetchDiscussions().finally(() => setLoading(false));
     fetchUsers();
 
+    // Use 30s polling interval for better performance (can be increased to 60s if needed)
     pollRef.current = setInterval(() => {
       fetchDiscussions();
-    }, 10000);
+    }, 30000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
@@ -199,7 +200,8 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
   }, [fetchDiscussions, fetchUsers]);
 
   const fetchComments = useCallback(async (discussionId: string) => {
-    const result = await apiFetch<{ items: IComment[] }>(`/api/comments?discussionId=${discussionId}&limit=100`);
+    // Improved: Load only last 50 comments initially (was 100) for faster rendering
+    const result = await apiFetch<{ items: IComment[] }>(`/api/comments?discussionId=${discussionId}&limit=50`);
     if (result.success && result.data?.items) {
       setComments((prev) => ({ ...prev, [discussionId]: result.data!.items }));
     }
