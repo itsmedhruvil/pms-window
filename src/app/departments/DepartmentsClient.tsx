@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import { cn, apiFetch } from '@/lib/utils';
 import { Modal } from '@/components/ui/Modal';
+import { notifyDepartmentsChanged } from '@/hooks/useDepartments';
 
 export interface DepartmentItem {
   _id: string;
@@ -59,6 +60,7 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
     setDepartments((prev) => [...prev, result.data as DepartmentItem]);
     setModalOpen(false);
     setForm(emptyForm);
+    notifyDepartmentsChanged();
   };
 
   const startEdit = (dept: DepartmentItem) => {
@@ -82,6 +84,7 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
         prev.map((d) => (d._id === deptId ? { ...d, ...editForm } : d))
       );
       setEditingId(null);
+      notifyDepartmentsChanged();
     }
   };
 
@@ -116,6 +119,7 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
         body: JSON.stringify({ sequence: deptSeq }),
       }),
     ]);
+    notifyDepartmentsChanged();
   };
 
   const deleteDepartment = async (deptId: string) => {
@@ -131,6 +135,7 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
 
     if (result.success) {
       setDepartments((prev) => prev.filter((d) => d._id !== deptId));
+      notifyDepartmentsChanged();
     } else {
       alert(result.error || 'Failed to delete department');
     }
@@ -150,6 +155,7 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
       setDepartments((prev) =>
         prev.map((d) => (d._id === deptId ? { ...d, isActive: !currentActive } : d))
       );
+      notifyDepartmentsChanged();
     }
   };
 

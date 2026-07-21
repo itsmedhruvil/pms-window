@@ -3,7 +3,7 @@ import type React from 'react';
 import ClerkAppProvider from '@/components/ClerkAppProvider';
 import { SWRProvider } from '@/components/SWRProvider';
 import './globals.css';
-import OneSignalProvider from '@/components/OneSignalProvider';
+import FCMProvider from '@/components/FCMProvider';
 
 export const metadata: Metadata = {
   title: 'Unique Arts PMS — Production Management System',
@@ -34,8 +34,6 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-const onesignalAppId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '';
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -48,19 +46,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link href="/icons/icon-512x512.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" />
         <link href="/icons/icon-512x512.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)" rel="apple-touch-startup-image" />
         <link href="/icons/icon-512x512.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" rel="apple-touch-startup-image" />
-        <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer />
-        {onesignalAppId && (
-          <script
-            dangerouslySetInnerHTML={{
-              __html: 'window.OneSignalDeferred=window.OneSignalDeferred||[];OneSignalDeferred.push(async function(OneSignal){await OneSignal.init({appId:"' + onesignalAppId + '",safari_web_id:"",notifyButton:{enable:false},allowLocalhostAsSecureOrigin:true});console.log("[OneSignal] SDK initialized");});',
-            }}
-          />
-        )}
+        {/* FCM service worker is registered by the Firebase SDK automatically */}
       </head>
       <body className="antialiased">
         <ClerkAppProvider>
           <SWRProvider>
-            <OneSignalProvider />
+            <FCMProvider />
             {children}
           </SWRProvider>
         </ClerkAppProvider>

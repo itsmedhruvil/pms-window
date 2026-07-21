@@ -1,17 +1,17 @@
 /**
  * notifications.ts
  *
- * Unified notification service that sends both push notifications (via OneSignal)
+ * Unified notification service that sends both push notifications (via FCM)
  * AND persists in-app notifications to MongoDB so they survive across devices.
  *
  * Every notification type gets:
- * - Push notification via OneSignal (with action buttons, icons, grouping)
+ * - Push notification via Firebase Cloud Messaging (FCM)
  * - MongoDB document for the in-app notification bell
  * - De-duplicated user targeting
  */
 
 import connectDB from '@/lib/db';
-import { sendRichPush, type OneSignalPayload } from '@/lib/onesignal';
+import { sendFcmPushToUsers } from '@/lib/firebase-admin';
 import { NotificationType } from '@/types/notifications';
 
 // ─── Notification Design Helpers ──────────────────────────────────────────────
@@ -29,7 +29,7 @@ interface RichNotificationConfig {
   targetAudience?: string;
   metadata?: Record<string, unknown>;
   /**
-   * Optional: A larger image URL to include in the notification (big picture).
+   * Optional: A larger image URL to include in the notification.
    */
   imageUrl?: string;
 }
@@ -66,85 +66,6 @@ function getNotificationIcon(type: NotificationType): { emoji: string; hexColor:
   }
 }
 
-/**
- * Build a design-rich OneSignal push notification payload with:
- * - Action buttons for common workflows
- * - Thread grouping so notifications of same type are stacked
- * - Big picture / large icon support
- * - Prioritization (alert = high priority, other = normal)
- */
-function buildRichPushPayload(config: RichNotificationConfig): OneSignalPayload {
-  const { type, title, body, link, userIds, metadata, imageUrl } = config;
-  const icon = getNotificationIcon(type);
-  const targetUrl = link || '/';
-
-  // Build action buttons based on notification type
-  const webButtons: Array<{ id: string; text: string; icon?: string; url?: string }> = [
-    { id: 'open', text: '🔍 Open', url: targetUrl },
-  ];
-
-  // Add type-specific actions
-  switch (type) {
-    case NotificationType.TASK_ASSIGNED:
-      webButtons.push({ id: 'view-task', text: '📋 View Task', url: targetUrl });
-      break;
-    case NotificationType.INTERNAL_TASK_ASSIGNED:
-      webButtons.push({ id: 'view-task', text: '📋 View Task', url: targetUrl });
-      break;
-    case NotificationType.ALERT_CREATED:
-      webButtons.push({ id: 'view-alerts', text: '🚨 View Alerts', url: '/alerts' });
-      break;
-    case NotificationType.ALERT_ACKNOWLEDGED:
-    case NotificationType.ALERT_RESOLVED:
-      webButtons.push({ id: 'view-alerts', text: '✅ View Status', url: '/alerts' });
-      break;
-    case NotificationType.COMMENT_MENTION:
-      webButtons.push({ id: 'reply', text: '💬 Reply', url: targetUrl });
-      break;
-    case NotificationType.DISCUSSION_REPLY:
-    case NotificationType.DISCUSSION_CREATED:
-      webButtons.push({ id: 'view-discussion', text: '💡 View Discussion', url: targetUrl });
-      break;
-    case NotificationType.TASK_STATUS_CHANGED:
-      webButtons.push({ id: 'view-task', text: '📋 View Task', url: targetUrl });
-      break;
-    case NotificationType.PROJECT_CREATED:
-      webButtons.push({ id: 'view-project', text: '📦 View Project', url: targetUrl });
-      break;
-    case NotificationType.TASK_OVERDUE:
-      webButtons.push({ id: 'view-tasks', text: '⏰ View Tasks', url: targetUrl });
-      break;
-  }
-
-  return {
-    app_id: process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID!,
-    include_external_user_ids: userIds,
-    headings: { en: title },
-    contents: { en: body },
-    subtitle: { en: icon.label },
-    url: targetUrl,
-    icon: '/icons/icon-192x192.png',
-    web_url: targetUrl,
-    launch_url: targetUrl,
-    isAnyWeb: true,
-    data: {
-      url: targetUrl,
-      click_action: targetUrl,
-      route: targetUrl,
-      type,
-      icon: icon.emoji,
-      color: icon.hexColor,
-      imageUrl: imageUrl || undefined,
-      ...(metadata || {}),
-    },
-    big_picture: imageUrl || undefined,
-    chrome_web_image: imageUrl || undefined,
-    web_buttons: webButtons,
-    thread_id: `pms-${type}`,
-    priority: type.startsWith('alert') || type === NotificationType.TASK_OVERDUE ? 10 : 5,
-  };
-}
-
 // ─── Unified Dispatch ─────────────────────────────────────────────────────────
 
 /**
@@ -156,11 +77,37 @@ export async function notifyUsers(config: RichNotificationConfig): Promise<void>
 
   if (userIds.length === 0) return;
 
-  // 1. Send DESIGN-RICH push notification via OneSignal (fire-and-forget)
-  const richPayload = buildRichPushPayload(config);
-  sendRichPush(richPayload).catch(() => {
+  // 1. Send push notification via FCM to users who have FCM tokens
+  try {
+    await connectDB();
+    const UserModel = (await import('@/models/User')).default;
+    const users = await UserModel.find({
+      _id: { $in: userIds },
+      fcmToken: { $ne: '', $exists: true },
+    }).select('fcmToken').lean();
+
+    const tokens = users
+      .map((u: { fcmToken?: string }) => u.fcmToken)
+      .filter((t: string | undefined): t is string => Boolean(t));
+
+    const icon = getNotificationIcon(type);
+    const fcmData: Record<string, string> = {
+      type,
+      icon: icon.emoji,
+      color: icon.hexColor,
+      ...(metadata ? Object.fromEntries(
+        Object.entries(metadata).map(([k, v]) => [k, String(v)])
+      ) : {}),
+    };
+
+    if (tokens.length > 0) {
+      sendFcmPushToUsers(tokens, title, body, link, fcmData).catch(() => {
+        // Push failures are non-critical
+      });
+    }
+  } catch {
     // Push failures are non-critical
-  });
+  }
 
   // 2. Persist in-app notifications to MongoDB for each user
   try {
@@ -233,7 +180,3 @@ export function getAudienceLabel(count: number): string {
   if (count === 1) return '1 user';
   return `${count} users`;
 }
-
-// Re-export for convenience
-export { sendPushToOneSignalUsers } from '@/lib/onesignal';
-export type { OneSignalPayload } from '@/lib/onesignal';

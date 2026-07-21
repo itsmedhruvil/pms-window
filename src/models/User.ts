@@ -9,6 +9,7 @@ export interface IUserDocument extends Document {
   department: Department;
   avatar?: string;
   isActive: boolean;
+  fcmToken?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,6 +49,10 @@ const UserSchema = new Schema<IUserDocument>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    fcmToken: {
+      type: String,
+      default: '',
     },
   },
   {

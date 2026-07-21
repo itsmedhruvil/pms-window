@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import UserModel from '@/models/User';
-import { sendPushToOneSignalUsers } from '@/lib/onesignal';
+import { sendFcmPushToUsers } from '@/lib/firebase-admin';
 
 // POST /api/test-push - Send a test push notification to all active users
 export async function POST(req: NextRequest) {
@@ -13,23 +13,32 @@ export async function POST(req: NextRequest) {
     const bodyText = body.body || 'This is a test push notification sent to all users.';
     const link = body.link || '/';
 
-    // Fetch all active users
-    const allUsers = await UserModel.find({ isActive: true }).select('_id').lean();
-    const allUserIds = allUsers.map((u) => u._id.toString());
+    // Fetch all active users with FCM tokens
+    const users = await UserModel.find({
+      isActive: true,
+      fcmToken: { $ne: '', $exists: true },
+    }).select('fcmToken').lean();
 
-    if (allUserIds.length === 0) {
+    const tokens = users
+      .map((u: { fcmToken?: string }) => u.fcmToken)
+      .filter((t: string | undefined): t is string => Boolean(t));
+
+    if (tokens.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'No active users found to send notification to' },
+        { success: false, error: 'No users with registered FCM tokens found' },
         { status: 400 }
       );
     }
 
-    // Send push notification to all active users
-    const result = await sendPushToOneSignalUsers(allUserIds, title, bodyText, link);
+    // Send push notification via FCM
+    const result = await sendFcmPushToUsers(tokens, title, bodyText, link, {
+      type: 'test',
+      source: 'test-push',
+    });
 
-    if (!result) {
+    if (result.failed > 0 && result.success === 0) {
       return NextResponse.json(
-        { success: false, error: 'Failed to send push notification via OneSignal' },
+        { success: false, error: 'Failed to send push notification via FCM' },
         { status: 500 }
       );
     }
@@ -39,8 +48,10 @@ export async function POST(req: NextRequest) {
       data: {
         notificationTitle: title,
         notificationBody: bodyText,
-        totalUsersNotified: allUserIds.length,
-        message: `Test push notification sent to ${allUserIds.length} active users`,
+        totalUsers: tokens.length,
+        sent: result.success,
+        failed: result.failed,
+        message: `Test push notification sent to ${result.success}/${tokens.length} users`,
       },
     });
   } catch (error) {

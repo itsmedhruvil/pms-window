@@ -61,7 +61,7 @@
   }
 
   .erp-table td {
-    @apply px-3 py-2.5 border-b border-primary-100 align-middle word-break overflow-wrap-break-word;
+    @apply px-3 py-2.5 border-b border-primary-100 align-middle break-words;
     word-break: break-word;
     overflow-wrap: break-word;
   }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch, getDepartmentAbbreviation, getDepartmentLabel } from '@/lib/utils';
 import { DEPARTMENT_SEQUENCE } from '@/types';
 import type { Department } from '@/types';
@@ -22,28 +22,62 @@ const fallbackDepartments: ClientDepartment[] = DEPARTMENT_SEQUENCE.map((name, s
   isActive: true,
 }));
 
-export function useDepartments(includeInactive = false) {
-  const [departments, setDepartments] = useState<ClientDepartment[]>(fallbackDepartments);
+/** Custom event name emitted when departments are created, updated, or deleted */
+export const DEPARTMENTS_CHANGED_EVENT = 'erp-departments-changed';
 
-  useEffect(() => {
-    let mounted = true;
+/** Fire the departments-changed event so all hooks refetch */
+export function notifyDepartmentsChanged() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(DEPARTMENTS_CHANGED_EVENT));
+  }
+}
 
-    apiFetch<Array<{
+async function fetchDepartments(): Promise<ClientDepartment[]> {
+  try {
+    const result = await apiFetch<Array<{
       _id: string;
       name: Department;
       label: string;
       abbreviation: string;
       sequence: number;
       isActive: boolean;
-    }>>('/api/departments')
-      .then((result) => {
-        if (!mounted || !result.success || !result.data || result.data.length === 0) return;
-        setDepartments(result.data);
-      })
-      .catch(() => {});
+    }>>('/api/departments');
+
+    if (result.success && result.data && result.data.length > 0) {
+      return result.data;
+    }
+  } catch {
+    // ignore network errors, fall through to fallback
+  }
+  return fallbackDepartments;
+}
+
+export function useDepartments(includeInactive = false) {
+  const [departments, setDepartments] = useState<ClientDepartment[]>(fallbackDepartments);
+
+  const refresh = useCallback(async () => {
+    const data = await fetchDepartments();
+    setDepartments(data);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetchDepartments().then((data) => {
+      if (mounted) setDepartments(data);
+    });
+
+    // Listen for changes emitted after create/update/delete
+    const handleChange = () => {
+      fetchDepartments().then((data) => {
+        if (mounted) setDepartments(data);
+      });
+    };
+    window.addEventListener(DEPARTMENTS_CHANGED_EVENT, handleChange);
 
     return () => {
       mounted = false;
+      window.removeEventListener(DEPARTMENTS_CHANGED_EVENT, handleChange);
     };
   }, []);
 
@@ -52,3 +86,6 @@ export function useDepartments(includeInactive = false) {
     [departments, includeInactive]
   );
 }
+
+/** Convenience export for components that need to manually trigger a refresh */
+export { fetchDepartments };

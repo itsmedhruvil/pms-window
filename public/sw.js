@@ -50,15 +50,8 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Notification click event - handle non-OneSignal notifications
-// OneSignal SDK handles its own notification clicks via OneSignalSDKWorker.js
-// This is a fallback for any custom notifications
+// Notification click event
 self.addEventListener('notificationclick', (event) => {
-  // If this notification has OneSignal data, let OneSignal handle it
-  if (event.notation?.data?.['OneSignal']) {
-    return;
-  }
-
   event.notification.close();
 
   const url = event.notification.data?.url || '/';
