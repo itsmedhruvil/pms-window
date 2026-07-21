@@ -35,7 +35,6 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/projects/new', label: 'Create Project', icon: Plus, prominent: true },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
-  { href: '/internal-tasks', label: 'Internal Tasks', icon: ClipboardList },
   { href: '/discussions', label: 'Discussions', icon: MessageCircle },
   { href: '/alerts', label: 'Alerts', icon: AlertTriangle },
 ];
@@ -43,7 +42,6 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
 const DEPT_USER_NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
-  { href: '/internal-tasks', label: 'Internal Tasks', icon: ClipboardList },
   { href: '/discussions', label: 'Discussions', icon: MessageCircle },
   { href: '/alerts', label: 'Alerts', icon: AlertTriangle },
 ];
@@ -57,7 +55,6 @@ interface AppLayoutProps {
 const COUNT_KEY_MAP: Record<string, string> = {
   'Alerts': 'activeAlerts',
   'Discussions': 'unreadDiscussions',
-  'Internal Tasks': 'internalTasksPending',
   'Projects': 'activeProjects',
 };
 

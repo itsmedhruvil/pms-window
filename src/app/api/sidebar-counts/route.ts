@@ -19,8 +19,7 @@ export const GET = withAuth(async (_req: NextRequest, _ctx, { user }) => {
     activeAlerts,
     totalDiscussions,
     unreadDiscussions,
-    projectTasksPending,
-    internalTasksPending,
+    pendingTasks,
     overdueTasks,
     totalActiveProjects,
     projectsOnHold,
@@ -51,18 +50,10 @@ export const GET = withAuth(async (_req: NextRequest, _ctx, { user }) => {
       return unread;
     })(),
 
-    // Project tasks not done (filter by dept for non-admins)
+    // Tasks not done (filter by dept for non-admins) — includes both project and internal tasks
     TaskModel.countDocuments({
       ...(isAdmin ? {} : { department: user.department as string }),
       status: { $ne: TaskStatus.DONE },
-      projectId: { $ne: null },
-    }),
-
-    // Internal tasks not done (no projectId)
-    TaskModel.countDocuments({
-      ...(isAdmin ? {} : { department: user.department as string }),
-      status: { $ne: TaskStatus.DONE },
-      projectId: null,
     }),
 
     // Overdue tasks (not done and past due date)
@@ -87,9 +78,7 @@ export const GET = withAuth(async (_req: NextRequest, _ctx, { user }) => {
       activeAlerts,
       discussions: totalDiscussions,
       unreadDiscussions,
-      pendingTasks: projectTasksPending + internalTasksPending,
-      projectTasksPending,
-      internalTasksPending,
+      pendingTasks,
       overdueTasks,
       activeProjects: totalActiveProjects,
       projectsOnHold,
