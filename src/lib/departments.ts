@@ -1,3 +1,4 @@
+import connectDB from '@/lib/db';
 import DepartmentModel from '@/models/Department';
 import { DEPARTMENT_LABELS, DEPARTMENT_SEQUENCE } from '@/types';
 import type { Department } from '@/types';
@@ -11,6 +12,7 @@ export interface DepartmentOption {
 }
 
 export async function getActiveDepartmentOptions(): Promise<DepartmentOption[]> {
+  await connectDB();
   const departments = await DepartmentModel.find({ isActive: true })
     .select('name label abbreviation sequence isActive')
     .sort({ sequence: 1, label: 1 })

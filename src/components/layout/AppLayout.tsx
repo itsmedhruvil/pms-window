@@ -66,7 +66,7 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
   const [dbRole, setDbRole] = useState<string | null>(null);
   const [dbDepartment, setDbDepartment] = useState<string | null>(null);
   const fetchedRef = useRef(false);
-  const departments = useDepartments();
+  const departments = useDepartments(true);
   const [counts, setCounts] = useState<Record<string, number>>({});
 
   // Fetch sidebar counts (discussions, pending tasks, alerts, etc.)

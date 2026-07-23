@@ -44,7 +44,17 @@ async function fetchDepartments(): Promise<ClientDepartment[]> {
     }>>('/api/departments');
 
     if (result.success && result.data && result.data.length > 0) {
-      return result.data;
+      // Merge API departments with fallback so any custom departments
+      // created in the DB always appear, even if the API only returns
+      // a partial set. API data takes priority over fallback.
+      const apiNames = new Set(result.data.map((d) => d.name));
+      const merged = [
+        ...result.data,
+        ...fallbackDepartments.filter((fb) => !apiNames.has(fb.name)),
+      ];
+      // Sort by sequence
+      merged.sort((a, b) => a.sequence - b.sequence);
+      return merged;
     }
   } catch {
     // ignore network errors, fall through to fallback
