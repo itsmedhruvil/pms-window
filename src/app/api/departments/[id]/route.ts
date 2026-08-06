@@ -4,7 +4,7 @@ import DepartmentModel from '@/models/Department';
 import UserModel from '@/models/User';
 import TaskModel from '@/models/Task';
 import { withAuth } from '@/lib/auth';
-import { UserRole } from '@/types';
+import { UserRole, FactoryGroup } from '@/types';
 
 // GET /api/departments/[id]
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
@@ -26,16 +26,23 @@ export const PATCH = withAuth(
     const { id } = await ctx.params;
 
     const body = await req.json();
-    const allowedFields = ['label', 'abbreviation', 'description', 'sequence', 'isActive'];
+    const allowedFields = ['label', 'abbreviation', 'description', 'sequence', 'isActive', 'factoryGroup'];
 
     const update: Record<string, unknown> = {};
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
-        update[field] = field === 'abbreviation'
-          ? String(body[field]).trim().toUpperCase()
-          : field === 'label'
-          ? String(body[field]).trim()
-          : body[field];
+        if (field === 'abbreviation') {
+          update[field] = String(body[field]).trim().toUpperCase();
+        } else if (field === 'label') {
+          update[field] = String(body[field]).trim();
+        } else if (field === 'factoryGroup') {
+          const value = String(body[field]).trim();
+          update[field] = Object.values(FactoryGroup).includes(value as FactoryGroup)
+            ? value
+            : FactoryGroup.INSIDE;
+        } else {
+          update[field] = body[field];
+        }
       }
     }
 

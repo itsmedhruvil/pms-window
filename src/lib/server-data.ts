@@ -15,8 +15,10 @@ import TaskModel from '@/models/Task';
 import TaskTemplateModel from '@/models/TaskTemplate';
 import AlertModel from '@/models/Alert';
 import UserModel from '@/models/User';
+import DepartmentModel from '@/models/Department';
 import {
   Department,
+  FactoryGroup,
   ProjectStatus,
   ProjectPriority,
   TaskStatus,
@@ -37,6 +39,7 @@ export interface ProjectListFilters {
   userId?: string;
   isAdmin?: boolean;
   department?: Department;
+  factoryGroup?: FactoryGroup;
 }
 
 export async function getProjects(filters: ProjectListFilters = {}) {
@@ -55,6 +58,27 @@ export async function getProjects(filters: ProjectListFilters = {}) {
     ];
   }
 
+  if (filters.factoryGroup) {
+    const departmentNames = await DepartmentModel.find({ factoryGroup: filters.factoryGroup })
+      .distinct('name')
+      .lean();
+
+    if (departmentNames.length === 0) {
+      return { items: [], total: 0, page, limit, totalPages: 0 };
+    }
+
+    const projectIds = await TaskModel.distinct('projectId', {
+      projectId: { $exists: true, $ne: null },
+      department: { $in: departmentNames },
+    });
+
+    if (projectIds.length === 0) {
+      return { items: [], total: 0, page, limit, totalPages: 0 };
+    }
+
+    query._id = { $in: projectIds };
+  }
+
   const [items, total] = await Promise.all([
     ProjectModel.find(query)
       .sort({ priority: -1, deadline: 1, createdAt: -1 })
@@ -65,7 +89,37 @@ export async function getProjects(filters: ProjectListFilters = {}) {
     ProjectModel.countDocuments(query),
   ]);
 
-  return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  const departmentDocs = await DepartmentModel.find().select('name factoryGroup').lean();
+  const departmentGroupMap = new Map<string, FactoryGroup>();
+  for (const dept of departmentDocs) {
+    departmentGroupMap.set(dept.name, dept.factoryGroup);
+  }
+
+  const taskRows = await TaskModel.find(
+    { projectId: { $in: items.map((item) => item._id) } },
+    'projectId department'
+  ).lean();
+
+  const projectGroupMap = new Map<string, Set<FactoryGroup>>();
+  for (const task of taskRows) {
+    const projectId = task.projectId?.toString();
+    const group = departmentGroupMap.get(task.department as string);
+    if (!projectId || !group) continue;
+
+    if (!projectGroupMap.has(projectId)) {
+      projectGroupMap.set(projectId, new Set());
+    }
+    projectGroupMap.get(projectId)?.add(group);
+  }
+
+  const itemsWithGroups = items.map((item) => ({
+    ...item,
+    factoryGroups: projectGroupMap.get(item._id.toString())
+      ? Array.from(projectGroupMap.get(item._id.toString())!)
+      : undefined,
+  }));
+
+  return { items: itemsWithGroups, total, page, limit, totalPages: Math.ceil(total / limit) };
 }
 
 export async function getProjectDetail(id: string) {

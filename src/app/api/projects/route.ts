@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import ProjectModel from '@/models/Project';
+import TaskModel from '@/models/Task';
+import DepartmentModel from '@/models/Department';
 import { withAuth } from '@/lib/auth';
 import { CreateProjectSchema, ProjectFiltersSchema } from '@/lib/validations';
 import { generateProjectTasks, generateFromSelectedTemplateGroup } from '@/lib/workflow';
-import { ProjectStatus, UserRole } from '@/types';
+import { FactoryGroup, ProjectStatus, UserRole } from '@/types';
 import mongoose from 'mongoose';
 import { createSystemLog } from '@/lib/workflow';
 import { NotificationType } from '@/types/notifications';
@@ -25,7 +27,7 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
     );
   }
 
-  const { status, priority, search, page, limit } = filters.data;
+  const { status, priority, search, factoryGroup, page, limit } = filters.data;
   const skip = (page - 1) * limit;
 
   // Build query
@@ -40,6 +42,33 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
       { clientName: { $regex: search, $options: 'i' } },
       { projectTitle: { $regex: search, $options: 'i' } },
     ];
+  }
+
+  if (factoryGroup) {
+    const departmentNames = await DepartmentModel.find({ factoryGroup })
+      .distinct('name')
+      .lean();
+
+    if (departmentNames.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: { items: [], total: 0, page, limit, totalPages: 0 },
+      });
+    }
+
+    const projectIds = await TaskModel.distinct('projectId', {
+      projectId: { $exists: true, $ne: null },
+      department: { $in: departmentNames },
+    });
+
+    if (projectIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: { items: [], total: 0, page, limit, totalPages: 0 },
+      });
+    }
+
+    query._id = { $in: projectIds };
   }
 
   // Use hint to ensure the query planner picks the right index

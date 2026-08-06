@@ -1,7 +1,8 @@
 'use client';
 
+import { Suspense } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { UserButton, useUser } from '@clerk/nextjs';
 import {
   LayoutDashboard,
@@ -15,6 +16,7 @@ import {
   Menu,
   Bell,
   Building2,
+  Settings,
 } from 'lucide-react';
 import { cn, getDepartmentLabel, apiFetch } from '@/lib/utils';
 import { AlertStatus, UserRole } from '@/types';
@@ -62,6 +64,7 @@ const COUNT_KEY_MAP: Record<string, string> = {
 
 const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCount?: number }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { user, isSignedIn } = useUser();
   const [dbRole, setDbRole] = useState<string | null>(null);
   const [dbDepartment, setDbDepartment] = useState<string | null>(null);
@@ -241,6 +244,18 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
       {isAdmin && (
         <div className="px-3 lg:px-4 py-3 border-t border-primary-200 space-y-0.5">
           <Link
+            href="/projects?tab=previous"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',
+              pathname === '/projects' && searchParams.get('tab') === 'previous'
+                ? 'bg-dark-500 text-white'
+                : 'text-dark-400 hover:text-dark-500 hover:bg-primary-50'
+            )}
+          >
+            <FolderKanban className="w-4 h-4 flex-shrink-0" />
+            <span>Previous Work</span>
+          </Link>
+          <Link
             href="/template-groups"
             className={cn(
               'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',
@@ -275,6 +290,18 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
           >
             <Building2 className="w-4 h-4 flex-shrink-0" />
             <span>Departments</span>
+          </Link>
+          <Link
+            href="/settings"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',
+              pathname === '/settings'
+                ? 'bg-dark-500 text-white'
+                : 'text-dark-400 hover:text-dark-500 hover:bg-primary-50'
+            )}
+          >
+            <Settings className="w-4 h-4 flex-shrink-0" />
+            <span>Settings</span>
           </Link>
         </div>
       )}
@@ -352,7 +379,9 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
         'fixed lg:static inset-y-0 left-0',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       )}>
-        <Sidebar activeAlertCount={liveActiveAlertCount} />
+        <Suspense fallback={<div className="flex-1" />}>
+          <Sidebar activeAlertCount={liveActiveAlertCount} />
+        </Suspense>
       </aside>
 
       {/* Mobile header bar */}

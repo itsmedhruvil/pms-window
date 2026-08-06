@@ -1,4 +1,5 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
+import { FactoryGroup } from '@/types';
 
 export interface IDepartmentDocument extends Document {
   name: string;        // internal slug e.g. 'production'
@@ -7,6 +8,7 @@ export interface IDepartmentDocument extends Document {
   sequence: number;    // ordering
   description: string;
   isActive: boolean;
+  factoryGroup: FactoryGroup;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,6 +47,12 @@ const DepartmentSchema = new Schema<IDepartmentDocument>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    factoryGroup: {
+      type: String,
+      enum: Object.values(FactoryGroup),
+      default: FactoryGroup.INSIDE,
+      required: true,
     },
   },
   {

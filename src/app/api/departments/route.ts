@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import DepartmentModel from '@/models/Department';
 import { withAuth } from '@/lib/auth';
-import { UserRole } from '@/types';
+import { UserRole, FactoryGroup } from '@/types';
 
 // GET /api/departments
 export const GET = withAuth(async () => {
@@ -23,6 +23,7 @@ export const POST = withAuth(
 
   const body = await req.json();
   const { name, label, abbreviation, description, sequence } = body;
+  const factoryGroup = body.factoryGroup === FactoryGroup.OUTSIDE ? FactoryGroup.OUTSIDE : FactoryGroup.INSIDE;
   const slug = String(name || '')
     .trim()
     .toLowerCase()
@@ -60,6 +61,7 @@ export const POST = withAuth(
       abbreviation: abbreviation.trim().toUpperCase(),
       description: description || '',
       sequence: seq,
+      factoryGroup,
     });
 
     return NextResponse.json({ success: true, data: created });

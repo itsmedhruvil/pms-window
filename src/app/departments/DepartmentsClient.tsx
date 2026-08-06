@@ -5,6 +5,7 @@ import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import { cn, apiFetch } from '@/lib/utils';
 import { Modal } from '@/components/ui/Modal';
 import { notifyDepartmentsChanged } from '@/hooks/useDepartments';
+import { FactoryGroup, FACTORY_GROUP_LABELS } from '@/types';
 
 export interface DepartmentItem {
   _id: string;
@@ -14,6 +15,7 @@ export interface DepartmentItem {
   sequence: number;
   description: string;
   isActive: boolean;
+  factoryGroup: FactoryGroup;
 }
 
 interface DepartmentForm {
@@ -21,9 +23,10 @@ interface DepartmentForm {
   label: string;
   abbreviation: string;
   description: string;
+  factoryGroup: FactoryGroup;
 }
 
-const emptyForm: DepartmentForm = { name: '', label: '', abbreviation: '', description: '' };
+const emptyForm: DepartmentForm = { name: '', label: '', abbreviation: '', description: '', factoryGroup: FactoryGroup.INSIDE };
 const EMPTY_ROW_TEXT = 'No departments yet. Click \u201cAdd Department\u201d to create one.';
 
 export function DepartmentsClient({ initialDepartments }: { initialDepartments: DepartmentItem[] }) {
@@ -34,11 +37,20 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
   const [form, setForm] = useState<DepartmentForm>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{ label: string; abbreviation: string; description: string } | null>(null);
+  const [editForm, setEditForm] = useState<{
+    label: string;
+    abbreviation: string;
+    description: string;
+    factoryGroup: FactoryGroup;
+  } | null>(null);
 
   const sorted = useMemo(() => [...departments].sort((a, b) => a.sequence - b.sequence), [departments]);
 
-  const isFormValid = form.name.trim().length >= 2 && form.label.trim().length >= 2 && form.abbreviation.trim().length >= 1;
+  const isFormValid =
+    form.name.trim().length >= 2 &&
+    form.label.trim().length >= 2 &&
+    form.abbreviation.trim().length >= 1 &&
+    (form.factoryGroup === FactoryGroup.INSIDE || form.factoryGroup === FactoryGroup.OUTSIDE);
 
   const handleCreate = async () => {
     if (!isFormValid) return;
@@ -65,7 +77,12 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
 
   const startEdit = (dept: DepartmentItem) => {
     setEditingId(dept._id);
-    setEditForm({ label: dept.label, abbreviation: dept.abbreviation, description: dept.description });
+    setEditForm({
+      label: dept.label,
+      abbreviation: dept.abbreviation,
+      description: dept.description,
+      factoryGroup: dept.factoryGroup,
+    });
   };
 
   const saveEdit = async (deptId: string) => {
@@ -195,6 +212,7 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
               <th>Label</th>
               <th>Abbreviation</th>
               <th>Description</th>
+              <th>Factory Group</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -257,6 +275,11 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
                         {dept.description || '\u2014'}
                       </span>
                     )}
+                  </td>
+                  <td>
+                    <span className="text-[10px] font-mono text-primary-500 uppercase">
+                      {dept.factoryGroup === 'inside' ? 'Inside' : 'Outside'}
+                    </span>
                   </td>
                   <td>
                     <button
@@ -394,6 +417,20 @@ export function DepartmentsClient({ initialDepartments }: { initialDepartments: 
                   placeholder="Brief description of the department"
                   className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
                 />
+              </label>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block text-[11px] uppercase tracking-[0.2em] text-primary-500 font-bold">
+                Factory Group
+                <select
+                  value={form.factoryGroup}
+                  onChange={(e) => setForm({ ...form, factoryGroup: e.target.value as FactoryGroup })}
+                  className="mt-2 w-full border border-primary-200 px-3 py-2 text-sm focus:outline-none focus:border-dark-500"
+                >
+                  <option value="inside">Inside Factory</option>
+                  <option value="outside">Outside Factory</option>
+                </select>
               </label>
             </div>
           </div>

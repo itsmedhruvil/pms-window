@@ -27,6 +27,16 @@ export enum ProjectStatus {
   DISPATCHED = 'dispatched',
 }
 
+export enum FactoryGroup {
+  INSIDE = 'inside',
+  OUTSIDE = 'outside',
+}
+
+export const FACTORY_GROUP_LABELS: Record<FactoryGroup, string> = {
+  [FactoryGroup.INSIDE]: 'Inside Factory',
+  [FactoryGroup.OUTSIDE]: 'Outside Factory',
+};
+
 export enum ProjectPriority {
   STANDARD = 'standard',
   NECESSARY = 'necessary',
@@ -131,6 +141,7 @@ export interface IProject {
   budget: number;
   productTypes: string[];
   tags: string[];
+  factoryGroups?: FactoryGroup[];
   createdAt: Date;
   updatedAt: Date;
 }

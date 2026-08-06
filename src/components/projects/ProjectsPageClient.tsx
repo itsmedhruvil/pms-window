@@ -2,18 +2,19 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, Calendar, Package, Search, X, Filter, ChevronDown } from 'lucide-react';
+import { AlertTriangle, Calendar, Search, X, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ProjectStatusBadge, PriorityBadge } from '@/components/ui/badges';
 import { FilterDrawer, MobileFilterButton } from '@/components/ui/FilterDrawer';
 import { formatDate, isOverdue, isDueSoon, cn } from '@/lib/utils';
 import type { IProject } from '@/types';
-import { ProjectStatus, ProjectPriority } from '@/types';
+import { FactoryGroup, FACTORY_GROUP_LABELS, ProjectStatus, ProjectPriority } from '@/types';
 
 interface ProjectsPageClientProps {
   projects: IProject[];
   activeAlertCount: number;
   isAdmin: boolean;
+  initialTab?: 'active' | 'previous';
 }
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
@@ -33,12 +34,33 @@ const PRIORITY_OPTIONS: { value: string; label: string }[] = [
   { value: ProjectPriority.URGENT, label: 'Urgent' },
 ];
 
-export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: ProjectsPageClientProps) {
+const FACTORY_GROUP_OPTIONS: { value: string; label: string }[] = [
+  { value: 'all', label: 'All Factory Groups' },
+  { value: FactoryGroup.INSIDE, label: FACTORY_GROUP_LABELS[FactoryGroup.INSIDE] },
+  { value: FactoryGroup.OUTSIDE, label: FACTORY_GROUP_LABELS[FactoryGroup.OUTSIDE] },
+];
+
+type SortField = 'projectTitle' | 'clientName' | 'status' | 'priority' | 'completionPercentage' | 'totalWindows' | 'deadline' | 'createdAt';
+type SortDirection = 'asc' | 'desc';
+
+const PAGE_SIZE = 10;
+
+export function ProjectsPageClient({ projects, activeAlertCount, isAdmin, initialTab = 'active' }: ProjectsPageClientProps) {
   const [searchText, setSearchText] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [factoryGroupFilter, setFactoryGroupFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'active' | 'previous'>(initialTab);
+  
+  // Sync activeTab when initialTab prop changes (e.g. nav from sidebar)
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState<SortField>('deadline');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounce search input — reduces filtering lag and API-like feel
@@ -48,7 +70,8 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: Proj
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => {
       setDebouncedSearch(value);
-    }, 150); // 150ms debounce — feels instant but avoids lag on large lists
+      setCurrentPage(1);
+    }, 150);
   }, []);
 
   useEffect(() => {
@@ -57,14 +80,26 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: Proj
     };
   }, []);
 
+  const currentTabProjects = useMemo(() => {
+    if (!isAdmin) return projects;
+    return activeTab === 'previous'
+      ? projects.filter((project) => project.status === ProjectStatus.COMPLETED)
+      : projects.filter((project) => project.status !== ProjectStatus.COMPLETED);
+  }, [projects, activeTab, isAdmin]);
+
   // Filter and search projects
   const filtered = useMemo(() => {
-    return projects.filter((project) => {
+    return currentTabProjects.filter((project) => {
       // Status filter
       if (statusFilter !== 'all' && project.status !== statusFilter) return false;
 
       // Priority filter
       if (priorityFilter !== 'all' && project.priority !== priorityFilter) return false;
+
+      // Factory group filter (admin-only)
+      if (factoryGroupFilter !== 'all') {
+        if (!project.factoryGroups?.includes(factoryGroupFilter as FactoryGroup)) return false;
+      }
 
       // Search filter (client name, project title, tags, address)
       if (debouncedSearch.trim().length > 0) {
@@ -81,55 +116,178 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: Proj
 
       return true;
     });
-  }, [projects, statusFilter, priorityFilter, debouncedSearch]);
+  }, [currentTabProjects, statusFilter, priorityFilter, factoryGroupFilter, debouncedSearch]);
+
+  // Sort projects
+  const sorted = useMemo(() => {
+    const sortedProjects = [...filtered];
+    sortedProjects.sort((a, b) => {
+      let aVal: string | number;
+      let bVal: string | number;
+
+      switch (sortField) {
+        case 'projectTitle':
+          aVal = a.projectTitle.toLowerCase();
+          bVal = b.projectTitle.toLowerCase();
+          break;
+        case 'clientName':
+          aVal = a.clientName.toLowerCase();
+          bVal = b.clientName.toLowerCase();
+          break;
+        case 'status':
+          aVal = a.status;
+          bVal = b.status;
+          break;
+        case 'priority': {
+          const priorityOrder: Record<string, number> = {
+            [ProjectPriority.URGENT]: 4,
+            [ProjectPriority.PRIORITY]: 3,
+            [ProjectPriority.NECESSARY]: 2,
+            [ProjectPriority.STANDARD]: 1,
+          };
+          aVal = priorityOrder[a.priority] || 0;
+          bVal = priorityOrder[b.priority] || 0;
+          break;
+        }
+        case 'completionPercentage':
+          aVal = a.completionPercentage;
+          bVal = b.completionPercentage;
+          break;
+        case 'totalWindows':
+          aVal = a.totalWindows;
+          bVal = b.totalWindows;
+          break;
+        case 'deadline':
+          aVal = new Date(a.deadline).getTime();
+          bVal = new Date(b.deadline).getTime();
+          break;
+        case 'createdAt':
+          aVal = new Date(a.createdAt).getTime();
+          bVal = new Date(b.createdAt).getTime();
+          break;
+        default:
+          aVal = a.projectTitle.toLowerCase();
+          bVal = b.projectTitle.toLowerCase();
+      }
+
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return sortedProjects;
+  }, [filtered, sortField, sortDirection]);
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedProjects = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return sorted.slice(start, start + PAGE_SIZE);
+  }, [sorted, safePage]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, priorityFilter, factoryGroupFilter, activeTab]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (statusFilter !== 'all') count++;
     if (priorityFilter !== 'all') count++;
+    if (factoryGroupFilter !== 'all') count++;
     if (debouncedSearch.trim()) count++;
     return count;
-  }, [statusFilter, priorityFilter, debouncedSearch]);
+  }, [statusFilter, priorityFilter, factoryGroupFilter, debouncedSearch]);
 
   const clearFilters = useCallback(() => {
     setSearchText('');
     setDebouncedSearch('');
     setStatusFilter('all');
     setPriorityFilter('all');
+    setFactoryGroupFilter('all');
+    setCurrentPage(1);
   }, []);
 
   // Compute stats for the filter chips
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const p of projects) {
+    for (const p of currentTabProjects) {
       counts[p.status] = (counts[p.status] || 0) + 1;
     }
     return counts;
-  }, [projects]);
+  }, [currentTabProjects]);
 
   const priorityCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const p of projects) {
+    for (const p of currentTabProjects) {
       counts[p.priority] = (counts[p.priority] || 0) + 1;
     }
     return counts;
-  }, [projects]);
+  }, [currentTabProjects]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection((dir) => (dir === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1);
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 inline ml-1 text-primary-300" />;
+    return sortDirection === 'asc'
+      ? <ArrowUp className="w-3 h-3 inline ml-1 text-dark-500" />
+      : <ArrowDown className="w-3 h-3 inline ml-1 text-dark-500" />;
+  };
 
   return (
     <AppLayout activeAlertCount={activeAlertCount}>
       <div className="p-6">
-        <div className="flex items-center justify-between mb-6 pb-4 border-b border-primary-200">
-          <div>
-            <h1 className="text-xl font-black text-dark-500">Projects</h1>
-            <p className="text-xs text-primary-500 font-mono mt-0.5">
-              {filtered.length} of {projects.length} order{projects.length !== 1 ? 's' : ''}
-              {activeFilterCount > 0 && (
-                <button onClick={clearFilters} className="ml-2 text-[10px] text-blue-600 hover:text-blue-800 underline">
-                  Clear filters
-                </button>
-              )}
-            </p>
+        <div className="flex flex-col gap-4 mb-6 pb-4 border-b border-primary-200">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-black text-dark-500">Projects</h1>
+              <p className="text-xs text-primary-500 font-mono mt-0.5">
+                {sorted.length} of {currentTabProjects.length} order{currentTabProjects.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            {activeFilterCount > 0 && (
+              <button onClick={clearFilters} className="text-[10px] text-blue-600 hover:text-blue-800 underline">
+                Clear filters
+              </button>
+            )}
           </div>
+
+          {isAdmin && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('active')}
+                className={cn(
+                  'px-3 py-2 text-[11px] font-mono font-bold uppercase tracking-wide rounded border transition-colors',
+                  activeTab === 'active'
+                    ? 'bg-dark-500 text-white border-dark-500'
+                    : 'bg-white text-primary-500 border-primary-200 hover:border-primary-400'
+                )}
+              >
+                Active Projects ({projects.filter((project) => project.status !== ProjectStatus.COMPLETED).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('previous')}
+                className={cn(
+                  'px-3 py-2 text-[11px] font-mono font-bold uppercase tracking-wide rounded border transition-colors',
+                  activeTab === 'previous'
+                    ? 'bg-dark-500 text-white border-dark-500'
+                    : 'bg-white text-primary-500 border-primary-200 hover:border-primary-400'
+                )}
+              >
+                Previous Work ({projects.filter((project) => project.status === ProjectStatus.COMPLETED).length})
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Search and Filters */}
@@ -146,7 +304,7 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: Proj
             />
             {searchText && (
               <button
-                onClick={() => { setSearchText(''); setDebouncedSearch(''); }}
+                onClick={() => { setSearchText(''); setDebouncedSearch(''); setCurrentPage(1); }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-primary-400 hover:text-dark-500"
               >
                 <X className="w-4 h-4" />
@@ -167,7 +325,7 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: Proj
                     : 'border-primary-200 text-primary-500 hover:border-primary-400'
                 )}
               >
-                All ({projects.length})
+                All ({currentTabProjects.length})
               </button>
               {STATUS_OPTIONS.filter((o) => o.value !== 'all').map((opt) => (
                 <button
@@ -205,6 +363,20 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: Proj
                 </option>
               ))}
             </select>
+
+            {isAdmin && (
+              <select
+                value={factoryGroupFilter}
+                onChange={(e) => setFactoryGroupFilter(e.target.value)}
+                className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wide border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors bg-white"
+              >
+                {FACTORY_GROUP_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            )}
 
             {/* Clear button */}
             {activeFilterCount > 0 && (
@@ -284,94 +456,180 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin }: Proj
             </div>
           </div>
 
-          {activeFilterCount > 0 && (
-            <button onClick={clearFilters} className="w-full px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide border border-red-300 text-red-600 hover:bg-red-50 transition-colors">
-              Clear All Filters
-            </button>
+          {isAdmin && (
+            <div className="mb-5">
+              <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500 mb-2">
+                Factory Group
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {FACTORY_GROUP_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setFactoryGroupFilter(opt.value)}
+                    className={cn(
+                      'px-2.5 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wide border transition-colors',
+                      factoryGroupFilter === opt.value ? 'bg-dark-500 text-white border-dark-500' : 'border-primary-200 text-primary-500'
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </FilterDrawer>
 
-        {/* Results */}
-        {filtered.length === 0 ? (
-          <div className="border border-dashed border-primary-200 p-16 text-center">
-            <Package className="w-8 h-8 text-primary-300 mx-auto mb-3" />
-            <p className="text-sm font-mono text-primary-400">
-              {activeFilterCount > 0
-                ? 'No projects match your filters'
-                : 'No projects yet'}
-            </p>
-          </div>
-        ) : (
-          <div className="erp-table-wrap border border-primary-200">
-            <table className="erp-table">
-              <thead>
-                <tr>
-                  <th>Client / Project</th>
-                  <th>Status</th>
-                  <th>Priority</th>
-                  <th>Progress</th>
-                  <th>Products</th>
-                  <th>Deadline</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((project) => {
-                  const overdue = isOverdue(project.deadline);
-                  const dueSoon = isDueSoon(project.deadline);
-                  const hasAlerts = (project.activeAlertIds?.length ?? 0) > 0;
+        {/* Projects Table */}
+        <div className="erp-table-wrap border border-primary-200">
+          <table className="erp-table">
+            <thead>
+              <tr>
+                <th>
+                  <button onClick={() => handleSort('projectTitle')} className="inline-flex items-center gap-1 hover:text-dark-500">
+                    Project <SortIcon field="projectTitle" />
+                  </button>
+                </th>
+                <th>
+                  <button onClick={() => handleSort('status')} className="inline-flex items-center gap-1 hover:text-dark-500">
+                    Status <SortIcon field="status" />
+                  </button>
+                </th>
+                <th>
+                  <button onClick={() => handleSort('priority')} className="inline-flex items-center gap-1 hover:text-dark-500">
+                    Priority <SortIcon field="priority" />
+                  </button>
+                </th>
+                <th>
+                  <button onClick={() => handleSort('completionPercentage')} className="inline-flex items-center gap-1 hover:text-dark-500">
+                    Progress <SortIcon field="completionPercentage" />
+                  </button>
+                </th>
+                <th>
+                  <button onClick={() => handleSort('totalWindows')} className="inline-flex items-center gap-1 hover:text-dark-500">
+                    Windows <SortIcon field="totalWindows" />
+                  </button>
+                </th>
+                <th>
+                  <button onClick={() => handleSort('deadline')} className="inline-flex items-center gap-1 hover:text-dark-500">
+                    Deadline <SortIcon field="deadline" />
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedProjects.map((project) => {
+                const overdue = isOverdue(project.deadline);
+                const dueSoon = isDueSoon(project.deadline);
+                const hasAlerts = (project.activeAlertIds?.length ?? 0) > 0;
 
-                  return (
-                    <tr key={project._id} className={cn('cursor-pointer', hasAlerts && 'bg-red-50/30 hover:bg-red-50/50')}>
-                      <td>
-                        <div className="flex items-center gap-2">
-                          {hasAlerts && (
-                            <AlertTriangle className="w-3 h-3 text-red-500 animate-pulse flex-shrink-0" />
-                          )}
-                          <div className="min-w-0">
-                            <Link
-                              href={`/projects/${project._id}`}
-                              className="font-semibold text-dark-500 hover:underline break-words"
-                            >
-                              {project.projectTitle}
-                            </Link>
-                            <p className="text-[10px] text-primary-500 break-words">{project.clientName}</p>
-                          </div>
+                return (
+                  <tr key={project._id} className={cn('cursor-pointer', hasAlerts && 'bg-red-50/30 hover:bg-red-50/50')}>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        {hasAlerts && (
+                          <AlertTriangle className="w-3 h-3 text-red-500 animate-pulse flex-shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <Link
+                            href={`/projects/${project._id}`}
+                            className="font-semibold text-dark-500 hover:underline break-words"
+                          >
+                            {project.projectTitle}
+                          </Link>
+                          <p className="text-[10px] text-primary-500 break-words">{project.clientName}</p>
                         </div>
-                      </td>
-                      <td><ProjectStatusBadge status={project.status} size="sm" /></td>
-                      <td><PriorityBadge priority={project.priority} size="sm" /></td>
-                      <td>
-                        <div className="flex items-center gap-2">
-                          <div className="w-20 h-1.5 bg-primary-100 flex-shrink-0">
-                            <div
-                              className={cn('h-full', hasAlerts ? 'bg-red-400' : 'bg-dark-500')}
-                              style={{ width: `${project.completionPercentage}%` }}
-                            />
-                          </div>
-                          <span className="text-[10px] font-mono text-dark-400 w-8 flex-shrink-0">
-                            {project.completionPercentage}%
-                          </span>
+                      </div>
+                    </td>
+                    <td><ProjectStatusBadge status={project.status} size="sm" /></td>
+                    <td><PriorityBadge priority={project.priority} size="sm" /></td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 h-1.5 bg-primary-100 flex-shrink-0">
+                          <div
+                            className={cn('h-full', hasAlerts ? 'bg-red-400' : 'bg-dark-500')}
+                            style={{ width: `${project.completionPercentage}%` }}
+                          />
                         </div>
-                      </td>
-                      <td><span className="font-mono">{project.totalWindows}</span></td>
-                      <td>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          {(overdue || dueSoon) && (
-                            <Calendar className={cn('w-3 h-3', overdue ? 'text-red-500' : 'text-yellow-500')} />
-                          )}
-                          <span className={cn(
-                            'font-mono text-[11px] whitespace-nowrap',
-                            overdue ? 'text-red-600 font-bold' : dueSoon ? 'text-yellow-700' : 'text-dark-400'
-                          )}>
-                            {formatDate(project.deadline)}
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        <span className="text-[10px] font-mono text-dark-400 w-8 flex-shrink-0">
+                          {project.completionPercentage}%
+                        </span>
+                      </div>
+                    </td>
+                    <td><span className="font-mono">{project.totalWindows}</span></td>
+                    <td>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {(overdue || dueSoon) && (
+                          <Calendar className={cn('w-3 h-3', overdue ? 'text-red-500' : 'text-yellow-500')} />
+                        )}
+                        <span className={cn(
+                          'font-mono text-[11px] whitespace-nowrap',
+                          overdue ? 'text-red-600 font-bold' : dueSoon ? 'text-yellow-700' : 'text-dark-400'
+                        )}>
+                          {formatDate(project.deadline)}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {paginatedProjects.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="text-center py-8 text-primary-400 text-xs font-mono">
+                    No projects found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-primary-200">
+            <p className="text-[10px] font-mono text-primary-500">
+              Showing {((safePage - 1) * PAGE_SIZE) + 1}–{Math.min(safePage * PAGE_SIZE, sorted.length)} of {sorted.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                className="p-1.5 border border-primary-200 text-primary-500 hover:border-dark-500 hover:text-dark-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                .reduce<Array<number | '...'>>((acc, p, idx, arr) => {
+                  if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, idx) =>
+                  p === '...' ? (
+                    <span key={`ellipsis-${idx}`} className="px-1.5 text-[10px] text-primary-400">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setCurrentPage(p)}
+                      className={cn(
+                        'px-2.5 py-1 text-[10px] font-mono font-bold border transition-colors',
+                        safePage === p
+                          ? 'bg-dark-500 text-white border-dark-500'
+                          : 'border-primary-200 text-primary-500 hover:border-dark-500 hover:text-dark-500'
+                      )}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage === totalPages}
+                className="p-1.5 border border-primary-200 text-primary-500 hover:border-dark-500 hover:text-dark-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         )}
       </div>
