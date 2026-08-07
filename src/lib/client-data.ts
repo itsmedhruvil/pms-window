@@ -22,6 +22,7 @@ import useSWRMutation from 'swr/mutation';
 import { apiFetch } from '@/lib/utils';
 import { dispatchNotification } from '@/hooks/useInAppNotifications';
 import { NotificationType } from '@/types/notifications';
+import type { IComment, PaginatedResponse } from '@/types';
 
 // ── Generic fetcher ──────────────────────────────────────────────────────────
 
@@ -100,6 +101,32 @@ export function useDashboard() {
 export function useUsers(params?: Record<string, string>) {
   const query = params ? new URLSearchParams(params).toString() : '';
   return useSWR(KEYS.usersList + (query ? `?${query}` : ''), fetcher, defaultConfig);
+}
+
+// ── Discussions & Comments ───────────────────────────────────────────────────
+
+export function useDiscussions(params?: Record<string, string>) {
+  const query = params ? new URLSearchParams(params).toString() : '';
+  return useSWR(KEYS.discussions(query), fetcher, {
+    ...defaultConfig,
+    refreshInterval: 30000, // Poll every 30s for hot reload
+  });
+}
+
+export function useDiscussion(id: string) {
+  return useSWR(id ? KEYS.discussion(id) : null, fetcher, defaultConfig);
+}
+
+/**
+ * Fetch comments for a discussion/task/alert.
+ * Uses a faster refresh interval so the active chat feels live.
+ */
+export function useComments<T = PaginatedResponse<IComment>>(params: Record<string, string>) {
+  const query = new URLSearchParams(params).toString();
+  return useSWR<T>(KEYS.comments(query), fetcher, {
+    ...defaultConfig,
+    refreshInterval: 15000, // Faster polling for active chat
+  });
 }
 
 // ── Helpers for instant cache updates ────────────────────────────────────────
@@ -374,18 +401,6 @@ export function invalidateAlerts() {
     undefined,
     { revalidate: true }
   );
-}
-
-export function useDiscussions(params?: Record<string, string>) {
-  const query = params ? new URLSearchParams(params).toString() : '';
-  return useSWR(KEYS.discussions(query), fetcher, {
-    ...defaultConfig,
-    refreshInterval: 30000, // Poll every 30s for hot reload
-  });
-}
-
-export function useDiscussion(id: string) {
-  return useSWR(id ? KEYS.discussion(id) : null, fetcher, defaultConfig);
 }
 
 export function invalidateDiscussions() {
