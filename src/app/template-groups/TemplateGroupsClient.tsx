@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Save, X, Edit3, ChevronDown, ChevronRight, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Save, X, Edit3, ChevronDown, ChevronRight, ArrowUp, ArrowDown, GripVertical, Download } from 'lucide-react';
 import { apiFetch, cn, DEPARTMENT_LABELS } from '@/lib/utils';
 import { Department, DEPARTMENT_SEQUENCE, TaskFrequency } from '@/types';
 import type { ITemplateGroup } from '@/types';
@@ -410,6 +410,7 @@ export function TemplateGroupsClient() {
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<GroupDraft>(emptyGroupDraft);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<GroupDraft>(emptyGroupDraft);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
@@ -632,6 +633,35 @@ export function TemplateGroupsClient() {
     }
   };
 
+  const exportToExcel = async () => {
+    setExporting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/template-groups/export', {
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error || `Export failed (${res.status})`);
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `task-templates-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export templates');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <div className="border-b border-primary-200 px-6 py-5">
@@ -642,9 +672,21 @@ export function TemplateGroupsClient() {
               Groups of department-wise tasks assigned to window specifications when creating a project.
             </p>
           </div>
-          <div className="text-right font-mono">
-            <p className="text-2xl font-black text-dark-500">{groups.length}</p>
-            <p className="text-[10px] uppercase tracking-widest text-primary-400">Groups</p>
+          <div className="flex flex-col items-end gap-3">
+            <button
+              type="button"
+              onClick={exportToExcel}
+              disabled={exporting || groups.length === 0 || loading}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[10px] font-mono font-bold uppercase tracking-widest bg-dark-500 text-white hover:bg-dark-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors rounded-sm"
+              title="Export all template groups to an Excel file"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {exporting ? 'Exporting...' : 'Export to Excel'}
+            </button>
+            <div className="text-right font-mono">
+              <p className="text-2xl font-black text-dark-500">{groups.length}</p>
+              <p className="text-[10px] uppercase tracking-widest text-primary-400">Groups</p>
+            </div>
           </div>
         </div>
       </div>

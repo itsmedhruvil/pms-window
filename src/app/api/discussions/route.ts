@@ -39,14 +39,32 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
   }).lean();
   const readMap = new Map(readRecords.map((r) => [r.discussionId.toString(), r.lastReadAt]));
 
-  // Fetch comment counts per discussion for unread calculation
-  const commentCounts = await CommentModel.aggregate([
+  // Fetch per-discussion comment stats (count, last message + author) efficiently
+  // in a single aggregate — avoids an N+1 fetch for each discussion's preview.
+  const commentStats = await CommentModel.aggregate([
     { $match: { discussionId: { $in: discussionIds } } },
-    { $group: { _id: '$discussionId', count: { $sum: 1 }, lastCreated: { $max: '$createdAt' } } },
+    { $sort: { createdAt: -1, _id: -1 } },
+    {
+      $group: {
+        _id: '$discussionId',
+        count: { $sum: 1 },
+        lastCreated: { $max: '$createdAt' },
+        lastComment: { $first: '$$ROOT' },
+      },
+    },
+    {
+      $lookup: {
+        // Resolve the last comment's author name for the list preview.
+        from: 'users',
+        localField: 'lastComment.author',
+        foreignField: '_id',
+        as: 'lastCommentAuthor',
+      },
+    },
   ]);
-  const commentCountMap = new Map(commentCounts.map((c) => [c._id.toString(), c]));
+  const commentCountMap = new Map(commentStats.map((c) => [c._id.toString(), c]));
 
-  // Enhance discussions with unread info
+  // Enhance discussions with unread info + last message preview
   const enhanced = discussions.map((d) => {
     const dId = d._id.toString();
     const lastReadAt = readMap.get(dId);
@@ -54,12 +72,26 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
     const lastMessageAt = commentInfo?.lastCreated || d.createdAt;
     const totalComments = commentInfo?.count || 0;
     const unread = lastReadAt && lastReadAt >= lastMessageAt ? 0 : totalComments;
+    const lastComment = commentInfo?.lastComment as
+      | { content?: string; createdAt?: Date }
+      | undefined;
+    const lastCommentAuthor = commentInfo?.lastCommentAuthor as
+      | Array<{ name?: string }>
+      | undefined;
+    const lastMessage = lastComment
+      ? {
+          content: lastComment.content ?? '',
+          authorName: lastCommentAuthor?.[0]?.name || 'Unknown',
+          createdAt: lastComment.createdAt,
+        }
+      : null;
     return {
       ...d,
       lastMessageAt,
       totalComments,
       unreadCount: unread > 0 ? unread : (lastReadAt ? 0 : totalComments),
       lastReadAt: lastReadAt || null,
+      lastMessage,
     };
   });
 

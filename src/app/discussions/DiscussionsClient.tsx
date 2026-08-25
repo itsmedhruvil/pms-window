@@ -16,6 +16,7 @@ interface ExtendedDiscussion extends IDiscussion {
   totalComments?: number;
   lastMessageAt?: string;
   lastReadAt?: string | null;
+  lastMessage?: { content: string; authorName: string; createdAt: string | Date } | null;
 }
 
 interface DiscussionsClientProps {
@@ -560,10 +561,11 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
             const startedBy = typeof discussion.startedBy === 'object' ? discussion.startedBy as Partial<IUser> : null;
             const project = typeof discussion.projectId === 'object' ? discussion.projectId as Partial<IProject> : null;
             const unreadCount = discussion.unreadCount || 0;
-            const lastMsg = comments.length > 0 ? comments[comments.length - 1] : null;
-            const lastMsgAuthor = lastMsg && typeof lastMsg.author === 'object' ? (lastMsg.author as Partial<IUser>) : null;
+            // Use each discussion's OWN last message (from the server response),
+            // never the shared `comments` array (which only holds the open thread).
+            const lastMsg = discussion.lastMessage;
             const previewText = lastMsg
-              ? `${lastMsgAuthor?.name || 'Unknown'}: ${lastMsg.content}`
+              ? `${lastMsg.authorName || 'Unknown'}: ${lastMsg.content}`
               : (discussion.description || 'No messages yet');
 
             return (
