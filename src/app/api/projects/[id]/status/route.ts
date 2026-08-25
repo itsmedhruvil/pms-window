@@ -18,7 +18,8 @@ const ALLOWED_TRANSITIONS: Partial<Record<ProjectStatus, ProjectStatus[]>> = {
   [ProjectStatus.NEW]: [ProjectStatus.IN_PRODUCTION],
   [ProjectStatus.IN_PRODUCTION]: [ProjectStatus.ON_HOLD, ProjectStatus.COMPLETED],
   [ProjectStatus.ON_HOLD]: [ProjectStatus.IN_PRODUCTION],
-  [ProjectStatus.COMPLETED]: [ProjectStatus.DISPATCHED],
+  // A completed project can be dispatched OR moved back into previous production work.
+  [ProjectStatus.COMPLETED]: [ProjectStatus.DISPATCHED, ProjectStatus.IN_PRODUCTION],
 };
 
 // POST /api/projects/[id]/status
@@ -74,8 +75,8 @@ export const POST = withAuth(
       }
     }
 
-    // Guard: cannot start production if unresolved alerts
-    if (newStatus === ProjectStatus.IN_PRODUCTION) {
+    // Guard: cannot start production if unresolved alerts (skip when simply reverting a completed project)
+    if (newStatus === ProjectStatus.IN_PRODUCTION && currentStatus !== ProjectStatus.COMPLETED) {
       const openAlerts = await AlertModel.countDocuments({
         projectId: id,
         status: { $ne: AlertStatus.RESOLVED },

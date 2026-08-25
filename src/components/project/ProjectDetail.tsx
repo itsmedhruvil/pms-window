@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, type ChangeEvent } from 'react';
+import { useState, useCallback, useMemo, useRef, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -18,7 +18,7 @@ import { ProjectStatusControl } from '@/components/project/ProjectStatusControl'
 import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
 import { Modal, ConfirmModal } from '@/components/ui/Modal';
 import type { IProject, ITask, IAlert, IUser, PdfAttachment, WindowSpec } from '@/types';
-import { TaskStatus, AlertStatus, Department, ProjectPriority, ProjectStatus, UserRole } from '@/types';
+import { TaskStatus, AlertStatus, Department, ProjectPriority, ProjectStatus, UserRole, STAGE_SEQUENCE, STAGE_LABELS, formatStageName, resolveTaskStage } from '@/types';
 import { useDepartments } from '@/hooks/useDepartments';
 
 interface ProjectDetailProps {
@@ -362,6 +362,53 @@ export function ProjectDetail({
     ? Math.round((completedTasks / tasks.length) * 100)
     : 0;
   const hasActiveAlerts = activeAlerts.length > 0;
+
+  // ── Stage grouping (admin stage-wise view) ────────────────────────────────
+  type StageGroup = { key: string; label: string; index: number; tasks: ITask[] };
+  const stageGroups = useMemo<StageGroup[]>(() => {
+    const groups: StageGroup[] = [];
+    STAGE_SEQUENCE.forEach((stage, index) => {
+      const stageTasks = tasks.filter((t) => resolveTaskStage(t) === stage);
+      if (stageTasks.length > 0) {
+        groups.push({
+          key: stage,
+          label: STAGE_LABELS[stage] || formatStageName(stage),
+          index: index + 1,
+          tasks: stageTasks,
+        });
+      }
+    });
+    const uncategorized = tasks.filter((t) => !resolveTaskStage(t));
+    if (uncategorized.length > 0) {
+      groups.push({ key: 'uncategorized', label: 'Uncategorized', index: STAGE_SEQUENCE.length + 1, tasks: uncategorized });
+    }
+    return groups;
+  }, [tasks]);
+
+  const progressGroups = isAdmin
+    ? stageGroups.map((g) => ({
+        key: g.key,
+        title: g.label,
+        tasks: g.tasks,
+        href: `/tasks/project/${project._id}`,
+        viewLabel: 'Open full view',
+      }))
+    : visibleDepartments.map((dept) => ({
+        key: dept,
+        title: departments.find((d) => d.name === dept)?.label || getDepartmentLabel(dept),
+        tasks: tasks.filter((t) => t.department === dept),
+        href: `/projects/${project._id}/departments/${dept}`,
+        viewLabel: 'View tasks',
+      }));
+
+  const workflowGroups: StageGroup[] = isAdmin
+    ? stageGroups
+    : visibleDepartments.map((dept, i) => ({
+        key: dept,
+        label: departments.find((d) => d.name === dept)?.label || getDepartmentLabel(dept),
+        index: i + 1,
+        tasks: tasks.filter((t) => t.department === dept),
+      }));
 
   return (
     <div className={cn('min-h-screen bg-primary-50', hasActiveAlerts && 'border-t-4 border-t-red-500')}>
@@ -761,39 +808,39 @@ export function ProjectDetail({
           {/* Department completion cards */}
           <div className="xl:col-span-2 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-black text-dark-500 uppercase tracking-widest text-dark-600">Department Progress</h2>
+              <h2 className="text-sm font-black uppercase tracking-widest text-dark-600">{isAdmin ? 'Stage Progress' : 'Department Progress'}</h2>
               <span className="text-xs font-mono text-primary-400">{tasks.length} total tasks</span>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-              {visibleDepartments.map((dept) => {
-                const deptTasks = tasks.filter((t) => t.department === dept);
-                const done = deptTasks.filter((t) => t.status === TaskStatus.DONE).length;
-                const blocked = deptTasks.filter((t) => t.status === TaskStatus.BLOCKED).length;
-                const inProgress = deptTasks.filter((t) => t.status === TaskStatus.IN_PROGRESS).length;
-                const pct = deptTasks.length > 0 ? Math.round((done / deptTasks.length) * 100) : 0;
+              {progressGroups.map((group) => {
+                const groupTasks = group.tasks;
+                const done = groupTasks.filter((t) => t.status === TaskStatus.DONE).length;
+                const blocked = groupTasks.filter((t) => t.status === TaskStatus.BLOCKED).length;
+                const inProgress = groupTasks.filter((t) => t.status === TaskStatus.IN_PROGRESS).length;
+                const pct = groupTasks.length > 0 ? Math.round((done / groupTasks.length) * 100) : 0;
 
                 return (
                   <Link
-                    key={dept}
-                    href={`/projects/${project._id}/departments/${dept}`}
+                    key={group.key}
+                    href={group.href}
                     className="bg-white border border-primary-200 rounded-xl p-4 hover:border-primary-400 hover:shadow-sm transition-all group"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-mono uppercase tracking-wider font-bold text-dark-400">
-                        {departments.find((department) => department.name === dept)?.label || getDepartmentLabel(dept)}
+                        {group.title}
                       </span>
                       <span className="text-sm font-black font-mono text-dark-500">{pct}%</span>
                     </div>
                     <div className="h-1.5 bg-primary-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-dark-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                      <div className={cn('h-full rounded-full transition-all', blocked > 0 ? 'bg-red-500' : 'bg-dark-500')} style={{ width: `${pct}%` }} />
                     </div>
                     <div className="flex items-center gap-2 mt-2 text-[10px] font-mono text-primary-500">
-                      <span className="text-green-600 font-bold">{done}</span>/<span>{deptTasks.length}</span> done
+                      <span className="text-green-600 font-bold">{done}</span>/<span>{groupTasks.length}</span> done
                       {blocked > 0 && <span className="text-red-500">· {blocked} blocked</span>}
                       {inProgress > 0 && <span className="text-blue-500">· {inProgress} active</span>}
                     </div>
                     <div className="mt-2 text-[9px] font-mono text-primary-400 group-hover:text-dark-500 transition-colors flex items-center gap-1">
-                      View tasks <ArrowUpRight className="w-2.5 h-2.5" />
+                      {group.viewLabel} <ArrowUpRight className="w-2.5 h-2.5" />
                     </div>
                   </Link>
                 );
@@ -840,7 +887,7 @@ export function ProjectDetail({
             <div>
               <h2 className="text-sm font-black uppercase tracking-widest text-dark-600">Workflow Timeline</h2>
               <p className="text-xs text-primary-400 font-mono mt-0.5">
-                {isAdmin ? 'Task status across all departments' : 'Task status for your department'}
+                {isAdmin ? 'Task status grouped by stage' : 'Task status for your department'}
               </p>
             </div>
             <a
@@ -854,8 +901,8 @@ export function ProjectDetail({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {visibleDepartments.map((dept, deptIdx) => {
-              const deptTasks = tasks.filter((t) => t.department === dept).sort((a, b) => a.sequence - b.sequence);
+            {workflowGroups.map((group) => {
+              const deptTasks = [...group.tasks].sort((a, b) => a.sequence - b.sequence);
               if (deptTasks.length === 0) return null;
 
               const deptDone = deptTasks.filter((t) => t.status === TaskStatus.DONE).length;
@@ -865,12 +912,12 @@ export function ProjectDetail({
               const inProgressCount = deptTasks.filter((t) => t.status === TaskStatus.IN_PROGRESS).length;
 
               return (
-                <div key={dept} className="border border-primary-200 rounded-lg overflow-hidden bg-white flex flex-col">
+                <div key={group.key} className="border border-primary-200 rounded-lg overflow-hidden bg-white flex flex-col">
                   {/* Header */}
                   <div className="px-4 py-3 border-b border-primary-100">
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-xs font-mono font-bold uppercase tracking-widest text-dark-600">
-                        {deptIdx + 1}. {departments.find((department) => department.name === dept)?.label || getDepartmentLabel(dept)}
+                        {group.index}. {group.label}
                       </span>
                       <span className="text-[11px] font-black font-mono">{deptPct}%</span>
                     </div>

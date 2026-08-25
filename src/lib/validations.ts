@@ -157,6 +157,7 @@ export const CreateTaskSchema = z.object({
   description: z.string().min(10, 'Task description must be at least 10 characters'),
   projectId: z.string().optional(),
   department: DepartmentSchema,
+  stage: z.string().trim().optional(),
   frequency: z.nativeEnum(TaskFrequency).optional(),
   startDate: z.string().optional(),
   dueDate: z.string().optional(),
@@ -164,6 +165,7 @@ export const CreateTaskSchema = z.object({
 
 export const CreateTaskTemplateSchema = z.object({
   department: DepartmentSchema,
+  stage: z.string().trim().optional(),
   title: z.string().min(3, 'Task title must be at least 3 characters'),
   description: z.string().min(10, 'Task description must be at least 10 characters'),
   sequence: z.number().int().min(0).optional(),
@@ -186,6 +188,7 @@ const TaskFileSchema = z.object({
 
 export const UpdateTaskSchema = z.object({
   status: z.nativeEnum(TaskStatus).optional(),
+  stage: z.string().trim().optional(),
   assignedUser: z.string().nullable().optional(),
   startDate: z
     .preprocess(

@@ -42,12 +42,45 @@ const TaskFrequency = {
 
 type TaskFrequency = (typeof TaskFrequency)[keyof typeof TaskFrequency];
 
+// ── Stages (UA Master categorization) ──────────────────────────────────────
+const Stage = {
+  KICKOFF: 'project_kickoff',
+  PURCHASE: 'material_purchase',
+  RECEIVED: 'material_received',
+  PRODUCTION: 'production',
+  SITE: 'site',
+  CLOSURE: 'project_closure',
+} as const;
+
+function resolveStage(title: string): string {
+  const t = title.toLowerCase();
+  if (t.includes('receive material from store')) return Stage.PRODUCTION;
+  if (t.includes('kick-off') || t.includes('kickoff') || t.includes('job card') || t.includes('design') ||
+      t.includes('stock') || t.includes('bom') || t.includes('requirement') || t.includes('discuss') ||
+      t.includes('coordinate with site supervisor') || t.includes('upload the design') ||
+      t.includes('planning') || t.includes('allotment')) return Stage.KICKOFF;
+  if (t.includes('rfq') || t.includes('purchase') || t.includes('price') || t.includes('po ') ||
+      t.includes('colour') || t.includes('powder coating') || t.includes('anodiz') ||
+      t.includes('local purchase') || t.includes('buy ')) return Stage.PURCHASE;
+  if (t.includes('receive') || t.includes('verify') || t.includes('challan') || t.includes('qty') ||
+      t.includes('stock check & update') || t.includes('coordinate with santoshi')) return Stage.RECEIVED;
+  if (t.includes('cutting') || t.includes('slotting') || t.includes('assembly') || t.includes('qc') ||
+      t.includes('rework') || t.includes('dispatch') || t.includes('fabricat') ||
+      t.includes('handover of store') || t.includes('issue material') || t.includes('plant')) return Stage.PRODUCTION;
+  if (t.includes('site') || t.includes('installation') || t.includes('survey') || t.includes('contractor') ||
+      t.includes('client') || t.includes('readiness')) return Stage.SITE;
+  if (t.includes('closing') || t.includes('sign-off') || t.includes('invoice') || t.includes('expense') ||
+      t.includes('handover') || t.includes('followup') || t.includes('final')) return Stage.CLOSURE;
+  return Stage.KICKOFF;
+}
+
 // ── Schema (same as TemplateGroup model) ────────────────────────────────────────
 const TemplateGroupSchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true, trim: true },
   description: { type: String, default: '', trim: true },
   tasks: [{
     department: { type: String, required: true },
+    stage: { type: String, default: null },
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true, trim: true },
     sequence: { type: Number, required: true },
@@ -624,6 +657,7 @@ async function seedUaTemplateGroup() {
   // Mark accounts tasks as internal (not project-linked)
   const allGroupTasksWithType = allGroupTasks.map((t) => ({
     ...t,
+    stage: resolveStage(t.title),
     type: t.department === Department.ACCOUNTS ? 'internal' : 'project',
   }));
 

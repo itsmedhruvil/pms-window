@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { Factory, Building2, Check, Loader2 } from 'lucide-react';
 import { cn, apiFetch } from '@/lib/utils';
 import { notifyDepartmentsChanged } from '@/hooks/useDepartments';
-import { FactoryGroup, FACTORY_GROUP_LABELS } from '@/types';
+import { FactoryGroup, FACTORY_GROUP_LABELS, DEPARTMENT_LABELS, STAGE_SEQUENCE, STAGE_LABELS, STAGE_TASK_CATEGORIES, formatStageName } from '@/types';
 
 interface DepartmentItem {
   _id: string;
@@ -184,6 +184,56 @@ export function SettingsClient({ initialDepartments }: SettingsClientProps) {
               No departments found. Create departments first.
             </div>
           )}
+        </div>
+      </div>
+{/* Stages & Task Categorization */}
+      <div className="mt-6 border border-primary-200">
+        <div className="px-4 py-3 border-b border-primary-200 bg-primary-50 flex items-center justify-between">
+          <div>
+            <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-dark-600">
+              Stages & Task Categorization
+            </h2>
+            <p className="text-[10px] text-primary-500 font-mono mt-0.5">
+              Master task list grouped by workflow stage. Project view shows Stage Progress by this categorization.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-4 p-4">
+          {STAGE_SEQUENCE.map((stage, index) => {
+            const tasks = STAGE_TASK_CATEGORIES.filter((c) => c.stage === stage);
+            const departmentsPresent = [...new Set(tasks.map((c) => c.department))];
+            return (
+              <div key={stage} className="border border-primary-100 rounded-lg">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-primary-50/50 border-b border-primary-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-sm bg-dark-500 text-white text-[10px] font-mono font-bold flex items-center justify-center">
+                      {index + 1}
+                    </span>
+                    <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-dark-600">
+                      {STAGE_LABELS[stage] || formatStageName(stage)}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-primary-500">
+                    {tasks.length} tasks · {departmentsPresent.length} departments
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-primary-100/60">
+                  {tasks.map((task, i) => (
+                    <div key={i} className="flex items-start gap-2 bg-white px-3 py-2">
+                      <span className="text-[9px] font-mono text-dark-400 mt-0.5 shrink-0">
+                        {DEPARTMENT_LABELS[task.department] || task.department}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-medium text-dark-500 leading-tight">{task.title}</p>
+                        <p className="text-[10px] text-primary-400 font-mono mt-0.5 line-clamp-2">{task.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

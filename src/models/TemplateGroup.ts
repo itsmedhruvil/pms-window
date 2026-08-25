@@ -3,6 +3,7 @@ import { Department, TaskFrequency } from '@/types';
 
 interface ITemplateGroupTask {
   department: Department;
+  stage?: string;
   title: string;
   description: string;
   sequence: number;
@@ -27,6 +28,12 @@ const TemplateGroupTaskSchema = new Schema<ITemplateGroupTask>(
       required: true,
       lowercase: true,
       trim: true,
+    },
+    stage: {
+      type: String,
+      lowercase: true,
+      trim: true,
+      default: null,
     },
     title: {
       type: String,

@@ -34,6 +34,18 @@ const TRANSITIONS: Record<ProjectStatus, { to: ProjectStatus; label: string; ico
   [ProjectStatus.DISPATCHED]: null,
 };
 
+// Secondary actions — e.g. moving a completed project back into prior production work.
+const EXTRA_TRANSITIONS: Partial<Record<ProjectStatus, Array<{ to: ProjectStatus; label: string; icon: React.ReactNode; style: string }>>> = {
+  [ProjectStatus.COMPLETED]: [
+    {
+      to: ProjectStatus.IN_PRODUCTION,
+      label: 'Move to Previous Work',
+      icon: <Play className="w-3.5 h-3.5" />,
+      style: 'border border-primary-300 text-dark-500 hover:bg-primary-50',
+    },
+  ],
+};
+
 interface ProjectStatusControlProps {
   project: IProject;
   hasActiveAlerts: boolean;
@@ -51,21 +63,23 @@ export function ProjectStatusControl({
   const [note, setNote] = useState('');
 
   const transition = TRANSITIONS[project.status];
+  const extraTransitions = EXTRA_TRANSITIONS[project.status] || [];
 
   if (!transition) return null;
 
   const isBlocked =
-    (transition.to === ProjectStatus.IN_PRODUCTION && hasActiveAlerts) ||
-    (transition.to === ProjectStatus.COMPLETED && project.completionPercentage < 100);
+    (transition?.to === ProjectStatus.IN_PRODUCTION && hasActiveAlerts) ||
+    (transition?.to === ProjectStatus.COMPLETED && project.completionPercentage < 100);
 
-  const handleTransition = async () => {
-    if (isBlocked) return;
+  const handleTransition = async (target: ProjectStatus) => {
+    if ((target === ProjectStatus.IN_PRODUCTION && hasActiveAlerts) ||
+        (target === ProjectStatus.COMPLETED && project.completionPercentage < 100)) return;
     setLoading(true);
     setError(null);
 
     const result = await apiFetch<IProject>(`/api/projects/${project._id}/status`, {
       method: 'POST',
-      body: JSON.stringify({ status: transition.to, note: note.trim() || undefined }),
+      body: JSON.stringify({ status: target, note: note.trim() || undefined }),
     });
 
     setLoading(false);
@@ -111,7 +125,7 @@ export function ProjectStatusControl({
           />
           <div className="flex gap-2">
             <button
-              onClick={handleTransition}
+              onClick={() => handleTransition(transition!.to)}
               disabled={loading}
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono font-bold uppercase tracking-wide transition-colors flex-1 justify-center',
@@ -137,7 +151,7 @@ export function ProjectStatusControl({
       ) : (
         <div className="flex items-center gap-2">
           <button
-            onClick={handleTransition}
+            onClick={() => handleTransition(transition!.to)}
             disabled={loading || isBlocked}
             className={cn(
               'flex items-center gap-1.5 px-3 py-2 text-[11px] font-mono font-bold uppercase tracking-wide transition-colors',
@@ -160,6 +174,26 @@ export function ProjectStatusControl({
           >
             + Note
           </button>
+        </div>
+      )}
+
+      {!noteMode && extraTransitions.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {extraTransitions.map((extra) => (
+            <button
+              key={extra.to}
+              onClick={() => handleTransition(extra.to)}
+              disabled={loading}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-2 text-[11px] font-mono font-bold uppercase tracking-wide transition-colors',
+                extra.style,
+                loading && 'opacity-50 cursor-not-allowed'
+              )}
+            >
+              {extra.icon}
+              {extra.label}
+            </button>
+          ))}
         </div>
       )}
     </div>

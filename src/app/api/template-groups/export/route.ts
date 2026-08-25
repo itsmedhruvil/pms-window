@@ -3,7 +3,7 @@ import ExcelJS from 'exceljs';
 import connectDB from '@/lib/db';
 import TemplateGroupModel from '@/models/TemplateGroup';
 import { withAuth } from '@/lib/auth';
-import { DEPARTMENT_LABELS } from '@/types';
+import { DEPARTMENT_LABELS, STAGE_LABELS } from '@/types';
 import type { IUserDocument } from '@/models/User';
 
 const FREQUENCY_LABELS: Record<string, string> = {
@@ -38,8 +38,8 @@ async function getHandler(_req: NextRequest, _ctx: unknown, { user }: { user: IU
   workbook.creator = user.email || 'PMS';
   workbook.created = new Date();
 
-  const header = ['#', 'Task Title', 'Description', 'Department', 'Type', 'Linked to Product', 'Frequency'];
-  const columnWidths = [6, 40, 60, 16, 12, 20, 16];
+  const header = ['#', 'Task Title', 'Description', 'Department', 'Stage', 'Type', 'Linked to Product', 'Frequency'];
+  const columnWidths = [6, 40, 60, 16, 20, 12, 20, 16];
 
   if (groups.length === 0) {
     const emptySheet = workbook.addWorksheet('Template Groups');
@@ -96,9 +96,10 @@ async function getHandler(_req: NextRequest, _ctx: unknown, { user }: { user: IU
       row.getCell(2).value = task.title;
       row.getCell(3).value = task.description;
       row.getCell(4).value = DEPARTMENT_LABELS[task.department] || task.department;
-      row.getCell(5).value = TYPE_LABELS[task.type || 'project'] || task.type;
-      row.getCell(6).value = task.linkedToProduct ? 'Yes' : 'No';
-      row.getCell(7).value = FREQUENCY_LABELS[task.frequency || 'project'] || task.frequency;
+      row.getCell(5).value = STAGE_LABELS[task.stage || ''] || (task.stage || 'Uncategorized');
+      row.getCell(6).value = TYPE_LABELS[task.type || 'project'] || task.type;
+      row.getCell(7).value = task.linkedToProduct ? 'Yes' : 'No';
+      row.getCell(8).value = FREQUENCY_LABELS[task.frequency || 'project'] || task.frequency;
       row.getCell(3).alignment = { wrapText: true };
       row.height = 20;
     });

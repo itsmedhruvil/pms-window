@@ -22,6 +22,7 @@ export interface ITaskDocument extends Document {
   projectId?: mongoose.Types.ObjectId;
   templateTaskId?: mongoose.Types.ObjectId;
   department: Department;
+  stage?: string;
   title: string;
   description: string;
   status: TaskStatus;
@@ -96,6 +97,13 @@ const TaskSchema = new Schema<ITaskDocument>(
       required: true,
       lowercase: true,
       trim: true,
+      index: true,
+    },
+    stage: {
+      type: String,
+      lowercase: true,
+      trim: true,
+      default: null,
       index: true,
     },
     title: {

@@ -41,8 +41,9 @@ async function patchHandler(
     {
       name: name.trim(),
       description: description?.trim() || '',
-      tasks: tasks.map((t: { department: string; title: string; description: string; frequency?: string; type?: string; linkedToProduct?: boolean }, i: number) => ({
+      tasks: tasks.map((t: { department: string; title: string; description: string; frequency?: string; type?: string; linkedToProduct?: boolean; stage?: string }, i: number) => ({
         department: t.department,
+        stage: t.stage || null,
         title: t.title.trim(),
         description: t.description.trim(),
         sequence: i,

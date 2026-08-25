@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, Save, X, Edit3, ChevronDown, ChevronRight, ArrowUp, ArrowDown, GripVertical, Download } from 'lucide-react';
 import { apiFetch, cn, DEPARTMENT_LABELS } from '@/lib/utils';
-import { Department, DEPARTMENT_SEQUENCE, TaskFrequency } from '@/types';
+import { Department, DEPARTMENT_SEQUENCE, TaskFrequency, STAGE_SEQUENCE, STAGE_LABELS } from '@/types';
 import type { ITemplateGroup } from '@/types';
 import { useDepartments } from '@/hooks/useDepartments';
 
 type TaskDraft = {
   department: Department;
+  stage?: string;
   title: string;
   description: string;
   frequency: string;
@@ -42,6 +43,7 @@ const FREQUENCY_BADGES: Record<string, string> = {
 
 const emptyTaskDraft: TaskDraft = {
   department: DEPARTMENT_SEQUENCE[0],
+  stage: STAGE_SEQUENCE[0],
   title: '',
   description: '',
   frequency: TaskFrequency.PROJECT,
@@ -142,12 +144,13 @@ function TaskTable({
   return (
     <div className="border border-primary-200 overflow-x-auto">
       {/* Table header */}
-      <div className="grid grid-cols-[36px_64px_1fr_1fr_130px_90px_70px_90px_36px] min-w-[900px] bg-primary-50 border-b border-primary-200 text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">
+      <div className="grid grid-cols-[36px_64px_1fr_1fr_130px_120px_90px_70px_90px_36px] min-w-[1020px] bg-primary-50 border-b border-primary-200 text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">
         <div className="px-2 py-2 text-center">#</div>
         <div className="px-1 py-2 text-center">Move</div>
         <div className="px-3 py-2">Task Title</div>
         <div className="px-3 py-2">Description</div>
         <div className="px-3 py-2">Department</div>
+        <div className="px-3 py-2">Stage</div>
         <div className="px-3 py-2">Type</div>
         <div className="px-3 py-2">Product</div>
         <div className="px-3 py-2">Frequency</div>
@@ -175,7 +178,7 @@ function TaskTable({
               setDraggedIdx(null);
             }}
             className={cn(
-              'grid grid-cols-[36px_64px_1fr_1fr_130px_90px_70px_90px_36px] gap-0 items-start group transition-colors',
+              'grid grid-cols-[36px_64px_1fr_1fr_130px_120px_90px_70px_90px_36px] gap-0 items-start group transition-colors',
               draggedIdx === idx && 'bg-primary-50 opacity-60'
             )}
           >
@@ -259,6 +262,22 @@ function TaskTable({
               >
                 {departments.map((d) => (
                   <option key={d.name} value={d.name}>{d.label}</option>
+                ))}
+              </select>
+            </div>
+            {/* Stage selector */}
+            <div className="px-2 py-1.5">
+              <select
+                value={task.stage || STAGE_SEQUENCE[0]}
+                onChange={(e) => onUpdate(idx, 'stage', e.target.value)}
+                disabled={readOnly}
+                className={cn(
+                  'w-full px-2 py-1.5 text-[10px] font-mono border border-primary-200 focus:outline-none focus:border-dark-500 transition-colors bg-white',
+                  readOnly && 'bg-primary-50 cursor-default'
+                )}
+              >
+                {STAGE_SEQUENCE.map((s) => (
+                  <option key={s} value={s}>{STAGE_LABELS[s] || s}</option>
                 ))}
               </select>
             </div>
@@ -358,21 +377,27 @@ function ViewTaskTable({ tasks }: { tasks: ITemplateGroup['tasks'] }) {
   return (
     <div className="erp-table-wrap border border-primary-200">
       <div className="min-w-[640px]">
-        <div className="grid grid-cols-[32px_1fr_1fr_90px] bg-primary-50 border-b border-primary-200 text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">
+        <div className="grid grid-cols-[32px_1fr_1fr_120px_90px] bg-primary-50 border-b border-primary-200 text-[10px] font-mono font-bold uppercase tracking-widest text-primary-500">
           <div className="px-2 py-2 text-center">#</div>
           <div className="px-3 py-2">Task</div>
           <div className="px-3 py-2">Description</div>
+          <div className="px-3 py-2">Stage</div>
           <div className="px-3 py-2">Frequency</div>
         </div>
         <div className="divide-y divide-gray-100">
           {tasks.map((task, idx) => (
-            <div key={idx} className="grid grid-cols-[32px_1fr_1fr_90px] gap-0 items-center px-2 py-2 hover:bg-primary-50/50">
+            <div key={idx} className="grid grid-cols-[32px_1fr_1fr_120px_90px] gap-0 items-center px-2 py-2 hover:bg-primary-50/50">
               <div className="text-[10px] font-mono text-primary-400 text-center">{idx + 1}</div>
               <div className="min-w-0 px-1">
                 <p className="text-[11px] font-medium text-dark-500 truncate">{task.title}</p>
               </div>
               <div className="min-w-0 px-1">
                 <p className="text-[10px] text-primary-500 truncate">{task.description}</p>
+              </div>
+              <div className="px-1">
+                <span className="inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider rounded-sm bg-primary-100 text-dark-600">
+                  {STAGE_LABELS[task.stage || ''] || 'Uncategorized'}
+                </span>
               </div>
               <div className="px-1">
                 <span className={cn(
@@ -501,6 +526,7 @@ export function TemplateGroupsClient() {
         description: draft.description.trim(),
         tasks: validTasks.map((t) => ({
           department: t.department,
+          stage: t.stage || null,
           title: t.title.trim(),
           description: t.description.trim(),
           frequency: t.frequency,
@@ -530,6 +556,7 @@ export function TemplateGroupsClient() {
       description: group.description,
       tasks: group.tasks.map((t) => ({
         department: t.department,
+        stage: t.stage || STAGE_SEQUENCE[0],
         title: t.title,
         description: t.description,
         frequency: t.frequency || 'project',
@@ -602,6 +629,7 @@ export function TemplateGroupsClient() {
         description: editDraft.description.trim(),
         tasks: validTasks.map((t) => ({
           department: t.department,
+          stage: t.stage || null,
           title: t.title.trim(),
           description: t.description.trim(),
           frequency: t.frequency,

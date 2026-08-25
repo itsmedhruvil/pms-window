@@ -3,6 +3,7 @@ import { Department, TaskFrequency } from '@/types';
 
 export interface ITaskTemplateDocument extends Document {
   department: Department;
+  stage?: string;
   title: string;
   description: string;
   sequence: number;
@@ -20,6 +21,13 @@ const TaskTemplateSchema = new Schema<ITaskTemplateDocument>(
       required: true,
       lowercase: true,
       trim: true,
+      index: true,
+    },
+    stage: {
+      type: String,
+      lowercase: true,
+      trim: true,
+      default: null,
       index: true,
     },
     title: {
