@@ -338,10 +338,9 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
 function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [liveActiveAlertCount, setLiveActiveAlertCount] = useState(activeAlertCount);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [canGoForward, setCanGoForward] = useState(false);
   const pathname = usePathname();
-
-  const canGoBack = typeof window !== 'undefined' && window.history.length > 1;
-  const canGoForward = typeof window !== 'undefined' && !!window.history.state && window.history.state.idx < window.history.length - 1;
 
   const handleBack = () => {
     if (typeof window !== 'undefined') {
@@ -354,6 +353,26 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
       window.history.forward();
     }
   };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const updateHistoryState = () => {
+      const currentState = window.history.state as { idx?: number } | null;
+      const hasBack = window.history.length > 1 && (typeof currentState?.idx !== 'number' || currentState.idx > 0);
+      const hasForward = typeof currentState?.idx === 'number' && currentState.idx < window.history.length - 1;
+
+      setCanGoBack(hasBack);
+      setCanGoForward(hasForward);
+    };
+
+    updateHistoryState();
+    window.addEventListener('popstate', updateHistoryState);
+
+    return () => {
+      window.removeEventListener('popstate', updateHistoryState);
+    };
+  }, []);
 
   useEffect(() => {
     setLiveActiveAlertCount(activeAlertCount);
