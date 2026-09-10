@@ -17,6 +17,8 @@ import {
   Bell,
   Building2,
   Settings,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { cn, getDepartmentLabel, apiFetch } from '@/lib/utils';
 import { AlertStatus, UserRole } from '@/types';
@@ -338,6 +340,21 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
   const [liveActiveAlertCount, setLiveActiveAlertCount] = useState(activeAlertCount);
   const pathname = usePathname();
 
+  const canGoBack = typeof window !== 'undefined' && window.history.length > 1;
+  const canGoForward = typeof window !== 'undefined' && !!window.history.state && window.history.state.idx < window.history.length - 1;
+
+  const handleBack = () => {
+    if (typeof window !== 'undefined') {
+      window.history.back();
+    }
+  };
+
+  const handleForward = () => {
+    if (typeof window !== 'undefined') {
+      window.history.forward();
+    }
+  };
+
   useEffect(() => {
     setLiveActiveAlertCount(activeAlertCount);
   }, [activeAlertCount]);
@@ -422,12 +439,34 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
       <main className="min-w-0 flex-1 overflow-auto pt-[calc(3.5rem+env(safe-area-inset-top))] lg:pt-0">
         {/* Desktop top bar */}
         <div className="hidden lg:flex items-center justify-between px-6 h-12 border-b border-primary-200 bg-white sticky top-0 z-10">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-dark-500 flex items-center justify-center rounded-sm">
-              <Factory className="w-3.5 h-3.5 text-white" />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 rounded-md border border-primary-200 bg-primary-50 p-1">
+              <button
+                type="button"
+                onClick={handleBack}
+                disabled={!canGoBack}
+                className="p-1.5 text-primary-500 hover:text-dark-500 disabled:text-primary-300 disabled:cursor-not-allowed transition-colors"
+                aria-label="Go back"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleForward}
+                disabled={!canGoForward}
+                className="p-1.5 text-primary-500 hover:text-dark-500 disabled:text-primary-300 disabled:cursor-not-allowed transition-colors"
+                aria-label="Go forward"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
-            <p className="text-[11px] font-black text-dark-500 tracking-tight">UNIQUE ARTS</p>
-            <p className="text-[8px] font-mono text-primary-400 tracking-widest uppercase ml-1">PMS</p>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-dark-500 flex items-center justify-center rounded-sm">
+                <Factory className="w-3.5 h-3.5 text-white" />
+              </div>
+              <p className="text-[11px] font-black text-dark-500 tracking-tight">UNIQUE ARTS</p>
+              <p className="text-[8px] font-mono text-primary-400 tracking-widest uppercase ml-1">PMS</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <NotificationBell serverActiveAlertCount={liveActiveAlertCount} />
