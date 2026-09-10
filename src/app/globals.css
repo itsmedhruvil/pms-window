@@ -22,10 +22,19 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     @apply text-dark-500 bg-white;
+    padding-top: env(safe-area-inset-top);
   }
 
   .font-mono {
     font-family: var(--font-mono);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 

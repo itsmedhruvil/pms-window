@@ -9,10 +9,14 @@ export const GET = withAuth(async (req: NextRequest) => {
   await connectDB();
 
   const department = req.nextUrl.searchParams.get('department');
-  const query = department ? { department } : {};
+  const stage = req.nextUrl.searchParams.get('stage');
+  const query = {
+    ...(department ? { department } : {}),
+    ...(stage ? { stage } : {}),
+  };
 
   const templates = await TaskTemplateModel.find(query)
-    .sort({ department: 1, sequence: 1, createdAt: 1 })
+    .sort({ department: 1, stage: 1, sequence: 1, createdAt: 1 })
     .lean();
 
   return NextResponse.json({ success: true, data: templates });

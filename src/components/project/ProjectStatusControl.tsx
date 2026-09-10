@@ -38,9 +38,17 @@ const TRANSITIONS: Record<ProjectStatus, { to: ProjectStatus; label: string; ico
 const EXTRA_TRANSITIONS: Partial<Record<ProjectStatus, Array<{ to: ProjectStatus; label: string; icon: React.ReactNode; style: string }>>> = {
   [ProjectStatus.COMPLETED]: [
     {
-      to: ProjectStatus.IN_PRODUCTION,
+      to: ProjectStatus.DISPATCHED,
+      label: 'Send to Previous Work',
+      icon: <Truck className="w-3.5 h-3.5" />,
+      style: 'border border-primary-300 text-dark-500 hover:bg-primary-50',
+    },
+  ],
+  [ProjectStatus.DISPATCHED]: [
+    {
+      to: ProjectStatus.COMPLETED,
       label: 'Move to Previous Work',
-      icon: <Play className="w-3.5 h-3.5" />,
+      icon: <CheckCircle2 className="w-3.5 h-3.5" />,
       style: 'border border-primary-300 text-dark-500 hover:bg-primary-50',
     },
   ],

@@ -48,6 +48,13 @@ const DEPT_USER_NAV_ITEMS: NavItem[] = [
   { href: '/alerts', label: 'Alerts', icon: AlertTriangle },
 ];
 
+const TOP_BAR_NAV_ITEMS = [
+  { href: '/dashboard', label: 'Dashboard' },
+  { href: '/projects', label: 'Projects' },
+  { href: '/discussions', label: 'Discussions' },
+  { href: '/alerts', label: 'Alerts' },
+];
+
 interface AppLayoutProps {
   children: React.ReactNode;
   activeAlertCount?: number;
@@ -385,8 +392,8 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
       </aside>
 
       {/* Mobile header bar */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white/95 backdrop-blur-sm border-b border-primary-200 z-20 flex items-center justify-between px-3 safe-area-top">
-        <div className="flex items-center gap-1">
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-[calc(3.5rem+env(safe-area-inset-top))] bg-white/95 backdrop-blur-sm border-b border-primary-200 z-20 flex items-center justify-between px-3 safe-area-top">
+        <div className="flex items-center gap-1 pt-[env(safe-area-inset-top)]">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
@@ -405,15 +412,14 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
             </div>
           </Link>
         </div>
-        <div className="flex items-center gap-0.5">
-          {/* In-app notification bell dropdown (mobile) — includes both in-app + alert badge */}
+        <div className="flex items-center gap-0.5 pt-[env(safe-area-inset-top)]">
           <NotificationBell serverActiveAlertCount={liveActiveAlertCount} />
           <UserButton />
         </div>
       </header>
 
       {/* Main content — isolated from Sidebar Clerk re-renders */}
-      <main className="min-w-0 flex-1 overflow-auto pt-14 lg:pt-0">
+      <main className="min-w-0 flex-1 overflow-auto pt-[calc(3.5rem+env(safe-area-inset-top))] lg:pt-0">
         {/* Desktop top bar */}
         <div className="hidden lg:flex items-center justify-between px-6 h-12 border-b border-primary-200 bg-white sticky top-0 z-10">
           <div className="flex items-center gap-2">
@@ -424,10 +430,29 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
             <p className="text-[8px] font-mono text-primary-400 tracking-widest uppercase ml-1">PMS</p>
           </div>
           <div className="flex items-center gap-2">
-            {/* In-app notification bell dropdown (desktop) — includes both in-app + alert badge */}
             <NotificationBell serverActiveAlertCount={liveActiveAlertCount} />
           </div>
         </div>
+
+        <nav className="hidden lg:flex items-center gap-2 border-b border-primary-200 bg-primary-50 px-6 py-2.5 overflow-x-auto">
+          {TOP_BAR_NAV_ITEMS.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-sm transition-colors whitespace-nowrap',
+                  isActive
+                    ? 'bg-dark-500 text-white'
+                    : 'bg-white text-primary-500 border border-primary-200 hover:border-primary-400 hover:text-dark-500'
+                )}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
         {children}
       </main>
     </div>

@@ -10,7 +10,9 @@ import {
   AlertStatus,
   DEPARTMENT_SEQUENCE,
   DEFAULT_TASKS_PER_DEPARTMENT,
+  STAGE_TASK_CATEGORIES,
   Stage,
+  resolveTaskStage,
 } from '@/types';
 import type { Department } from '@/types';
 import { getActiveDepartmentNames } from '@/lib/departments';
@@ -21,23 +23,115 @@ async function getWorkflowDepartments() {
   return departments.length > 0 ? departments : DEPARTMENT_SEQUENCE;
 }
 
-export async function ensureDefaultTaskTemplates() {
-  const existingCount = await TaskTemplateModel.estimatedDocumentCount();
-  if (existingCount > 0) return;
+export async function backfillProjectTaskStages() {
+  const tasks = await TaskModel.find({
+    $or: [
+      { stage: { $exists: false } },
+      { stage: null },
+      { stage: '' },
+    ],
+  }).lean();
 
-  const departments = await getWorkflowDepartments();
-  const templates = departments.flatMap((department) =>
-    (DEFAULT_TASKS_PER_DEPARTMENT[department] || []).map((task, index) => ({
-      department,
+  for (const task of tasks) {
+    const resolvedStage = resolveTaskStage({ stage: task.stage, title: task.title });
+    if (!resolvedStage) continue;
+
+    await TaskModel.updateOne(
+      { _id: task._id },
+      { $set: { stage: resolvedStage } }
+    );
+  }
+
+  const templates = await TaskTemplateModel.find({
+    $or: [
+      { stage: { $exists: false } },
+      { stage: null },
+      { stage: '' },
+    ],
+  }).lean();
+
+  for (const template of templates) {
+    const resolvedStage = STAGE_TASK_CATEGORIES.find(
+      (category) =>
+        category.department === template.department &&
+        template.title.toLowerCase().includes(category.title.toLowerCase())
+    )?.stage;
+
+    if (!resolvedStage) continue;
+
+    await TaskTemplateModel.updateOne(
+      { _id: template._id },
+      { $set: { stage: resolvedStage } }
+    );
+  }
+}
+
+export async function ensureDefaultTaskTemplates() {
+  const departmentSequence = new Map<string, number>();
+  const canonicalTemplates = STAGE_TASK_CATEGORIES.map((task) => {
+    const nextSequence = departmentSequence.get(task.department) ?? 0;
+    departmentSequence.set(task.department, nextSequence + 1);
+
+    return {
+      department: task.department,
+      stage: task.stage,
       title: task.title,
       description: task.description,
-      sequence: index,
-      frequency: 'project',
+      sequence: nextSequence,
+      frequency: task.frequency,
       isActive: true,
-    }))
-  );
+      linkedToProduct: false,
+    };
+  });
 
-  await TaskTemplateModel.insertMany(templates);
+  const existingTemplates = await TaskTemplateModel.find({}).lean();
+  if (existingTemplates.length === 0) {
+    await TaskTemplateModel.insertMany(canonicalTemplates);
+    await backfillProjectTaskStages();
+    return;
+  }
+
+  const updates: Promise<any>[] = [];
+  for (const canonical of canonicalTemplates) {
+    const match = existingTemplates.find(
+      (template) =>
+        String((template as any).department).toLowerCase() === String(canonical.department).toLowerCase() &&
+        String((template as any).title).trim().toLowerCase() === String(canonical.title).trim().toLowerCase()
+    );
+
+    if (!match) {
+      updates.push(TaskTemplateModel.create({ ...canonical }));
+      continue;
+    }
+
+    const needsUpdate =
+      String((match as any).stage || '').toLowerCase() !== String(canonical.stage || '').toLowerCase() ||
+      String((match as any).description || '').trim() !== String(canonical.description || '').trim() ||
+      Number((match as any).sequence ?? 0) !== Number(canonical.sequence) ||
+      String((match as any).frequency || 'project') !== String(canonical.frequency || 'project');
+
+    if (needsUpdate) {
+      updates.push(
+        TaskTemplateModel.findByIdAndUpdate(
+          (match as any)._id,
+          {
+            $set: {
+              stage: canonical.stage,
+              description: canonical.description,
+              sequence: canonical.sequence,
+              frequency: canonical.frequency,
+              isActive: true,
+              linkedToProduct: false,
+            },
+          },
+          { new: true }
+        )
+      );
+    }
+  }
+
+  await Promise.all(updates);
+  await backfillProjectTaskStages();
 }
 
 /**

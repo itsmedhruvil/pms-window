@@ -82,9 +82,12 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin, initia
 
   const currentTabProjects = useMemo(() => {
     if (!isAdmin) return projects;
+    const isPreviousProject = (project: IProject) =>
+      project.status === ProjectStatus.COMPLETED || project.status === ProjectStatus.DISPATCHED;
+
     return activeTab === 'previous'
-      ? projects.filter((project) => project.status === ProjectStatus.COMPLETED)
-      : projects.filter((project) => project.status !== ProjectStatus.COMPLETED);
+      ? projects.filter(isPreviousProject)
+      : projects.filter((project) => !isPreviousProject(project));
   }, [projects, activeTab, isAdmin]);
 
   // Filter and search projects
@@ -272,7 +275,7 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin, initia
                     : 'bg-white text-primary-500 border-primary-200 hover:border-primary-400'
                 )}
               >
-                Active Projects ({projects.filter((project) => project.status !== ProjectStatus.COMPLETED).length})
+                Active Projects ({projects.filter((project) => project.status !== ProjectStatus.COMPLETED && project.status !== ProjectStatus.DISPATCHED).length})
               </button>
               <button
                 type="button"
@@ -284,7 +287,7 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin, initia
                     : 'bg-white text-primary-500 border-primary-200 hover:border-primary-400'
                 )}
               >
-                Previous Work ({projects.filter((project) => project.status === ProjectStatus.COMPLETED).length})
+                Previous Work ({projects.filter((project) => project.status === ProjectStatus.COMPLETED || project.status === ProjectStatus.DISPATCHED).length})
               </button>
             </div>
           )}
