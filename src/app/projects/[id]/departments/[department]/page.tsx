@@ -40,10 +40,16 @@ export default async function ProjectDepartmentTasksPage(
 
   const { project, tasks: allTasks } = detail;
 
-  // Filter tasks by department
+  // Filter tasks by department — pending-first so huge Done history
+  // doesn't bloat initial load. Client lazy-loads Done via /api/tasks.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const deptTasks = allTasks.filter((t: any) => t.department === department);
-  const serializedTasks = serialize(deptTasks) as unknown as ITask[];
+  const deptTasks = (allTasks as any[]).filter((t: any) => t.department === department);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pendingDept = deptTasks.filter((t: any) => t.status !== 'done');
+  const firstPage = pendingDept.slice(0, 50);
+  const serializedTasks = serialize(firstPage) as unknown as ITask[];
+  const pendingCount = pendingDept.length;
+  const doneCount = deptTasks.length - pendingCount;
   const projectsResult = serialize(rawProjects) as unknown as {
     items: IProject[];
     total: number;
@@ -70,7 +76,7 @@ export default async function ProjectDepartmentTasksPage(
             {project.projectTitle} — {formatDepartmentName(department)} Tasks
           </h1>
           <p className="text-xs text-primary-500 font-mono mt-0.5">
-            {deptTasks.length} task{deptTasks.length === 1 ? '' : 's'} in this department
+            {pendingCount} pending · {doneCount} done in this department
           </p>
         </div>
 
@@ -81,6 +87,10 @@ export default async function ProjectDepartmentTasksPage(
             selectedDepartment={department}
             allProjects={projectsResult.items}
             initialProjectFilter={projectId}
+            initialPendingCount={pendingCount}
+            initialDoneCount={doneCount}
+            initialTotalCount={deptTasks.length}
+            fetchScope={`projectId=${encodeURIComponent(projectId)}&department=${encodeURIComponent(department)}`}
           />
         </div>
       </div>

@@ -2,14 +2,18 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, AlertTriangle, Plus, CheckSquare, Square, Search, Trash2, ChevronDown } from 'lucide-react';
-import { cn, getDepartmentLabel, formatDate } from '@/lib/utils';
+import { Lock, AlertTriangle, Plus, CheckSquare, Square, Search, Trash2, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { cn, getDepartmentLabel, formatDate, apiFetch } from '@/lib/utils';
 import { TaskStatusBadge } from '@/components/ui/badges';
 import { Modal } from '@/components/ui/Modal';
 import { FilterDrawer, MobileFilterButton } from '@/components/ui/FilterDrawer';
 import { CreateTaskForm } from '@/components/forms/CreateTaskForm';
 import type { ITask, IProject } from '@/types';
 import { TaskStatus, Department } from '@/types';
+
+type TaskView = 'pending' | 'done';
+
+const PAGE_SIZE = 50;
 
 interface TasksClientProps {
   initialTasks: ITask[];
@@ -19,6 +23,22 @@ interface TasksClientProps {
   initialProjectFilter?: string;
   pageTitle?: string;
   showDepartmentColumn?: boolean;
+  /** Server-side counts so tabs/pagination render without loading every doc */
+  initialPendingCount?: number;
+  initialDoneCount?: number;
+  initialTotalCount?: number;
+  /**
+   * Extra query string scoping lazy fetches to this view,
+   * e.g. `department=production` or `projectId=xxx`.
+   * Done pages are fetched via `/api/tasks?${fetchScope}&status=done`.
+   */
+  fetchScope?: string;
+}
+
+interface TasksApiResponse {
+  success: boolean;
+  data: ITask[];
+  pagination?: { total: number; page: number; limit: number; totalPages: number; hasMore: boolean };
 }
 
 export function TasksClient({
@@ -29,8 +49,35 @@ export function TasksClient({
   initialProjectFilter,
   pageTitle,
   showDepartmentColumn = true,
+  initialPendingCount,
+  initialDoneCount,
+  initialTotalCount,
+  fetchScope = '',
 }: TasksClientProps) {
-  const [tasks, setTasks] = useState<ITask[]>(initialTasks);
+  // initialTasks is the FIRST page of PENDING tasks (server renders
+  // pending-only by default for fast loading). Done tasks are fetched
+  // lazily only when the user opens the Done tab.
+  const [pendingTasks, setPendingTasks] = useState<ITask[]>(initialTasks);
+  const [doneTasks, setDoneTasks] = useState<ITask[]>([]);
+  const [doneLoaded, setDoneLoaded] = useState(false);
+  const [view, setView] = useState<TaskView>('pending');
+  const [pendingCount, setPendingCount] = useState<number>(
+    initialPendingCount ?? initialTasks.filter((t) => t.status !== TaskStatus.DONE).length
+  );
+  const [doneCount, setDoneCount] = useState<number>(
+    initialDoneCount ?? initialTasks.filter((t) => t.status === TaskStatus.DONE).length
+  );
+  const [totalCount, setTotalCount] = useState<number>(
+    initialTotalCount ?? initialTasks.length
+  );
+  const [pendingPage, setPendingPage] = useState(1);
+  const [pendingTotalPages, setPendingTotalPages] = useState(() =>
+    Math.max(1, Math.ceil(((initialPendingCount ?? initialTasks.length) || 0) / PAGE_SIZE))
+  );
+  const [donePage, setDonePage] = useState(1);
+  const [doneTotalPages, setDoneTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingView, setLoadingView] = useState(false);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
   const [searchText, setSearchText] = useState('');
   const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -41,6 +88,103 @@ export function TasksClient({
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const projectDropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  const withScope = useCallback(
+    (params: string) => {
+      const scope = fetchScope ? `${fetchScope}&` : '';
+      return `/api/tasks?${scope}${params}`;
+    },
+    [fetchScope]
+  );
+
+  // Reset when navigating to a different server-rendered view
+  useEffect(() => {
+    setPendingTasks(initialTasks);
+    setDoneTasks([]);
+    setDoneLoaded(false);
+    setView('pending');
+    setPendingCount(initialPendingCount ?? initialTasks.filter((t) => t.status !== TaskStatus.DONE).length);
+    setDoneCount(initialDoneCount ?? initialTasks.filter((t) => t.status === TaskStatus.DONE).length);
+    setTotalCount(initialTotalCount ?? initialTasks.length);
+    setPendingPage(1);
+    setPendingTotalPages(
+      Math.max(1, Math.ceil(((initialPendingCount ?? initialTasks.length) || 0) / PAGE_SIZE))
+    );
+    setDonePage(1);
+    setDoneTotalPages(1);
+    setSelectedTasks(new Set());
+    setSearchText('');
+    setProjectFilter(initialProjectFilter || 'all');
+  }, [initialTasks, initialPendingCount, initialDoneCount, initialTotalCount, initialProjectFilter]);
+
+  /** Lazy-load DONE tasks only when the Done tab is opened. */
+  const loadDoneView = useCallback(async () => {
+    if (doneLoaded) return;
+    setLoadingView(true);
+    try {
+      const res = await apiFetch<ITask[]>(withScope(`status=done&page=1&limit=${PAGE_SIZE}`)) as unknown as TasksApiResponse;
+      if (res.success && Array.isArray(res.data)) {
+        setDoneTasks(res.data);
+        setDoneLoaded(true);
+        setDonePage(1);
+        if (res.pagination) {
+          setDoneTotalPages(Math.max(1, res.pagination.totalPages));
+          setDoneCount(res.pagination.total);
+        } else {
+          setDoneTotalPages(Math.max(1, Math.ceil(res.data.length / PAGE_SIZE)));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load done tasks:', err);
+    } finally {
+      setLoadingView(false);
+    }
+  }, [doneLoaded, withScope]);
+
+  const switchView = useCallback((next: TaskView) => {
+    setView(next);
+    setSelectedTasks(new Set());
+    setStatusFilter('all');
+    if (next === 'done') void loadDoneView();
+  }, [loadDoneView]);
+
+  /** Server-side pagination — appends the next page without a full reload. */
+  const loadMore = useCallback(async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      if (view === 'pending') {
+        const nextPage = pendingPage + 1;
+        const res = await apiFetch<ITask[]>(withScope(`page=${nextPage}&limit=${PAGE_SIZE}`)) as unknown as TasksApiResponse;
+        if (res.success && Array.isArray(res.data)) {
+          setPendingTasks((prev) => [...prev, ...res.data]);
+          setPendingPage(nextPage);
+          if (res.pagination) {
+            setPendingTotalPages(Math.max(1, res.pagination.totalPages));
+            setPendingCount(res.pagination.total);
+          }
+        }
+      } else {
+        const nextPage = donePage + 1;
+        const res = await apiFetch<ITask[]>(withScope(`status=done&page=${nextPage}&limit=${PAGE_SIZE}`)) as unknown as TasksApiResponse;
+        if (res.success && Array.isArray(res.data)) {
+          setDoneTasks((prev) => [...prev, ...res.data]);
+          setDonePage(nextPage);
+          if (res.pagination) {
+            setDoneTotalPages(Math.max(1, res.pagination.totalPages));
+            setDoneCount(res.pagination.total);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load more tasks:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, view, pendingPage, donePage, withScope]);
+
+  const tasks = view === 'pending' ? pendingTasks : doneTasks;
+  const hasMore = view === 'pending' ? pendingPage < pendingTotalPages : donePage < doneTotalPages;
 
   // Close project dropdown on click outside
   useEffect(() => {
@@ -54,14 +198,16 @@ export function TasksClient({
   }, []);
 
   const handleTaskCreated = useCallback((task: ITask) => {
-    setTasks((prev) => [task, ...prev]);
+    if (task.status === TaskStatus.DONE) {
+      setDoneTasks((prev) => [task, ...prev]);
+      setDoneCount((c) => c + 1);
+    } else {
+      setPendingTasks((prev) => [task, ...prev]);
+      setPendingCount((c) => c + 1);
+    }
+    setTotalCount((c) => c + 1);
     setTaskModalOpen(false);
   }, []);
-
-  // Update tasks when initialTasks changes (e.g. navigation with different data)
-  useEffect(() => {
-    setTasks(initialTasks);
-  }, [initialTasks]);
 
   const filtered = tasks.filter((t) => {
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
@@ -113,11 +259,18 @@ export function TasksClient({
 
       if (!response.ok) throw new Error('Failed to update tasks');
 
-      setTasks(prev => prev.map(task =>
-        selectedTasks.has(task._id)
-          ? { ...task, status: TaskStatus.DONE, completedAt: new Date() }
-          : task
-      ));
+      const doneIds = new Set(selectedTasks);
+      // Tasks leave the pending view when marked done.
+      setPendingTasks((prev) => prev.filter((task) => !doneIds.has(task._id)));
+      setPendingCount((c) => Math.max(0, c - doneIds.size));
+      setDoneCount((c) => c + doneIds.size);
+      if (doneLoaded) {
+        setDoneTasks((prev) => [
+          ...prev.filter((t) => !doneIds.has(t._id)),
+        ]);
+        // Invalidate lazy cache so reopening Done refetches fresh page 1
+        setDoneLoaded(false);
+      }
       setSelectedTasks(new Set());
     } catch (error) {
       console.error('Failed to bulk update tasks:', error);
@@ -140,7 +293,15 @@ export function TasksClient({
 
       if (!response.ok) throw new Error('Failed to delete tasks');
 
-      setTasks(prev => prev.filter(task => !selectedTasks.has(task._id)));
+      const deletedIds = new Set(selectedTasks);
+      if (view === 'pending') {
+        setPendingTasks((prev) => prev.filter((task) => !deletedIds.has(task._id)));
+        setPendingCount((c) => Math.max(0, c - deletedIds.size));
+      } else {
+        setDoneTasks((prev) => prev.filter((task) => !deletedIds.has(task._id)));
+        setDoneCount((c) => Math.max(0, c - deletedIds.size));
+      }
+      setTotalCount((c) => Math.max(0, c - deletedIds.size));
       setSelectedTasks(new Set());
     } catch (error) {
       console.error('Failed to bulk delete tasks:', error);
@@ -206,8 +367,41 @@ export function TasksClient({
                 {title}
               </h1>
               <p className="text-xs text-primary-500 font-mono mt-0.5">
-                {filtered.length} task{filtered.length === 1 ? '' : 's'} in list view
+                {view === 'pending'
+                  ? `${pendingCount} pending · ${doneCount} done — Done loads on demand`
+                  : `${doneCount} completed task${doneCount === 1 ? '' : 's'}`}
               </p>
+              {/* Pending / Done view toggle — Done is lazy-loaded for fast initial render */}
+              <div className="flex items-center gap-2 mt-2">
+                <div className="inline-flex rounded-sm border border-primary-200 bg-primary-50 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => switchView('pending')}
+                    className={cn(
+                      'px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-sm transition-colors',
+                      view === 'pending' ? 'bg-dark-500 text-white' : 'text-primary-500 hover:text-dark-500'
+                    )}
+                  >
+                    Pending ({pendingCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => switchView('done')}
+                    className={cn(
+                      'px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-sm transition-colors flex items-center gap-1.5',
+                      view === 'done' ? 'bg-dark-500 text-white' : 'text-primary-500 hover:text-dark-500'
+                    )}
+                  >
+                    {loadingView && !doneLoaded ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : null}
+                    Done ({doneCount})
+                  </button>
+                </div>
+                <span className="text-[10px] font-mono text-primary-400 hidden md:inline">
+                  {totalCount} total · showing {filtered.length}
+                </span>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
@@ -353,8 +547,11 @@ export function TasksClient({
                 onChange={(e) => setStatusFilter(e.target.value as TaskStatus | 'all')}
                 className="text-[10px] font-mono border border-primary-200 px-2 py-1 bg-white focus:outline-none focus:border-dark-500"
               >
-                <option value="all">All Statuses</option>
-                {Object.values(TaskStatus).map((s) => (
+                <option value="all">{view === 'done' ? 'Done' : 'All Pending'}</option>
+                {(view === 'pending'
+                  ? [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED]
+                  : [TaskStatus.DONE]
+                ).map((s) => (
                   <option key={s} value={s}>{s.replace('_', ' ')}</option>
                 ))}
               </select>
@@ -388,7 +585,9 @@ export function TasksClient({
               Status
             </label>
             <div className="flex flex-wrap gap-1.5">
-              {(['all', ...Object.values(TaskStatus)] as const).map((s) => (
+              {(['all', ...(view === 'pending'
+                ? [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED]
+                : [TaskStatus.DONE])] as const).map((s) => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
@@ -399,7 +598,7 @@ export function TasksClient({
                       : 'border-primary-200 text-primary-500 hover:border-primary-400'
                   )}
                 >
-                  {s === 'all' ? 'All' : s.replace('_', ' ')}
+                  {s === 'all' ? (view === 'done' ? 'Done' : 'All Pending') : s.replace('_', ' ')}
                 </button>
               ))}
             </div>
@@ -454,13 +653,38 @@ export function TasksClient({
         </FilterDrawer>
 
         <div className="flex-1 overflow-auto p-4 sm:p-6">
-          <TaskListView
-            tasks={filtered}
-            selectedTasks={selectedTasks}
-            onToggleSelection={toggleTaskSelection}
-            onOpenTask={(task) => router.push(`/tasks/${task._id}`)}
-            showDepartmentColumn={showDepartmentColumn}
-          />
+          {view === 'done' && !doneLoaded && loadingView ? (
+            <div className="border border-dashed border-primary-200 p-16 text-center">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto text-primary-400" />
+              <p className="text-sm text-primary-400 font-mono mt-2">Loading completed tasks…</p>
+            </div>
+          ) : (
+            <TaskListView
+              tasks={filtered}
+              selectedTasks={selectedTasks}
+              onToggleSelection={toggleTaskSelection}
+              onOpenTask={(task) => router.push(`/tasks/${task._id}`)}
+              showDepartmentColumn={showDepartmentColumn}
+              emptyLabel={view === 'done' ? 'No completed tasks yet' : 'No pending tasks — all clear'}
+            />
+          )}
+          {hasMore && (
+            <div className="flex justify-center mt-4">
+              <button
+                type="button"
+                onClick={() => void loadMore()}
+                disabled={loadingMore}
+                className="flex items-center gap-2 px-4 py-2 text-[10px] font-mono font-bold uppercase tracking-wider border border-primary-200 text-dark-500 hover:border-dark-500 transition-colors disabled:opacity-50"
+              >
+                {loadingMore ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                {loadingMore
+                  ? 'Loading…'
+                  : view === 'pending'
+                    ? `Load more pending (${pendingTasks.length} of ${pendingCount})`
+                    : `Load more done (${doneTasks.length} of ${doneCount})`}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -481,17 +705,19 @@ function TaskListView({
   onToggleSelection,
   onOpenTask,
   showDepartmentColumn = true,
+  emptyLabel = 'No tasks found',
 }: {
   tasks: ITask[];
   selectedTasks: Set<string>;
   onToggleSelection: (taskId: string) => void;
   onOpenTask: (task: ITask) => void;
   showDepartmentColumn?: boolean;
+  emptyLabel?: string;
 }) {
   if (tasks.length === 0) {
     return (
       <div className="border border-dashed border-primary-200 p-16 text-center">
-        <p className="text-sm text-primary-400 font-mono">No tasks found</p>
+        <p className="text-sm text-primary-400 font-mono">{emptyLabel}</p>
       </div>
     );
   }

@@ -138,7 +138,24 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
       .catch(() => {});
   }, [isSignedIn]);
 
-  const effectiveRole = dbRole || user?.publicMetadata?.role as string | undefined;
+  // DB is the source of truth — normalize so legacy/casing variants
+  // (e.g. "ADMIN" vs "admin", "super_admin" vs "admin") never flip the
+  // sidebar between admin/dept layouts after a login or metadata edit.
+  const normalizeClientRole = (role: unknown): string | undefined => {
+    if (typeof role !== 'string') return undefined;
+    const normalized = role.trim().toLowerCase();
+    if (normalized === 'super_admin' || normalized === 'superadmin' || normalized === 'super-admin') {
+      return UserRole.SUPER_ADMIN;
+    }
+    if (normalized === 'admin' || normalized === 'administrator') return UserRole.ADMIN;
+    if (normalized === 'department_user' || normalized === 'department-user' || normalized === 'dept_user' || normalized === 'user') {
+      return UserRole.DEPARTMENT_USER;
+    }
+    return normalized;
+  };
+
+  const rawRole = dbRole || user?.publicMetadata?.role as string | undefined;
+  const effectiveRole = normalizeClientRole(rawRole);
   const effectiveDepartment = dbDepartment || user?.publicMetadata?.department as string | undefined;
 
   const isAdmin = effectiveRole === UserRole.ADMIN || effectiveRole === UserRole.SUPER_ADMIN;

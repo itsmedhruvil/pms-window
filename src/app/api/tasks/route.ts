@@ -5,22 +5,31 @@ import { withAuth } from '@/lib/auth';
 import { UserRole } from '@/types';
 import { CreateTaskSchema } from '@/lib/validations';
 
-// GET /api/tasks?projectId=xxx&department=xxx&status=xxx&page=1&limit=100
+// GET /api/tasks?projectId=xxx&department=xxx&status=xxx&includeDone=true&page=1&limit=100
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
   await connectDB();
 
   const projectId = req.nextUrl.searchParams.get('projectId');
   const department = req.nextUrl.searchParams.get('department');
   const status = req.nextUrl.searchParams.get('status');
+  // Default: pending-only for fast loading. Pass includeDone=true (or an
+  // explicit status) to also fetch DONE tasks.
+  const includeDone =
+    req.nextUrl.searchParams.get('includeDone') === 'true' ||
+    req.nextUrl.searchParams.get('include_done') === 'true';
   const page = Math.max(1, parseInt(req.nextUrl.searchParams.get('page') || '1', 10));
-  const limit = Math.min(200, Math.max(1, parseInt(req.nextUrl.searchParams.get('limit') || '100', 10)));
+  const limit = Math.min(200, Math.max(1, parseInt(req.nextUrl.searchParams.get('limit') || '50', 10)));
   const skip = (page - 1) * limit;
 
   const query: Record<string, unknown> = {};
 
   if (projectId) query.projectId = projectId;
   if (department) query.department = department;
-  if (status) query.status = status;
+  if (status) {
+    query.status = status;
+  } else if (!includeDone) {
+    query.status = { $ne: 'done' };
+  }
 
   // Department users only see their dept tasks + either assigned to them or unassigned
   if (user.role === UserRole.DEPARTMENT_USER) {

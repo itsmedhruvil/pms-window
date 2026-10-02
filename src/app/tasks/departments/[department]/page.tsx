@@ -2,12 +2,14 @@ import { getCurrentUser } from '@/lib/auth';
 import { notFound, redirect } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TasksClient } from '../../TasksClient';
-import { getAlerts, getTasks, getProjects, serialize } from '@/lib/server-data';
+import { getAlerts, getTasks, getTaskCounts, getProjects, serialize } from '@/lib/server-data';
 import { AlertStatus, Department, UserRole } from '@/types';
 import type { ITask, IProject } from '@/types';
 import { getActiveDepartmentNames } from '@/lib/departments';
 
 export const dynamic = 'force-dynamic';
+
+const FIRST_PAGE_SIZE = 50;
 
 export default async function DepartmentTasksPage(
   props: { params: Promise<{ department: string }> }
@@ -25,13 +27,17 @@ export default async function DepartmentTasksPage(
     redirect(`/tasks/departments/${user.department}`);
   }
 
-  const [rawTasks, rawAlerts, rawProjects] = await Promise.all([
-    getTasks({
-      isAdmin,
-      department,
-      assignedUserId: user._id.toString(),
-      limit: 300,
-    }),
+  // Pending-first: load only the first page of pending tasks + cheap
+  // counts. Done tasks are fetched lazily from /api/tasks when the user
+  // opens the Done tab — keeps initial load small even with huge lists.
+  const scope = {
+    isAdmin,
+    department,
+    assignedUserId: user._id.toString(),
+  };
+  const [rawTasks, counts, rawAlerts, rawProjects] = await Promise.all([
+    getTasks({ ...scope, page: 1, pageSize: FIRST_PAGE_SIZE }),
+    getTaskCounts(scope),
     getAlerts({ isAdmin, department: user.department, limit: 100 }),
     getProjects({
       isAdmin,
@@ -56,6 +62,10 @@ export default async function DepartmentTasksPage(
         isAdmin={isAdmin}
         selectedDepartment={department}
         allProjects={projectsResult.items}
+        initialPendingCount={counts.pending}
+        initialDoneCount={counts.done}
+        initialTotalCount={counts.total}
+        fetchScope={`department=${encodeURIComponent(department)}`}
       />
     </AppLayout>
   );

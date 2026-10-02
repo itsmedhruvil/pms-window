@@ -157,12 +157,30 @@ export interface TaskListFilters {
   assignedUserId?: string;
   isAdmin?: boolean;
   limit?: number;
+  /**
+   * When true (default) and no explicit `status` is given, DONE tasks are
+   * excluded from the result so task views stay light. Pass
+   * `excludeDone: false` (or an explicit `status`) to include them.
+   */
+  excludeDone?: boolean;
+  page?: number;
+  pageSize?: number;
 }
 
 export async function getTasks(filters: TaskListFilters = {}) {
   await connectDB();
 
-  const { department, projectId, status, assignedUserId, isAdmin = true, limit = 100 } = filters;
+  const {
+    department,
+    projectId,
+    status,
+    assignedUserId,
+    isAdmin = true,
+    limit = 100,
+    excludeDone = true,
+    page,
+    pageSize,
+  } = filters;
 
   await reconcileBlockedTasksWithAlerts(projectId === null ? undefined : projectId);
 
@@ -174,7 +192,13 @@ export async function getTasks(filters: TaskListFilters = {}) {
       query.projectId = projectId;
     }
   }
-  if (status) query.status = status;
+  if (status) {
+    query.status = status;
+  } else if (excludeDone) {
+    // Default: pending-only view for fast loading. Done tasks are
+    // fetched on demand via the "Done" tab (see TasksClient).
+    query.status = { $ne: TaskStatus.DONE };
+  }
 
   if (!isAdmin && department) {
     query.department = department;
@@ -185,14 +209,55 @@ export async function getTasks(filters: TaskListFilters = {}) {
     query.department = department;
   }
 
-  return TaskModel.find(query)
+  let cursor = TaskModel.find(query)
     .populate('projectId', 'projectTitle clientName')
     .populate('templateTaskId', 'title department sequence')
     .populate('assignedUser', 'name email department avatar')
     .populate('dependencyTaskId', 'title status department')
-    .sort({ sequence: 1 })
-    .limit(limit)
-    .lean();
+    .sort({ sequence: 1 });
+
+  if (page !== undefined && pageSize !== undefined) {
+    const safePage = Math.max(1, page);
+    const safeSize = Math.min(200, Math.max(1, pageSize));
+    cursor = cursor.skip((safePage - 1) * safeSize).limit(safeSize);
+  } else {
+    cursor = cursor.limit(limit);
+  }
+
+  return cursor.lean();
+}
+
+/**
+ * Lightweight pending/done/total counts for the same filter scope as
+ * getTasks (without pagination). Used to render the Pending/Done tabs and
+ * pagination without loading every document.
+ */
+export async function getTaskCounts(
+  filters: Pick<TaskListFilters, 'department' | 'projectId' | 'assignedUserId' | 'isAdmin'> = {}
+): Promise<{ pending: number; done: number; total: number }> {
+  await connectDB();
+
+  const { department, projectId, assignedUserId, isAdmin = true } = filters;
+
+  const baseQuery: Record<string, unknown> = {};
+  if (projectId !== undefined) {
+    baseQuery.projectId = projectId;
+  }
+  if (!isAdmin && department) {
+    baseQuery.department = department;
+    if (assignedUserId) {
+      baseQuery.$or = [{ assignedUser: assignedUserId }, { assignedUser: null }];
+    }
+  } else if (department) {
+    baseQuery.department = department;
+  }
+
+  const [pending, done] = await Promise.all([
+    TaskModel.countDocuments({ ...baseQuery, status: { $ne: TaskStatus.DONE } }),
+    TaskModel.countDocuments({ ...baseQuery, status: TaskStatus.DONE }),
+  ]);
+
+  return { pending, done, total: pending + done };
 }
 
 export async function getTaskDetail(id: string) {

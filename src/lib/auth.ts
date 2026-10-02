@@ -72,16 +72,45 @@ export function canModifyTask(
   user: IUserDocument,
   taskDepartment: Department,
 ): boolean {
-  if (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN)
-    return true;
+  if (isAdminRole(user.role)) return true;
   return user.department === taskDepartment;
+}
+
+/**
+ * Check if user is admin or super admin.
+ * Tolerant to legacy/casing variants (e.g. "ADMIN", "Admin",
+ * "super_admin") so a role edited manually in the Clerk dashboard
+ * never silently fails a strict `=== 'admin'` check and flips the UI.
+ */
+export function normalizeRole(role: unknown): UserRole | string {
+  if (typeof role !== 'string') return role as string;
+  const normalized = role.trim().toLowerCase();
+  if (normalized === 'super_admin' || normalized === 'superadmin' || normalized === 'super-admin') {
+    return UserRole.SUPER_ADMIN;
+  }
+  if (normalized === 'admin' || normalized === 'administrator') {
+    return UserRole.ADMIN;
+  }
+  if (normalized === 'department_user' || normalized === 'department-user' || normalized === 'dept_user' || normalized === 'user') {
+    return UserRole.DEPARTMENT_USER;
+  }
+  return normalized;
+}
+
+export function isAdminRole(role: unknown): boolean {
+  const normalized = normalizeRole(role);
+  return normalized === UserRole.ADMIN || normalized === UserRole.SUPER_ADMIN;
+}
+
+export function isSuperAdminRole(role: unknown): boolean {
+  return normalizeRole(role) === UserRole.SUPER_ADMIN;
 }
 
 /**
  * Check if user is admin or super admin
  */
 export function isAdmin(user: IUserDocument): boolean {
-  return user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
+  return isAdminRole(user.role);
 }
 
 /**
@@ -156,6 +185,14 @@ export async function getCurrentUser(): Promise<IUserDocument | null> {
     }
 
     let shouldSave = false;
+    // Normalize legacy/casing variants (e.g. a Clerk-dashboard edit that
+    // changed `super_admin` to `admin`/`ADMIN`) so strict role checks and
+    // the sidebar never flap between layouts on every login.
+    const normalizedRole = normalizeRole(user.role);
+    if (normalizedRole !== user.role) {
+      user.role = normalizedRole as UserRole;
+      shouldSave = true;
+    }
     if (user.clerkId !== clerkUserData.id) {
       user.clerkId = clerkUserData.id;
       shouldSave = true;

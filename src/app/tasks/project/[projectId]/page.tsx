@@ -2,11 +2,13 @@ import { getCurrentUser } from '@/lib/auth';
 import { notFound, redirect } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TasksClient } from '../../TasksClient';
-import { getTasks, getAlerts, getProjects, serialize } from '@/lib/server-data';
+import { getTasks, getTaskCounts, getAlerts, getProjects, serialize } from '@/lib/server-data';
 import { AlertStatus, UserRole } from '@/types';
 import type { ITask, IProject } from '@/types';
 
 export const dynamic = 'force-dynamic';
+
+const FIRST_PAGE_SIZE = 50;
 
 export default async function ProjectTasksPage(
   props: { params: Promise<{ projectId: string }> }
@@ -17,14 +19,15 @@ export default async function ProjectTasksPage(
 
   const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
 
-  const [rawTasks, rawAlerts, rawProjects] = await Promise.all([
-    getTasks({
-      isAdmin,
-      department: isAdmin ? undefined : user.department,
-      projectId: params.projectId,
-      assignedUserId: user._id.toString(),
-      limit: 500,
-    }),
+  const scope = {
+    isAdmin,
+    department: isAdmin ? undefined : user.department,
+    projectId: params.projectId,
+    assignedUserId: user._id.toString(),
+  };
+  const [rawTasks, counts, rawAlerts, rawProjects] = await Promise.all([
+    getTasks({ ...scope, page: 1, pageSize: FIRST_PAGE_SIZE }),
+    getTaskCounts(scope),
     getAlerts({ isAdmin, department: user.department, limit: 100 }),
     getProjects({
       isAdmin,
@@ -57,6 +60,10 @@ export default async function ProjectTasksPage(
         initialProjectFilter={params.projectId}
         pageTitle={`${currentProject.projectTitle} — Tasks`}
         showDepartmentColumn
+        initialPendingCount={counts.pending}
+        initialDoneCount={counts.done}
+        initialTotalCount={counts.total}
+        fetchScope={`projectId=${encodeURIComponent(params.projectId)}`}
       />
     </AppLayout>
   );
