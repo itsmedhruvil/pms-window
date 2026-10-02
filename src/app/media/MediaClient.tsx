@@ -10,6 +10,7 @@ type MediaKind = 'all' | 'images' | 'files';
 interface MediaItem {
   id: string;
   url: string;
+  thumbnailUrl?: string;
   name: string;
   type: string;
   size: number;
@@ -59,6 +60,7 @@ export function MediaClient() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [kind, setKind] = useState<MediaKind>('all');
+  const [visibleLimit, setVisibleLimit] = useState(36);
   const loadingRef = useRef(false);
 
   const loadPage = useCallback(async (nextPage: number) => {
@@ -95,9 +97,14 @@ export function MediaClient() {
     });
   }, [items, kind, search]);
 
+  const visibleItems = useMemo(
+    () => filteredItems.slice(0, visibleLimit),
+    [filteredItems, visibleLimit]
+  );
+
   const projectGroups = useMemo(() => {
     const groups = new Map<string, { title: string; clientName: string; items: MediaItem[] }>();
-    for (const item of filteredItems) {
+    for (const item of visibleItems) {
       const key = item.projectId || 'internal';
       const group = groups.get(key) || { title: item.projectTitle, clientName: item.clientName, items: [] };
       group.items.push(item);
@@ -106,7 +113,7 @@ export function MediaClient() {
     return Array.from(groups.entries())
       .map(([id, group]) => ({ id, ...group }))
       .sort((a, b) => a.title.localeCompare(b.title));
-  }, [filteredItems]);
+  }, [visibleItems]);
 
   return (
     <main className="min-h-full bg-primary-50">
@@ -117,7 +124,7 @@ export function MediaClient() {
             <h1 className="mt-1 text-xl font-black text-dark-500">Media</h1>
             <p className="mt-1 text-xs font-mono text-primary-500">Task photos and files grouped by project</p>
           </div>
-          <span className="text-xs font-mono text-primary-500">{filteredItems.length} loaded</span>
+          <span className="text-xs font-mono text-primary-500">Showing {visibleItems.length} of {filteredItems.length}</span>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <label className="flex min-w-[220px] flex-1 items-center gap-2 border border-primary-200 bg-white px-3 py-2 sm:max-w-sm">
@@ -178,7 +185,7 @@ export function MediaClient() {
                   >
                     <div className="relative aspect-[4/3] overflow-hidden bg-primary-100">
                       {image ? (
-                        <Image src={item.url} alt={item.name} fill unoptimized sizes="(max-width: 640px) 50vw, (max-width: 1280px) 25vw, 16vw" className="object-cover transition-transform group-hover:scale-[1.03]" />
+                        <Image src={item.thumbnailUrl || item.url} alt={item.name} fill unoptimized loading="lazy" sizes="(max-width: 640px) 50vw, (max-width: 1280px) 25vw, 16vw" className="object-cover transition-transform group-hover:scale-[1.03]" />
                       ) : (
                         <div className="flex h-full flex-col items-center justify-center gap-2 text-primary-400">
                           <FileText className="h-8 w-8" />
@@ -219,14 +226,20 @@ export function MediaClient() {
             <Loader2 className="h-4 w-4 animate-spin" /> Loading media
           </div>
         )}
-        {!loading && hasMore && (
+        {!loading && (visibleItems.length < filteredItems.length || hasMore) && (
           <div className="flex justify-center">
             <button
               type="button"
-              onClick={() => void loadPage(page + 1)}
+              onClick={() => {
+                if (visibleItems.length < filteredItems.length) {
+                  setVisibleLimit((current) => current + 36);
+                } else {
+                  void loadPage(page + 1);
+                }
+              }}
               className="border border-primary-300 px-4 py-2 text-[10px] font-mono font-bold uppercase tracking-wide text-dark-500 hover:border-dark-500"
             >
-              Load more media
+              {visibleItems.length < filteredItems.length ? 'Show more media' : 'Load more media'}
             </button>
           </div>
         )}

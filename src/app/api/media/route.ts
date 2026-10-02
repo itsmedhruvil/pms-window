@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import TaskModel from '@/models/Task';
 import { withAuth } from '@/lib/auth';
+import { getCloudinaryThumbnail } from '@/lib/cloudinary';
 import { UserRole } from '@/types';
 
 type StoredTaskFile = {
@@ -61,9 +62,14 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
       }
     }
 
-    return Array.from(files.values()).map((file) => ({
+    return Array.from(files.values()).map((file) => {
+      const isImage = file.type?.startsWith('image/') || /\.(avif|gif|heic|jpeg|jpg|png|svg|webp)$/i.test(file.name || '');
+      return {
       id: file.id || file.publicId || file.url,
       url: file.url!,
+      thumbnailUrl: isImage && file.publicId
+        ? getCloudinaryThumbnail(file.publicId, 480, 360)
+        : file.url,
       name: file.name || 'Untitled file',
       type: file.type || '',
       size: file.size || 0,
@@ -74,7 +80,8 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
       projectId: project?._id.toString() || null,
       projectTitle: project?.projectTitle || 'Internal tasks',
       clientName: project?.clientName || '',
-    }));
+      };
+    });
   });
 
   return NextResponse.json({
