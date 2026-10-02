@@ -27,6 +27,7 @@ import {
 } from '@/types';
 import { subDays } from 'date-fns';
 import { ensureDefaultTaskTemplates, reconcileBlockedTasksWithAlerts } from '@/lib/workflow';
+import { getTaskStageFilter } from '@/lib/task-stage-filter';
 
 // ─── Projects ────────────────────────────────────────────────────────────────
 
@@ -154,6 +155,7 @@ export interface TaskListFilters {
   department?: Department;
   projectId?: string | null;
   status?: TaskStatus;
+  stage?: string;
   assignedUserId?: string;
   isAdmin?: boolean;
   limit?: number;
@@ -174,6 +176,7 @@ export async function getTasks(filters: TaskListFilters = {}) {
     department,
     projectId,
     status,
+    stage,
     assignedUserId,
     isAdmin = true,
     limit = 100,
@@ -198,6 +201,11 @@ export async function getTasks(filters: TaskListFilters = {}) {
     // Default: pending-only view for fast loading. Done tasks are
     // fetched on demand via the "Done" tab (see TasksClient).
     query.status = { $ne: TaskStatus.DONE };
+  }
+
+  if (stage) {
+    const stageFilter = getTaskStageFilter(stage);
+    if (stageFilter) query.$and = [...((query.$and as unknown[]) || []), stageFilter];
   }
 
   if (!isAdmin && department) {
@@ -233,11 +241,11 @@ export async function getTasks(filters: TaskListFilters = {}) {
  * pagination without loading every document.
  */
 export async function getTaskCounts(
-  filters: Pick<TaskListFilters, 'department' | 'projectId' | 'assignedUserId' | 'isAdmin'> = {}
+  filters: Pick<TaskListFilters, 'department' | 'projectId' | 'assignedUserId' | 'isAdmin' | 'stage'> = {}
 ): Promise<{ pending: number; done: number; total: number }> {
   await connectDB();
 
-  const { department, projectId, assignedUserId, isAdmin = true } = filters;
+  const { department, projectId, assignedUserId, isAdmin = true, stage } = filters;
 
   const baseQuery: Record<string, unknown> = {};
   if (projectId !== undefined) {
@@ -250,6 +258,11 @@ export async function getTaskCounts(
     }
   } else if (department) {
     baseQuery.department = department;
+  }
+
+  if (stage) {
+    const stageFilter = getTaskStageFilter(stage);
+    if (stageFilter) baseQuery.$and = [...((baseQuery.$and as unknown[]) || []), stageFilter];
   }
 
   const [pending, done] = await Promise.all([

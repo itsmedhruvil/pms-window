@@ -4,6 +4,7 @@ import TaskModel from '@/models/Task';
 import { withAuth } from '@/lib/auth';
 import { UserRole } from '@/types';
 import { CreateTaskSchema } from '@/lib/validations';
+import { getTaskStageFilter } from '@/lib/task-stage-filter';
 
 // GET /api/tasks?projectId=xxx&department=xxx&status=xxx&includeDone=true&page=1&limit=100
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
@@ -12,6 +13,7 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
   const projectId = req.nextUrl.searchParams.get('projectId');
   const department = req.nextUrl.searchParams.get('department');
   const status = req.nextUrl.searchParams.get('status');
+  const stage = req.nextUrl.searchParams.get('stage');
   // Default: pending-only for fast loading. Pass includeDone=true (or an
   // explicit status) to also fetch DONE tasks.
   const includeDone =
@@ -31,6 +33,11 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
     query.status = { $ne: 'done' };
   }
 
+  if (stage) {
+    const stageFilter = getTaskStageFilter(stage);
+    if (stageFilter) query.$and = [...((query.$and as unknown[]) || []), stageFilter];
+  }
+
   // Department users only see their dept tasks + either assigned to them or unassigned
   if (user.role === UserRole.DEPARTMENT_USER) {
     query.department = user.department;
@@ -40,7 +47,7 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
   // Run query with pagination - only select needed fields initially
   const [tasks, total] = await Promise.all([
     TaskModel.find(query)
-      .select('projectId department title description status frequency assignedUser dependencyTaskId isLocked sequence startDate dueDate completedAt createdAt updatedAt')
+      .select('projectId department title description stage status frequency assignedUser dependencyTaskId isLocked sequence startDate dueDate completedAt createdAt updatedAt')
       .populate('assignedUser', 'name email department avatar')
       .populate('dependencyTaskId', 'title status department')
       .sort({ sequence: 1 })

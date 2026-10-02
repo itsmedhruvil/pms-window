@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TasksClient } from '../../TasksClient';
 import { getTasks, getTaskCounts, getAlerts, getProjects, serialize } from '@/lib/server-data';
-import { AlertStatus, UserRole } from '@/types';
+import { AlertStatus, UserRole, STAGE_SEQUENCE, formatStageName } from '@/types';
 import type { ITask, IProject } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -11,9 +11,15 @@ export const dynamic = 'force-dynamic';
 const FIRST_PAGE_SIZE = 50;
 
 export default async function ProjectTasksPage(
-  props: { params: Promise<{ projectId: string }> }
+  props: { params: Promise<{ projectId: string }>; searchParams: Promise<{ stage?: string }> }
 ) {
   const params = await props.params;
+  const searchParams = await props.searchParams;
+  const requestedStage = searchParams.stage;
+  const stage = requestedStage && (
+    requestedStage === 'uncategorized' ||
+    STAGE_SEQUENCE.includes(requestedStage as (typeof STAGE_SEQUENCE)[number])
+  ) ? requestedStage : undefined;
   const user = await getCurrentUser();
   if (!user) redirect('/sign-in');
 
@@ -24,6 +30,7 @@ export default async function ProjectTasksPage(
     department: isAdmin ? undefined : user.department,
     projectId: params.projectId,
     assignedUserId: user._id.toString(),
+    stage,
   };
   const [rawTasks, counts, rawAlerts, rawProjects] = await Promise.all([
     getTasks({ ...scope, page: 1, pageSize: FIRST_PAGE_SIZE }),
@@ -58,12 +65,13 @@ export default async function ProjectTasksPage(
         isAdmin={isAdmin}
         allProjects={projectsResult.items}
         initialProjectFilter={params.projectId}
-        pageTitle={`${currentProject.projectTitle} — Tasks`}
+        pageTitle={`${currentProject.projectTitle} — ${stage ? `${formatStageName(stage)} Tasks` : 'Tasks'}`}
         showDepartmentColumn
         initialPendingCount={counts.pending}
         initialDoneCount={counts.done}
         initialTotalCount={counts.total}
-        fetchScope={`projectId=${encodeURIComponent(params.projectId)}`}
+        fetchScope={`projectId=${encodeURIComponent(params.projectId)}${stage ? `&stage=${encodeURIComponent(stage)}` : ''}`}
+        initialStageFilter={stage}
       />
     </AppLayout>
   );

@@ -390,7 +390,7 @@ export function ProjectDetail({
         key: g.key,
         title: g.label,
         tasks: g.tasks,
-        href: `/tasks/project/${project._id}`,
+        href: `/tasks/project/${project._id}?stage=${encodeURIComponent(g.key)}`,
         viewLabel: 'Open full view',
       }))
     : visibleDepartments.map((dept) => ({
