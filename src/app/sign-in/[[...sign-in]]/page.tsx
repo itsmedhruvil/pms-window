@@ -1,7 +1,14 @@
+import { redirect } from 'next/navigation';
+import { auth } from '@clerk/nextjs/server';
 import { SignIn } from '@clerk/nextjs';
 import { Factory } from 'lucide-react';
 
-export default function SignInPage() {
+export default async function SignInPage() {
+  const { userId } = await auth();
+  if (userId) {
+    redirect('/dashboard');
+  }
+
   return (
     <div className="min-h-screen md:h-screen bg-white flex flex-col md:flex-row overflow-auto md:overflow-hidden">
       {/* Left panel — hidden on mobile */}
@@ -64,7 +71,6 @@ export default function SignInPage() {
             </p>
           </div>
           <SignIn
-            forceRedirectUrl="/dashboard"
             appearance={{
               elements: {
                 card: 'shadow-none border border-primary-200 rounded-none',
