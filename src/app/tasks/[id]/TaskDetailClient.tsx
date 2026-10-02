@@ -330,6 +330,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
       try {
         const formData = new FormData();
         formData.append('file', file);
+        if (projectId) formData.append('projectId', projectId);
 
         const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
         const uploadData = await uploadRes.json();

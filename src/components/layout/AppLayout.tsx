@@ -7,6 +7,7 @@ import { UserButton, useUser } from '@clerk/nextjs';
 import {
   LayoutDashboard,
   FolderKanban,
+  Image as ImageIcon,
   ClipboardList,
   AlertTriangle,
   Users,
@@ -14,7 +15,6 @@ import {
   Plus,
   MessageCircle,
   Menu,
-  Bell,
   Building2,
   Settings,
   ChevronLeft,
@@ -39,6 +39,7 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/projects/new', label: 'Create Project', icon: Plus, prominent: true },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
+  { href: '/media', label: 'Media', icon: ImageIcon },
   { href: '/discussions', label: 'Discussions', icon: MessageCircle },
   { href: '/alerts', label: 'Alerts', icon: AlertTriangle },
 ];
@@ -46,6 +47,7 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
 const DEPT_USER_NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
+  { href: '/media', label: 'Media', icon: ImageIcon },
   { href: '/discussions', label: 'Discussions', icon: MessageCircle },
   { href: '/alerts', label: 'Alerts', icon: AlertTriangle },
 ];
@@ -53,6 +55,7 @@ const DEPT_USER_NAV_ITEMS: NavItem[] = [
 const TOP_BAR_NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/projects', label: 'Projects' },
+  { href: '/media', label: 'Media' },
   { href: '/discussions', label: 'Discussions' },
   { href: '/alerts', label: 'Alerts' },
 ];
@@ -166,6 +169,7 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
   const isNavActive = (href: string) =>
     href === '/tasks' ? pathname === '/tasks'
     : href === '/template-groups' ? pathname.startsWith('/template-groups')
+    : href === '/media' ? pathname.startsWith('/media')
     : href === '/discussions' ? pathname.startsWith('/discussions')
     : pathname.startsWith(href);
 

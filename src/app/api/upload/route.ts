@@ -13,10 +13,18 @@ export const POST = withAuth(async (req: NextRequest) => {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
+    const projectId = formData.get('projectId');
 
     if (!file) {
       return NextResponse.json(
         { success: false, error: 'No file provided' },
+        { status: 400 }
+      );
+    }
+
+    if (projectId && (typeof projectId !== 'string' || !/^[a-f\d]{24}$/i.test(projectId))) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid project ID' },
         { status: 400 }
       );
     }
@@ -52,7 +60,10 @@ export const POST = withAuth(async (req: NextRequest) => {
     const fileBuffer = Buffer.from(arrayBuffer);
 
     // Determine folder based on file type
-    const folder = file.type.startsWith('image/') ? 'pms/task-images' : 'pms/task-files';
+    const projectFolder = projectId ? `pms/projects/${projectId}` : 'pms';
+    const folder = file.type.startsWith('image/')
+      ? `${projectFolder}/task-images`
+      : `${projectFolder}/task-files`;
 
     // Upload to Cloudinary
     const result = await uploadToCloudinary(fileBuffer, file.name, folder);
