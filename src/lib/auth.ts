@@ -202,17 +202,13 @@ export async function getCurrentUser(): Promise<IUserDocument | null> {
       shouldSave = true;
     }
 
-    // Force super admin role if email matches — always enforce on every login
-    if (SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) {
-      if (user.role !== UserRole.SUPER_ADMIN) {
-        user.role = UserRole.SUPER_ADMIN;
-        shouldSave = true;
-      }
-      if (user.department !== Department.PRODUCTION) {
-        user.department = Department.PRODUCTION;
-        shouldSave = true;
-      }
-    }
+    // NOTE: SUPER_ADMIN_EMAILS is only used as the *default* role for
+    // brand-new users (see creation above). We intentionally do NOT force
+    // super_admin on every login — otherwise demoting yourself to `admin`
+    // in Clerk + DB would flip straight back to `super_admin` on the next
+    // request and cause the login/dashboard shuttling you saw.
+    // To re-promote someone, set role='super_admin' in Mongo AND in
+    // Clerk publicMetadata manually (or via /users page as super-admin).
 
     if (shouldSave) await user.save();
 
