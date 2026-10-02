@@ -81,6 +81,7 @@ export function TasksClient({
   const [donePage, setDonePage] = useState(1);
   const [doneTotalPages, setDoneTotalPages] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
   const [loadingView, setLoadingView] = useState(false);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
   const [searchText, setSearchText] = useState('');
@@ -250,14 +251,26 @@ export function TasksClient({
     done: tasks.filter((t) => t.status === TaskStatus.DONE).length,
   };
 
-  const handleBulkMarkDone = async () => {
-    if (selectedTasks.size === 0) return;
+  const handleBulkUpdateStatus = async (status: TaskStatus) => {
+    if (selectedTasks.size === 0 || bulkUpdating) return;
+    setBulkUpdating(true);
+    const selectedIds = new Set(selectedTasks);
+    const selectedRecords = tasks.filter((task) => selectedIds.has(task._id));
+    const movedCount = status === TaskStatus.DONE
+      ? selectedRecords.filter((task) => task.status !== TaskStatus.DONE).length
+      : selectedRecords.filter((task) => task.status === TaskStatus.DONE).length;
+    const completedAt = status === TaskStatus.DONE ? new Date() : undefined;
+    const updatedRecords = selectedRecords.map((task) => ({
+      ...task,
+      status,
+      completedAt,
+    }));
 
     try {
-      const updates = Array.from(selectedTasks).map(taskId => ({
+      const updates = Array.from(selectedIds).map(taskId => ({
         taskId,
-        status: TaskStatus.DONE,
-        completedAt: new Date(),
+        status,
+        completedAt,
       }));
 
       const response = await fetch('/api/tasks/bulk-update', {
@@ -268,22 +281,31 @@ export function TasksClient({
 
       if (!response.ok) throw new Error('Failed to update tasks');
 
-      const doneIds = new Set(selectedTasks);
-      // Tasks leave the pending view when marked done.
-      setPendingTasks((prev) => prev.filter((task) => !doneIds.has(task._id)));
-      setPendingCount((c) => Math.max(0, c - doneIds.size));
-      setDoneCount((c) => c + doneIds.size);
-      if (doneLoaded) {
+      if (status === TaskStatus.DONE) {
+        setPendingTasks((prev) => prev.filter((task) => !selectedIds.has(task._id)));
+        setPendingCount((count) => Math.max(0, count - movedCount));
+        setDoneCount((count) => count + movedCount);
+        setDoneTotalPages(Math.max(1, Math.ceil((doneCount + movedCount) / PAGE_SIZE)));
         setDoneTasks((prev) => [
-          ...prev.filter((t) => !doneIds.has(t._id)),
+          ...updatedRecords,
+          ...prev.filter((task) => !selectedIds.has(task._id)),
         ]);
-        // Invalidate lazy cache so reopening Done refetches fresh page 1
-        setDoneLoaded(false);
+      } else {
+        setDoneTasks((prev) => prev.filter((task) => !selectedIds.has(task._id)));
+        setDoneCount((count) => Math.max(0, count - movedCount));
+        setPendingCount((count) => count + movedCount);
+        setPendingTotalPages(Math.max(1, Math.ceil((pendingCount + movedCount) / PAGE_SIZE)));
+        setPendingTasks((prev) => [
+          ...updatedRecords,
+          ...prev.filter((task) => !selectedIds.has(task._id)),
+        ]);
       }
       setSelectedTasks(new Set());
     } catch (error) {
-      console.error('Failed to bulk update tasks:', error);
+      console.error('Failed to bulk update task status:', error);
       alert('Failed to update tasks. Please try again.');
+    } finally {
+      setBulkUpdating(false);
     }
   };
 
@@ -414,25 +436,60 @@ export function TasksClient({
             </div>
 
             <div className="flex items-center gap-2">
-              {selectedTasks.size > 0 && (
-                <>
-                  <button
-                    onClick={handleBulkMarkDone}
-                    className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-dark-500 text-white hover:bg-dark-600 transition-colors"
-                  >
-                    <CheckSquare className="w-3.5 h-3.5" />
-                    Mark Done ({selectedTasks.size})
-                  </button>
-                  {isAdmin && (
+              {isAdmin && (
+                <details className="relative">
+                  <summary className="flex list-none cursor-pointer items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide border border-primary-300 text-dark-500 hover:border-dark-500">
+                    {bulkUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckSquare className="w-3.5 h-3.5" />}
+                    Bulk Actions ({selectedTasks.size})
+                    <ChevronDown className="w-3 h-3" />
+                  </summary>
+                  <div className="absolute right-0 top-full z-30 mt-1 min-w-48 border border-primary-200 bg-white py-1 shadow-lg">
                     <button
-                      onClick={handleBulkDelete}
-                      className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-red-600 text-white hover:bg-red-700 transition-colors"
+                      type="button"
+                      disabled={selectedTasks.size === 0 || bulkUpdating}
+                      onClick={(event) => {
+                        void handleBulkUpdateStatus(TaskStatus.DONE);
+                        event.currentTarget.closest('details')?.removeAttribute('open');
+                      }}
+                      className="block w-full px-3 py-2 text-left text-xs font-mono text-dark-500 hover:bg-primary-50 disabled:opacity-40"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      Delete ({selectedTasks.size})
+                      Mark Done
                     </button>
-                  )}
-                </>
+                    <button
+                      type="button"
+                      disabled={selectedTasks.size === 0 || bulkUpdating}
+                      onClick={(event) => {
+                        void handleBulkUpdateStatus(TaskStatus.TODO);
+                        event.currentTarget.closest('details')?.removeAttribute('open');
+                      }}
+                      className="block w-full px-3 py-2 text-left text-xs font-mono text-dark-500 hover:bg-primary-50 disabled:opacity-40"
+                    >
+                      Mark Pending
+                    </button>
+                    <button
+                      type="button"
+                      disabled={filtered.length === 0 || bulkUpdating}
+                      onClick={(event) => {
+                        toggleSelectAll();
+                        event.currentTarget.closest('details')?.removeAttribute('open');
+                      }}
+                      className="block w-full border-t border-primary-100 px-3 py-2 text-left text-xs font-mono text-dark-500 hover:bg-primary-50 disabled:opacity-40"
+                    >
+                      {selectedTasks.size === filtered.length && filtered.length > 0
+                        ? 'Deselect all visible'
+                        : 'Select all visible'}
+                    </button>
+                  </div>
+                </details>
+              )}
+              {selectedTasks.size > 0 && isAdmin && (
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase tracking-wide bg-red-600 text-white hover:bg-red-700 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete ({selectedTasks.size})
+                </button>
               )}
               {isAdmin && (
                 <button
@@ -574,12 +631,6 @@ export function TasksClient({
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            <button
-              onClick={toggleSelectAll}
-              className="text-[10px] font-mono text-blue-600 hover:text-blue-800 underline"
-            >
-              {selectedTasks.size === filtered.length && filtered.length > 0 ? 'Deselect all' : 'Select all'}
-            </button>
             <span className="text-[10px] text-primary-500 font-mono">
               {selectedTasks.size > 0 ? `${selectedTasks.size} selected • ` : ''}{filtered.length} tasks
             </span>

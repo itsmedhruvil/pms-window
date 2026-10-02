@@ -34,7 +34,7 @@ export const POST = withAuth(
     for (const update of updates) {
       const { taskId, status, completedAt } = update;
 
-      if (!taskId || !status) {
+      if (!taskId || !Object.values(TaskStatus).includes(status)) {
         throw new Error(`Invalid update data for task ${taskId}`);
       }
 
@@ -50,6 +50,8 @@ export const POST = withAuth(
       }
       if (status === TaskStatus.DONE && existingTask.status !== TaskStatus.DONE) {
         setFields.completedAt = new Date();
+      } else if (status !== TaskStatus.DONE) {
+        setFields.completedAt = null;
       }
 
       bulkOps.push({
