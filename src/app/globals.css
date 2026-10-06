@@ -98,7 +98,7 @@
   }
 }
 
-/* Alert border pulse for blocked/on-hold items */
+/* Alert border pulse for on-hold projects and active alerts */
 @keyframes alert-border {
   0%, 100% { border-color: rgb(252, 165, 165); }
   50% { border-color: rgb(239, 68, 68); }

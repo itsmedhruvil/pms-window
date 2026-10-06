@@ -21,7 +21,7 @@ enum Department { OFFICE_ADMIN = 'office_admin', PURCHASE = 'purchase', STORE = 
 enum UserRole { SUPER_ADMIN = 'super_admin', ADMIN = 'admin', DEPARTMENT_USER = 'department_user' }
 enum ProjectStatus { NEW = 'new', IN_PRODUCTION = 'in_production', ON_HOLD = 'on_hold', COMPLETED = 'completed', DISPATCHED = 'dispatched' }
 enum ProjectPriority { LOW = 'low', MEDIUM = 'medium', HIGH = 'high', URGENT = 'urgent' }
-enum TaskStatus { TODO = 'todo', IN_PROGRESS = 'in_progress', BLOCKED = 'blocked', DONE = 'done' }
+enum TaskStatus { TODO = 'todo', IN_PROGRESS = 'in_progress', DONE = 'done' }
 enum TaskFrequency { DAILY = 'daily', WEEKLY = 'weekly', MONTHLY = 'monthly', PROJECT = 'project', NEED_BASIS = 'need_basis', PROJECT_RECURRING = 'project_recurring' }
 enum AlertType { DESIGN_CHANGE = 'design_change', CLIENT_ESCALATION = 'client_escalation', PRODUCTION_ISSUE = 'production_issue', MATERIAL_ISSUE = 'material_issue' }
 enum AlertStatus { ACTIVE = 'active', ACKNOWLEDGED = 'acknowledged', RESOLVED = 'resolved' }
@@ -371,19 +371,10 @@ async function seed() {
     $push: { activeAlertIds: alert1._id },
   });
 
-  // Block affected tasks
-  await Task.updateMany(
-    {
-      projectId: project3._id,
-      department: { $in: [Department.PURCHASE, Department.STORE] },
-    },
-    { $set: { status: TaskStatus.BLOCKED } }
-  );
-
   // Add comment thread to alert
   await Comment.create({
     alertId: alert1._id,
-    content: `Alert raised: Design change for bay windows. Client requested modification from 3600mm single unit to two 1800mm units. All purchase and store tasks blocked pending resolution.`,
+    content: `Alert raised: Design change for bay windows. Client requested modification from 3600mm single unit to two 1800mm units. All purchase and store tasks are on hold pending resolution.`,
     author: adminUser._id,
     isSystemLog: true,
   });

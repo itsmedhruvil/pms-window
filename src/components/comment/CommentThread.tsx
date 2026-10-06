@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import useSWR from 'swr';
 import { Send, Bot, Upload, Paperclip, X, Loader2, Download, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import { timeAgo, apiFetch } from '@/lib/utils';
-import { dispatchDataChange } from '@/hooks/useRealtime';
+import { dispatchDataChange, useRealtime } from '@/hooks/useRealtime';
+import { invalidateComments } from '@/lib/client-data';
+import { Spinner } from '@/components/ui/spinner';
 import type { IComment, IUser, ICommentAttachment } from '@/types';
 
 interface CommentThreadProps {
@@ -13,11 +16,19 @@ interface CommentThreadProps {
   availableUsers?: Partial<IUser>[];
 }
 
+/** How often an open thread re-checks the server for new messages. */
+const COMMENT_POLL_MS = 15_000;
+
+/** True when both lists hold exactly the same comments in the same order. */
+function isSameThread(a: IComment[], b: IComment[]) {
+  if (a.length !== b.length) return false;
+  return a.every((comment, i) => comment._id === b[i]._id);
+}
+
 export function CommentThread({ taskId, alertId, availableUsers: propUsers = [], currentUser }: CommentThreadProps) {
   const [comments, setComments] = useState<IComment[]>([]);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(true);
   const [mentions, setMentions] = useState<string[]>([]);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
@@ -28,15 +39,52 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevCountRef = useRef(0);
 
-  const fetchComments = useCallback(async () => {
-    const params = taskId ? `taskId=${taskId}` : `alertId=${alertId}`;
-    const result = await apiFetch<{ items: IComment[] }>(`/api/comments?${params}&limit=50`);
-    if (result.success && result.data) {
-      setComments(result.data.items);
+  const queryParams = taskId ? `taskId=${taskId}` : `alertId=${alertId}`;
+  const commentsKey = `/api/comments?${queryParams}&limit=50`;
+
+  /**
+   * SWR keeps the thread live without a page refresh: it polls every 15s,
+   * refetches when the tab regains focus or the network reconnects, and shares
+   * its cache with every other CommentThread mounted in the app.
+   */
+  const { isLoading: fetching } = useSWR<{ items: IComment[] }>(
+    commentsKey,
+    async (url: string) => {
+      const result = await apiFetch<{ items: IComment[] }>(url);
+      if (!result.success) {
+        throw new Error(typeof result.error === 'string' ? result.error : 'Failed to load comments');
+      }
+      return result.data as { items: IComment[] };
+    },
+    {
+      refreshInterval: COMMENT_POLL_MS,
+      refreshWhenHidden: false,
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      dedupingInterval: 2000,
+      onSuccess: (data) => {
+        const next = data?.items ?? [];
+        // Keep the previous array reference when nothing changed, so a poll
+        // that finds no new messages cannot retrigger the scroll effect.
+        setComments((prev) => (isSameThread(prev, next) ? prev : next));
+      },
     }
-    setFetching(false);
-  }, [alertId, taskId]);
+  );
+
+  // Instant in-app propagation: a comment posted anywhere in this session
+  // (another thread, or the "mark done with comment" flow) appears immediately
+  // instead of waiting for the next poll.
+  useRealtime({
+    onCommentAdded: (payload) => {
+      const incoming = payload?.comment as IComment | undefined;
+      if (!incoming?._id) return;
+      if (taskId && payload.taskId !== taskId) return;
+      if (alertId && payload.alertId !== alertId) return;
+      setComments((prev) => (prev.some((c) => c._id === incoming._id) ? prev : [...prev, incoming]));
+    },
+  });
 
   const fetchUsers = useCallback(async () => {
     if (propUsers.length > 0) return;
@@ -47,12 +95,16 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
   }, [propUsers.length]);
 
   useEffect(() => {
-    fetchComments();
     fetchUsers();
-  }, [fetchComments, fetchUsers]);
+  }, [fetchUsers]);
 
+  // Only follow the thread downwards when a message actually arrives, so a
+  // reader who scrolled up to re-read history is not yanked back to the bottom.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (comments.length > prevCountRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevCountRef.current = comments.length;
   }, [comments]);
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -139,6 +191,9 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
         taskId,
         alertId,
       });
+      // Refresh every cached comment list so other mounted threads catch up
+      // without waiting for their next poll.
+      invalidateComments();
     }
 
     setLoading(false);
@@ -162,7 +217,7 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {fetching && (
             <div className="flex items-center justify-center h-16">
-              <span className="text-xs text-primary-400 font-mono">Loading...</span>
+              <Spinner size="sm" />
             </div>
           )}
 

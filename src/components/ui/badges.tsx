@@ -31,12 +31,8 @@ export function TaskStatusBadge({ status, className, size = 'md' }: { status: Ta
       'inline-flex items-center border font-mono font-medium tracking-wide uppercase',
       size === 'sm' ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-1',
       TASK_STATUS_STYLE[status],
-      status === TaskStatus.BLOCKED && 'animate-pulse',
       className
     )}>
-      {status === TaskStatus.BLOCKED && (
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5" />
-      )}
       {TASK_STATUS_LABEL[status]}
     </span>
   );

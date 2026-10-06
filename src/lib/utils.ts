@@ -102,16 +102,14 @@ export function normalizeProjectPriority(priority: ProjectPriority | string | un
 }
 
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
-  [TaskStatus.TODO]: 'To Do',
-  [TaskStatus.IN_PROGRESS]: 'In Progress',
-  [TaskStatus.BLOCKED]: 'Blocked',
+  [TaskStatus.TODO]: 'Pending',
+  [TaskStatus.IN_PROGRESS]: 'Ongoing',
   [TaskStatus.DONE]: 'Done',
 };
 
 export const TASK_STATUS_STYLE: Record<TaskStatus, string> = {
   [TaskStatus.TODO]: 'bg-primary-100 text-dark-400 border-primary-200',
   [TaskStatus.IN_PROGRESS]: 'bg-dark-500 text-white border-dark-500',
-  [TaskStatus.BLOCKED]: 'bg-red-50 text-red-700 border-red-400',
   [TaskStatus.DONE]: 'bg-dark-600 text-white border-dark-600',
 };
 

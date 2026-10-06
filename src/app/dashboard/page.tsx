@@ -76,15 +76,13 @@ export default async function DashboardPage() {
               </div>
               <div className="flex items-center gap-2 text-[8px] font-mono">
                 <span className="flex items-center gap-1"><span className="w-2 h-2 bg-dark-500" /> Done</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-primary-400" /> Active</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-red-500" /> Blocked</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-primary-400" /> Ongoing</span>
               </div>
             </div>
             <div className="space-y-1.5">
-              {data.charts.tasksByDepartment.map(({ department: dept, done, inProgress, blocked, total }) => {
+              {data.charts.tasksByDepartment.map(({ department: dept, done, inProgress, total }) => {
                 const donePct = total > 0 ? (done / total) * 100 : 0;
                 const inProgPct = total > 0 ? (inProgress / total) * 100 : 0;
-                const blockedPct = total > 0 ? (blocked / total) * 100 : 0;
 
                 return (
                   <div key={dept}>
@@ -93,7 +91,6 @@ export default async function DashboardPage() {
                       <span className="text-primary-400">{done}/{total}</span>
                     </div>
                     <div className="h-4 bg-primary-100 overflow-hidden flex">
-                      {blockedPct > 0 && <div className="h-full bg-red-500 transition-all" style={{ width: `${blockedPct}%` }} />}
                       {inProgPct > 0 && <div className="h-full bg-primary-400 transition-all" style={{ width: `${inProgPct}%` }} />}
                       {donePct > 0 && <div className="h-full bg-dark-500 transition-all" style={{ width: `${donePct}%` }} />}
                     </div>

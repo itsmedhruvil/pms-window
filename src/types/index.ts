@@ -44,10 +44,16 @@ export enum ProjectPriority {
   URGENT = 'urgent',
 }
 
+/**
+ * Tasks have exactly three statuses.
+ *
+ * The stored values are kept as `todo` / `in_progress` / `done` so existing
+ * MongoDB documents stay valid; the user-facing names are Pending / Ongoing /
+ * Done (see `TASK_STATUS_LABEL` in `src/lib/utils.ts`).
+ */
 export enum TaskStatus {
   TODO = 'todo',
   IN_PROGRESS = 'in_progress',
-  BLOCKED = 'blocked',
   DONE = 'done',
 }
 

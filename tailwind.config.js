@@ -43,7 +43,6 @@ module.exports = {
         task: {
           todo: '#6b7280',
           inProgress: '#3b82f6',
-          blocked: '#ef4444',
           done: '#10b981',
         },
         // ===== NEW THEME COLORS =====

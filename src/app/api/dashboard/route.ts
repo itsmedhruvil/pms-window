@@ -144,7 +144,6 @@ export const GET = withAuth(async (_req: NextRequest) => {
     total: number;
     done: number;
     inProgress: number;
-    blocked: number;
     todo: number;
     completionRate: number;
   }> = [];
@@ -162,7 +161,6 @@ export const GET = withAuth(async (_req: NextRequest) => {
       total: dept.total,
       done,
       inProgress: statusMap[TaskStatus.IN_PROGRESS] || 0,
-      blocked: statusMap[TaskStatus.BLOCKED] || 0,
       todo: statusMap[TaskStatus.TODO] || 0,
       completionRate: rate,
     });
@@ -174,11 +172,12 @@ export const GET = withAuth(async (_req: NextRequest) => {
     alertFrequency[a._id] = a.count;
   });
 
-  // Bottleneck detection
+  // Bottleneck detection — the department with outstanding work and the
+  // lowest completion rate.
   let bottleneckDepartment: Department | null = null;
   let lowestRate = 101;
   tasksByDeptFormatted.forEach((dept) => {
-    if (dept.blocked > 0 && dept.completionRate < lowestRate) {
+    if (dept.done < dept.total && dept.completionRate < lowestRate) {
       lowestRate = dept.completionRate;
       bottleneckDepartment = dept.department as Department;
     }

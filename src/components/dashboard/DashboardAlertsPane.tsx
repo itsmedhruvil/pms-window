@@ -13,7 +13,6 @@ interface DashboardCharts {
     total: number;
     done: number;
     inProgress: number;
-    blocked: number;
     todo: number;
     completionRate: number;
   }>;

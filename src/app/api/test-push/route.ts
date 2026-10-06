@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import UserModel from '@/models/User';
-import { sendFcmPushToUsers } from '@/lib/firebase-admin';
+import { sendFcmPushToUsers, isFcmConfigured } from '@/lib/firebase-admin';
 import { withAuth } from '@/lib/auth';
 import { UserRole } from '@/types';
 
@@ -13,6 +13,23 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
 
   try {
     await connectDB();
+
+    // Push delivery requires Firebase Admin credentials on the server.
+    // Without them, sending is skipped and every token "fails" — surface a
+    // clear configuration error instead of a misleading send failure.
+    if (!isFcmConfigured()) {
+      console.error(
+        '[Test Push] Firebase Admin not configured. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY.'
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Push notifications are disabled: Firebase Admin credentials are not configured on the server (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY).',
+        },
+        { status: 503 }
+      );
+    }
 
     const body = await req.json().catch(() => ({}));
     const title = body.title || '🧪 Test Push Notification';

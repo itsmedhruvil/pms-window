@@ -6,6 +6,7 @@ import { AlertCircle, ChevronRight, ChevronLeft, Check, X, FileText, Upload } fr
 import { cn, apiFetch } from '@/lib/utils';
 import { ProjectPriority } from '@/types';
 import type { ITemplateGroup } from '@/types';
+import { Spinner } from '@/components/ui/spinner';
 
 const PRIORITIES = [
   { value: ProjectPriority.STANDARD, label: 'Standard', desc: 'Standard timeline' },
@@ -570,7 +571,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
               <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-dark-600">
                 Task Template Group (optional)
               </span>
-              {loadingGroups && <span className="text-[10px] text-primary-400 font-mono">Loading...</span>}
+              {loadingGroups && <Spinner size="xs" />}
             </div>
             <p className="text-xs text-dark-400 font-mono mb-3">
               Select a template group to automatically generate department tasks.

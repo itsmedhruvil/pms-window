@@ -18,6 +18,14 @@ import type { Department } from '@/types';
 import { getActiveDepartmentNames } from '@/lib/departments';
 import { ClientSession } from 'mongoose';
 
+/**
+ * Tasks used to support a fourth `blocked` status driven by alerts. It is no
+ * longer part of `TaskStatus`, but old documents may still carry the value, so
+ * it is kept here as a raw string for the legacy cleanup in
+ * `normalizeLegacyTaskStatuses`.
+ */
+const LEGACY_BLOCKED_STATUS = 'blocked';
+
 async function getWorkflowDepartments() {
   const departments = await getActiveDepartmentNames();
   return departments.length > 0 ? departments : DEPARTMENT_SEQUENCE;
@@ -582,24 +590,18 @@ export async function unlockDependentTasks(completedTaskId: string): Promise<voi
     dependencyTaskId: completedTaskId,
     isLocked: true,
   })
-    .select('_id projectId status')
+    .select('_id')
     .lean();
 
   if (dependentTasks.length === 0) return;
 
   // Bulk update all dependent tasks in one operation
-  const bulkOps = dependentTasks.map((task) => {
-    const setFields: Record<string, any> = { isLocked: false };
-    if (task.status === TaskStatus.BLOCKED) {
-      setFields.status = TaskStatus.TODO;
-    }
-    return {
-      updateOne: {
-        filter: { _id: task._id },
-        update: { $set: setFields },
-      },
-    };
-  });
+  const bulkOps = dependentTasks.map((task) => ({
+    updateOne: {
+      filter: { _id: task._id },
+      update: { $set: { isLocked: false } },
+    },
+  }));
 
   await TaskModel.bulkWrite(bulkOps);
 
@@ -607,13 +609,40 @@ export async function unlockDependentTasks(completedTaskId: string): Promise<voi
 }
 
 /**
- * Repair stale blocked tasks by comparing them with unresolved alerts.
- * This keeps older data sane if an alert was resolved before unblock logic ran.
+ * Legacy data hygiene.
+ *
+ * Tasks used to support a fourth `blocked` status that alerts would set.
+ * Task statuses are now limited to Pending / Ongoing / Done, so any leftover
+ * `blocked` document is normalised back to Pending here. Also keeps
+ * `Project.activeAlertIds` in sync with the project's unresolved alerts.
  */
-export async function reconcileBlockedTasksWithAlerts(projectId?: string): Promise<void> {
-  const projectIds = projectId
-    ? [new Types.ObjectId(projectId)]
-    : await TaskModel.distinct('projectId', { status: TaskStatus.BLOCKED });
+export async function normalizeLegacyTaskStatuses(projectId?: string): Promise<void> {
+  const scope = projectId ? { projectId: new Types.ObjectId(projectId) } : {};
+
+  // `blocked` is no longer a valid TaskStatus, so the raw collection is used
+  // for this legacy cleanup instead of the typed model API.
+  const legacyTasks = await TaskModel.collection
+    .find({ ...scope, status: LEGACY_BLOCKED_STATUS }, { projection: { projectId: 1 } })
+    .toArray();
+
+  if (legacyTasks.length === 0 && !projectId) return;
+
+  if (legacyTasks.length > 0) {
+    await TaskModel.collection.updateMany(
+      { ...scope, status: LEGACY_BLOCKED_STATUS },
+      { $set: { status: TaskStatus.TODO } }
+    );
+  }
+
+  const projectIds: string[] = projectId
+    ? [projectId]
+    : [
+        ...new Set(
+          legacyTasks
+            .map((task) => (task.projectId ? String(task.projectId) : null))
+            .filter((id): id is string => Boolean(id))
+        ),
+      ];
 
   await Promise.all(
     projectIds.map(async (id) => {
@@ -621,47 +650,27 @@ export async function reconcileBlockedTasksWithAlerts(projectId?: string): Promi
         projectId: id,
         status: { $ne: AlertStatus.RESOLVED },
       })
-        .select('_id taskId affectedDepartments')
+        .select('_id')
         .lean();
 
-      if (openAlerts.length === 0) {
-        await Promise.all([
-          TaskModel.updateMany(
-            { projectId: id, status: TaskStatus.BLOCKED },
-            { $set: { status: TaskStatus.TODO } }
-          ),
-          ProjectModel.findByIdAndUpdate(id, { $set: { activeAlertIds: [] } }),
-        ]);
-        return;
-      }
-
-      const taskAlertTaskIds = openAlerts
-        .map((alert) => alert.taskId)
-        .filter((taskId): taskId is NonNullable<typeof taskId> => Boolean(taskId))
-        .map((id) => id.toString());
-      const globalAlertDepartments = [
-        ...new Set(
-          openAlerts
-            .filter((alert) => !alert.taskId)
-            .flatMap((alert) => alert.affectedDepartments)
-        ),
-      ];
-
-      await Promise.all([
-        TaskModel.updateMany(
-          {
-            projectId: id,
-            status: TaskStatus.BLOCKED,
-            _id: { $nin: taskAlertTaskIds },
-            department: { $nin: globalAlertDepartments },
-          },
-          { $set: { status: TaskStatus.TODO } }
-        ),
-        ProjectModel.findByIdAndUpdate(id, {
-          $set: { activeAlertIds: openAlerts.map((alert) => alert._id) },
-        }),
-      ]);
+      await ProjectModel.findByIdAndUpdate(id, {
+        $set: { activeAlertIds: openAlerts.map((alert) => alert._id) },
+      });
     })
+  );
+}
+
+/**
+ * Normalise a single task that may still carry the legacy `blocked` status.
+ * Uses the `_id` index and matches nothing once the data is clean, so it is
+ * cheap enough to run on every task detail load.
+ */
+export async function normalizeLegacyTaskStatus(taskId: string): Promise<void> {
+  if (!Types.ObjectId.isValid(taskId)) return;
+
+  await TaskModel.collection.updateOne(
+    { _id: new Types.ObjectId(taskId), status: LEGACY_BLOCKED_STATUS },
+    { $set: { status: TaskStatus.TODO } }
   );
 }
 
@@ -713,8 +722,11 @@ export async function updateProjectCompletion(projectId: string): Promise<void> 
 }
 
 /**
- * Apply alert effects: put project on hold, block affected tasks.
- * (DISCUSSION type was removed from alerts — discussions are now a standalone model.)
+ * Apply alert effects: put the project on hold and register the alert.
+ *
+ * Alerts no longer change task status — tasks only ever have the three
+ * statuses Pending / Ongoing / Done. The alert itself remains visible on the
+ * project and task so teams can see what is affected.
  */
 export async function applyAlertEffects(alertId: string): Promise<void> {
   const alert = await AlertModel.findById(alertId).populate('projectId');
@@ -727,42 +739,17 @@ export async function applyAlertEffects(alertId: string): Promise<void> {
       $addToSet: { activeAlertIds: alert._id },
     });
   }
-
-  // Block the specific task if this alert is tied to one
-  if (alert.taskId) {
-    await TaskModel.findByIdAndUpdate(alert.taskId, {
-      status: TaskStatus.BLOCKED,
-    });
-  } else if (alert.projectId) {
-    // Global/project alert: block tasks in affected departments
-    await TaskModel.updateMany(
-      {
-        projectId: alert.projectId,
-        department: { $in: alert.affectedDepartments },
-        status: { $in: [TaskStatus.TODO, TaskStatus.IN_PROGRESS] },
-      },
-      { $set: { status: TaskStatus.BLOCKED } }
-    );
-  }
-  // For internal task alerts with no projectId, only the task itself gets blocked (handled above)
 }
 
 /**
- * Resolve alert effects: restore project, unblock tasks
+ * Resolve alert effects: restore project status and clear the active alert.
  */
 export async function resolveAlertEffects(alertId: string): Promise<void> {
   const alert = await AlertModel.findById(alertId);
   if (!alert) return;
 
-  // For internal task alerts (no projectId), just unblock the task and return
-  if (!alert.projectId) {
-    if (alert.taskId) {
-      await TaskModel.findByIdAndUpdate(alert.taskId, {
-        status: TaskStatus.TODO,
-      });
-    }
-    return;
-  }
+  // Internal task alerts (no projectId) have no project state to restore.
+  if (!alert.projectId) return;
 
   // Remove from project's active alerts
   await ProjectModel.findByIdAndUpdate(alert.projectId, {
@@ -782,8 +769,6 @@ export async function resolveAlertEffects(alertId: string): Promise<void> {
     });
   }
 
-  await reconcileBlockedTasksWithAlerts(alert.projectId.toString());
-
   // Realtime events removed
 }
 
@@ -799,14 +784,9 @@ export function validateTaskTransition(
     return { valid: false, reason: 'Task is locked. Complete dependent tasks first.' };
   }
 
-  if (currentStatus === TaskStatus.BLOCKED) {
-    return { valid: false, reason: 'Task is blocked by an active alert.' };
-  }
-
   const allowedTransitions: Record<TaskStatus, TaskStatus[]> = {
     [TaskStatus.TODO]: [TaskStatus.IN_PROGRESS, TaskStatus.DONE],
     [TaskStatus.IN_PROGRESS]: [TaskStatus.DONE, TaskStatus.TODO],
-    [TaskStatus.BLOCKED]: [], // Cannot transition from blocked
     [TaskStatus.DONE]: [TaskStatus.TODO, TaskStatus.IN_PROGRESS],
   };
 

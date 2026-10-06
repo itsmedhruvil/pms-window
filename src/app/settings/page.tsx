@@ -16,6 +16,8 @@ export default async function SettingsPage() {
   const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
   if (!isAdmin) redirect('/dashboard');
 
+  const isSuperAdmin = user.role === UserRole.SUPER_ADMIN;
+
   await connectDB();
   const [rawDepartments, rawAlerts] = await Promise.all([
     DepartmentModel.find().select('-__v').sort({ sequence: 1 }).lean(),
@@ -29,16 +31,19 @@ export default async function SettingsPage() {
 
   return (
     <AppLayout activeAlertCount={activeAlertCount}>
-      <SettingsClient initialDepartments={departments as unknown as Array<{
-        _id: string;
-        name: string;
-        label: string;
-        abbreviation: string;
-        sequence: number;
-        description: string;
-        isActive: boolean;
-        factoryGroup: FactoryGroup;
-      }>} />
+      <SettingsClient
+        canManage={isSuperAdmin}
+        initialDepartments={departments as unknown as Array<{
+          _id: string;
+          name: string;
+          label: string;
+          abbreviation: string;
+          sequence: number;
+          description: string;
+          isActive: boolean;
+          factoryGroup: FactoryGroup;
+        }>}
+      />
     </AppLayout>
   );
 }

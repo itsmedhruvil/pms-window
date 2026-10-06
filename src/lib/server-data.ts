@@ -26,7 +26,7 @@ import {
   UserRole,
 } from '@/types';
 import { subDays } from 'date-fns';
-import { ensureDefaultTaskTemplates, reconcileBlockedTasksWithAlerts } from '@/lib/workflow';
+import { ensureDefaultTaskTemplates, normalizeLegacyTaskStatuses, normalizeLegacyTaskStatus } from '@/lib/workflow';
 import { getTaskStageFilter } from '@/lib/task-stage-filter';
 
 // ─── Projects ────────────────────────────────────────────────────────────────
@@ -125,7 +125,7 @@ export async function getProjects(filters: ProjectListFilters = {}) {
 
 export async function getProjectDetail(id: string) {
   await connectDB();
-  await reconcileBlockedTasksWithAlerts(id);
+  await normalizeLegacyTaskStatuses(id);
 
   const [project, tasks, alerts] = await Promise.all([
     ProjectModel.findById(id)
@@ -185,7 +185,7 @@ export async function getTasks(filters: TaskListFilters = {}) {
     pageSize,
   } = filters;
 
-  await reconcileBlockedTasksWithAlerts(projectId === null ? undefined : projectId);
+  await normalizeLegacyTaskStatuses(projectId === null ? undefined : projectId);
 
   const query: Record<string, unknown> = {};
   if (projectId !== undefined) {
@@ -275,6 +275,7 @@ export async function getTaskCounts(
 
 export async function getTaskDetail(id: string) {
   await connectDB();
+  await normalizeLegacyTaskStatus(id);
 
   return TaskModel.findById(id)
     .populate('projectId', 'projectTitle clientName status deadline')
@@ -415,7 +416,7 @@ export async function getDashboardData() {
   const taskCompletionRate: Record<string, number> = {};
   const tasksByDeptFormatted: Array<{
     department: string; total: number; done: number;
-    inProgress: number; blocked: number; todo: number; completionRate: number;
+    inProgress: number; todo: number; completionRate: number;
   }> = [];
 
   tasksByDeptData.forEach((dept: { _id: string; statuses: Array<{ status: string; count: number }>; total: number }) => {
@@ -427,7 +428,6 @@ export async function getDashboardData() {
     tasksByDeptFormatted.push({
       department: dept._id, total: dept.total, done,
       inProgress: sm[TaskStatus.IN_PROGRESS] || 0,
-      blocked: sm[TaskStatus.BLOCKED] || 0,
       todo: sm[TaskStatus.TODO] || 0,
       completionRate: rate,
     });
@@ -437,11 +437,12 @@ export async function getDashboardData() {
   const alertFrequency: Record<string, number> = {};
   alertStats.forEach((a: { _id: string; count: number }) => { alertFrequency[a._id] = a.count; });
 
-  // Bottleneck detection
+  // Bottleneck detection — the department with outstanding work and the
+  // lowest completion rate.
   let bottleneckDepartment: Department | null = null;
   let lowestRate = 101;
   tasksByDeptFormatted.forEach((dept) => {
-    if (dept.blocked > 0 && dept.completionRate < lowestRate) {
+    if (dept.done < dept.total && dept.completionRate < lowestRate) {
       lowestRate = dept.completionRate;
       bottleneckDepartment = dept.department as Department;
     }

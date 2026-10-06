@@ -1,9 +1,9 @@
 'use client';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, type DragEvent } from 'react';
 import useSWR, { mutate as swrMutate } from 'swr';
-import { invalidateTasks } from '@/lib/client-data';
-import { dispatchDataChange } from '@/hooks/useRealtime';
+import { invalidateComments, invalidateTasks } from '@/lib/client-data';
+import { dispatchDataChange, useRealtime } from '@/hooks/useRealtime';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -33,7 +33,7 @@ import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
 import { Modal } from '@/components/ui/Modal';
 import { TaskStatusBadge } from '@/components/ui/badges';
 import { apiFetch, cn, getDepartmentLabel, formatDate, formatDateTime } from '@/lib/utils';
-import { IAlert, IComment, IProject, ITask, IUser, TaskStatus } from '@/types';
+import { IComment, IProject, ITask, IUser, TaskStatus } from '@/types';
 
 interface TaskDetailClientProps {
   initialTask: ITask;
@@ -63,17 +63,29 @@ function getAssignedUser(task: ITask) {
     : null;
 }
 
+/**
+ * A single task attachment. `uploadedAt` may arrive as a real `Date` (RSC payload)
+ * or as an ISO string (JSON API / SWR responses), so both are allowed.
+ */
+type TaskFileEntry = {
+  id: string;
+  name: string;
+  url: string;
+  size: number;
+  type: string;
+  publicId?: string;
+  uploadedAt: Date | string;
+};
+
+/** Safely normalise a `Date` | ISO string into an ISO string (never throws). */
+function toIsoString(value: Date | string | undefined): string {
+  const date = value instanceof Date ? value : value ? new Date(value) : new Date();
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+}
+
 /** Get all files from a task — merges `files`, `imageAttachments`, `attachments` */
-function getAllTaskFiles(task: ITask) {
-  const fileMap = new Map<string, {
-    id: string;
-    name: string;
-    url: string;
-    size: number;
-    type: string;
-    publicId?: string;
-    uploadedAt: Date;
-  }>();
+function getAllTaskFiles(task: ITask): TaskFileEntry[] {
+  const fileMap = new Map<string, TaskFileEntry>();
 
   const sources = [task.files, task.imageAttachments, task.attachments].filter(Boolean) as Array<any[]>;
   for (const arr of sources) {
@@ -126,6 +138,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
   const [timelineSaving, setTimelineSaving] = useState(false);
   const [timelineError, setTimelineError] = useState<string | null>(null);
   const [fileUploading, setFileUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -140,7 +153,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
       return json.data;
     },
     {
-      refreshInterval: 30000,
+      refreshInterval: 15000,
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
       dedupingInterval: 2000,
@@ -149,6 +162,15 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
       },
     }
   );
+
+  // Instant in-app propagation: a task changed elsewhere in this session (the
+  // tasks list, a bulk update, a project panel) lands here without a reload.
+  useRealtime({
+    onTaskUpdated: (updated) => {
+      if (!updated || updated._id !== task._id) return;
+      setTask(updated);
+    },
+  });
 
   const project = getProject(task);
   const projectId = getProjectId(task);
@@ -214,7 +236,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
     setSubmittingDone(true);
     setStatusError(null);
 
-    const commentResult = await apiFetch('/api/comments', {
+    const commentResult = await apiFetch<IComment>('/api/comments', {
       method: 'POST',
       body: JSON.stringify({
         taskId: task._id,
@@ -228,6 +250,14 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
       setSubmittingDone(false);
       return;
     }
+
+    // Surface the completion comment in the thread straight away instead of
+    // waiting for the thread's next poll.
+    dispatchDataChange('comment', 'added', {
+      comment: commentResult.data,
+      taskId: task._id,
+    });
+    invalidateComments();
 
     const result = await apiFetch<ITask>(`/api/tasks/${task._id}`, {
       method: 'PATCH',
@@ -294,94 +324,102 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
     setEditingDates(false);
   };
 
-  /** Upload file(s) to Cloudinary via the API, then save to task */
-  const uploadFiles = async (files: FileList | null) => {
-    if (!files?.length) return;
-    setUploadError(null);
-    setFileUploading(true);
-
-    const selected = Array.from(files).slice(0, MAX_FILES - allFiles.length);
-
-    if (allFiles.length >= MAX_FILES) {
-      setUploadError(`Maximum ${MAX_FILES} files allowed.`);
-      setFileUploading(false);
-      return;
-    }
-
-    const invalid = selected.find((file) => file.size > MAX_FILE_SIZE);
-    if (invalid) {
-      setUploadError(`Use files under ${Math.round(MAX_FILE_SIZE / 1_000_000)} MB each.`);
-      setFileUploading(false);
-      return;
-    }
-
-    const existing = allFiles;
-    const additions: Array<{
-      id: string;
-      name: string;
-      url: string;
-      size: number;
-      type: string;
-      publicId?: string;
-      uploadedAt: Date;
-    }> = [];
-
-    for (const file of selected) {
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        if (projectId) formData.append('projectId', projectId);
-
-        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-        const uploadData = await uploadRes.json();
-
-        if (uploadData.success) {
-          additions.push({
-            id: `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
-            name: file.name,
-            url: uploadData.data.url,
-            size: file.size,
-            type: file.type,
-            publicId: uploadData.data.publicId,
-            uploadedAt: new Date(),
-          });
-        }
-      } catch {
-        // skip failed uploads
-      }
-    }
-
-    if (additions.length > 0) {
-      const updatedFiles = [...existing, ...additions];
-      const filesForSave = updatedFiles.map((f) => ({
-        id: f.id,
-        name: f.name,
-        url: f.url,
-        size: f.size,
-        type: f.type,
-        publicId: f.publicId,
-        uploadedAt: f.uploadedAt.toISOString(),
-      }));
-      await updateTask({ files: filesForSave } as any);
-    }
-
-    setFileUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    if (cameraInputRef.current) cameraInputRef.current.value = '';
-  };
-
-  const removeFile = async (fileId: string) => {
-    const updated = allFiles.filter((f) => f.id !== fileId);
-    const filesForSave = updated.map((f) => ({
+  /** Serialise the merged file list into the shape the API expects. */
+  const serializeFiles = (entries: TaskFileEntry[]) =>
+    entries.map((f) => ({
       id: f.id,
       name: f.name,
       url: f.url,
       size: f.size,
       type: f.type,
-      publicId: (f as any).publicId,
-      uploadedAt: f.uploadedAt,
+      publicId: f.publicId,
+      uploadedAt: toIsoString(f.uploadedAt),
     }));
-    await updateTask({ files: filesForSave } as any);
+
+  /** Upload file(s) to Cloudinary via the API, then save them to the task. */
+  const uploadFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploadError(null);
+    setFileUploading(true);
+
+    try {
+      const remainingSlots = MAX_FILES - allFiles.length;
+      if (remainingSlots <= 0) {
+        setUploadError(`Maximum ${MAX_FILES} files allowed.`);
+        return;
+      }
+
+      const selected = Array.from(files).slice(0, remainingSlots);
+
+      const invalid = selected.find((file) => file.size > MAX_FILE_SIZE);
+      if (invalid) {
+        setUploadError(`Use files under ${Math.round(MAX_FILE_SIZE / 1_000_000)} MB each.`);
+        return;
+      }
+
+      const additions: TaskFileEntry[] = [];
+      const failed: string[] = [];
+
+      for (const file of selected) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          if (projectId) formData.append('projectId', projectId);
+
+          const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+          const uploadData = await uploadRes.json();
+
+          if (uploadData.success) {
+            additions.push({
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+              name: file.name,
+              url: uploadData.data.url,
+              size: file.size,
+              type: file.type,
+              publicId: uploadData.data.publicId,
+              uploadedAt: new Date(),
+            });
+          } else {
+            failed.push(file.name);
+          }
+        } catch {
+          failed.push(file.name);
+        }
+      }
+
+      if (additions.length > 0) {
+        // Always merge against the latest task files so repeat uploads accumulate.
+        await updateTask({ files: serializeFiles([...allFiles, ...additions]) } as any);
+      }
+
+      if (failed.length > 0) {
+        setUploadError(
+          additions.length > 0
+            ? `Uploaded ${additions.length} file(s); could not upload: ${failed.join(', ')}`
+            : `Could not upload: ${failed.join(', ')}`
+        );
+      }
+    } catch {
+      setUploadError('Something went wrong while uploading. Please try again.');
+    } finally {
+      // Always release the UI so more files can be added afterwards.
+      setFileUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+    }
+  };
+
+  /** Drag & drop handler — reuses the same upload flow as the file picker. */
+  const handleDrop = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+    if (!canModify) return;
+    uploadFiles(event.dataTransfer?.files ?? null);
+  };
+
+  const removeFile = async (fileId: string) => {
+    const updated = allFiles.filter((f) => f.id !== fileId);
+    await updateTask({ files: serializeFiles(updated) } as any);
   };
 
   const tabs: { id: TabId; label: string; icon: typeof ImageIcon }[] = [
@@ -483,7 +521,32 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
 
           {/* Files tab — upload + download only, no inline rendering */}
           {activeTab === 'files' && (
-            <section className="border border-primary-200">
+            <section
+              className={cn(
+                'relative border transition-colors',
+                isDragging && canModify ? 'border-dark-500 bg-primary-50' : 'border-primary-200'
+              )}
+              onDragOver={(event) => {
+                if (!canModify) return;
+                event.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={(event) => {
+                if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+                setIsDragging(false);
+              }}
+              onDrop={handleDrop}
+            >
+              {isDragging && canModify && (
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-primary-50/80">
+                  <div className="flex flex-col items-center gap-2 text-dark-500">
+                    <Upload className="w-7 h-7" />
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest">
+                      Drop files to upload
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="px-4 py-3 border-b border-primary-200 flex items-center justify-between gap-3">
                 <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-primary-500">
                   Attachments ({allFiles.length}/{MAX_FILES})
@@ -535,15 +598,38 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
               )}
 
               {allFiles.length === 0 ? (
-                <div className="p-12 text-center">
-                  <Paperclip className="w-8 h-8 text-primary-300 mx-auto mb-3" />
-                  <p className="text-xs font-mono text-primary-400">No files uploaded for this task.</p>
-                  <p className="text-[10px] font-mono text-primary-400 mt-0.5">
-                    Upload images, PDFs, documents, spreadsheets, or take a photo (max {Math.round(MAX_FILE_SIZE / 1_000_000)} MB each)
-                  </p>
-                </div>
+                canModify ? (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={fileUploading}
+                    className="w-full p-12 text-center hover:bg-primary-50 disabled:opacity-60 transition-colors"
+                  >
+                    {fileUploading ? (
+                      <Loader2 className="w-8 h-8 text-primary-400 mx-auto mb-3 animate-spin" />
+                    ) : (
+                      <Upload className="w-8 h-8 text-primary-300 mx-auto mb-3" />
+                    )}
+                    <p className="text-xs font-mono font-bold uppercase tracking-widest text-dark-500">
+                      {fileUploading ? 'Uploading...' : 'Click to upload or drag & drop'}
+                    </p>
+                    <p className="text-[10px] font-mono text-primary-400 mt-1">
+                      Images, PDFs, documents & spreadsheets (max {Math.round(MAX_FILE_SIZE / 1_000_000)} MB each)
+                    </p>
+                  </button>
+                ) : (
+                  <div className="p-12 text-center">
+                    <Paperclip className="w-8 h-8 text-primary-300 mx-auto mb-3" />
+                    <p className="text-xs font-mono text-primary-400">No files uploaded for this task.</p>
+                  </div>
+                )
               ) : (
                 <div className="space-y-6 p-4">
+                  {canModify && (
+                    <p className="text-[10px] font-mono text-primary-400 border border-dashed border-primary-200 px-3 py-2">
+                      Tip: drag &amp; drop files anywhere here, or use the Upload / Camera buttons above.
+                    </p>
+                  )}
                   {/* Image gallery */}
                   {imageFiles.length > 0 && (
                     <div>
@@ -661,21 +747,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
           {/* Comments tab */}
           {activeTab === 'comments' && (
             <section className="border border-primary-200 h-[520px] flex flex-col">
-              {task.status === TaskStatus.BLOCKED ? (
-                <div className="flex flex-col items-center justify-center h-full px-6 py-12 text-center">
-                  <Lock className="w-8 h-8 text-primary-300 mb-3" />
-                  <p className="text-sm font-bold text-primary-500 font-mono">Comments Disabled</p>
-                  <p className="text-[11px] text-primary-400 font-mono mt-1 max-w-sm">
-                    This task is currently blocked by an active alert. Comments are unavailable until the alert is resolved.
-                  </p>
-                  <div className="mt-4 flex items-center gap-2 text-[10px] font-mono text-red-500 bg-red-50 border border-red-200 px-3 py-2">
-                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                    Resolve the blocking alert to re-enable comments
-                  </div>
-                </div>
-              ) : (
-                <CommentThread taskId={task._id} currentUser={currentUser} availableUsers={[]} />
-              )}
+              <CommentThread taskId={task._id} currentUser={currentUser} availableUsers={[]} />
             </section>
           )}
         </main>
@@ -689,23 +761,23 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
               <div className="grid grid-cols-1 gap-2">
                 <StatusActionButton
                   icon={RotateCcw}
-                  label="Mark To Do"
+                  label="Mark Pending"
                   active={task.status === TaskStatus.TODO}
-                  disabled={saving || task.isLocked || task.status === TaskStatus.BLOCKED}
+                  disabled={saving || task.isLocked}
                   onClick={() => updateTask({ status: TaskStatus.TODO })}
                 />
                 <StatusActionButton
                   icon={PlayCircle}
                   label="Start Task"
                   active={task.status === TaskStatus.IN_PROGRESS}
-                  disabled={saving || task.isLocked || task.status === TaskStatus.BLOCKED}
+                  disabled={saving || task.isLocked}
                   onClick={() => updateTask({ status: TaskStatus.IN_PROGRESS })}
                 />
                 <StatusActionButton
                   icon={CheckCircle2}
                   label="Mark Done"
                   active={task.status === TaskStatus.DONE}
-                  disabled={saving || task.isLocked || task.status === TaskStatus.BLOCKED || checkingComments}
+                  disabled={saving || task.isLocked || checkingComments}
                   onClick={checkCommentsBeforeDone}
                 />
               </div>
@@ -779,12 +851,6 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                 <div className="flex items-center gap-2 text-[11px] font-mono text-primary-500">
                   <Lock className="w-3.5 h-3.5" />
                   Waiting for dependency to complete
-                </div>
-              )}
-              {task.status === TaskStatus.BLOCKED && (
-                <div className="flex items-center gap-2 text-[11px] font-mono text-red-600">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Blocked by active alert
                 </div>
               )}
             </div>
@@ -989,8 +1055,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
           taskId={task._id}
           defaultAffectedDepartments={[task.department]}
           title="Raise Task Alert"
-          onSuccess={(alert: IAlert) => {
-            setTask((prev) => ({ ...prev, status: TaskStatus.BLOCKED }));
+          onSuccess={() => {
             setAlertModalOpen(false);
           }}
           onCancel={() => setAlertModalOpen(false)}

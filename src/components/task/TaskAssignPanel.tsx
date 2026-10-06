@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { mutate as swrMutate } from 'swr';
 import { User, X, Check, Search } from 'lucide-react';
 import { cn, getDepartmentLabel, apiFetch } from '@/lib/utils';
+import { Spinner } from '@/components/ui/spinner';
 import type { ITask, IUser } from '@/types';
 
 interface TaskAssignPanelProps {
@@ -126,8 +127,8 @@ export function TaskAssignPanel({ task, onAssigned, onClose }: TaskAssignPanelPr
       {/* User list */}
       <div className="max-h-52 overflow-y-auto">
         {loading ? (
-          <div className="px-3 py-4 text-center">
-            <span className="text-[11px] text-primary-400 font-mono">Loading...</span>
+          <div className="flex items-center justify-center px-3 py-4">
+            <Spinner size="sm" />
           </div>
         ) : filteredUsers.length === 0 ? (
           <div className="px-3 py-4 text-center">

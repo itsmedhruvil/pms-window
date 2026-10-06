@@ -815,7 +815,6 @@ export function ProjectDetail({
               {progressGroups.map((group) => {
                 const groupTasks = group.tasks;
                 const done = groupTasks.filter((t) => t.status === TaskStatus.DONE).length;
-                const blocked = groupTasks.filter((t) => t.status === TaskStatus.BLOCKED).length;
                 const inProgress = groupTasks.filter((t) => t.status === TaskStatus.IN_PROGRESS).length;
                 const pct = groupTasks.length > 0 ? Math.round((done / groupTasks.length) * 100) : 0;
 
@@ -832,12 +831,11 @@ export function ProjectDetail({
                       <span className="text-sm font-black font-mono text-dark-500">{pct}%</span>
                     </div>
                     <div className="h-1.5 bg-primary-100 rounded-full overflow-hidden">
-                      <div className={cn('h-full rounded-full transition-all', blocked > 0 ? 'bg-red-500' : 'bg-dark-500')} style={{ width: `${pct}%` }} />
+                      <div className="h-full rounded-full transition-all bg-dark-500" style={{ width: `${pct}%` }} />
                     </div>
                     <div className="flex items-center gap-2 mt-2 text-[10px] font-mono text-primary-500">
                       <span className="text-green-600 font-bold">{done}</span>/<span>{groupTasks.length}</span> done
-                      {blocked > 0 && <span className="text-red-500">· {blocked} blocked</span>}
-                      {inProgress > 0 && <span className="text-blue-500">· {inProgress} active</span>}
+                      {inProgress > 0 && <span className="text-blue-500">· {inProgress} ongoing</span>}
                     </div>
                     <div className="mt-2 text-[9px] font-mono text-primary-400 group-hover:text-dark-500 transition-colors flex items-center gap-1">
                       {group.viewLabel} <ArrowUpRight className="w-2.5 h-2.5" />
@@ -908,7 +906,6 @@ export function ProjectDetail({
               const deptDone = deptTasks.filter((t) => t.status === TaskStatus.DONE).length;
               const deptTotal = deptTasks.length;
               const deptPct = Math.round((deptDone / deptTotal) * 100);
-              const blockedCount = deptTasks.filter((t) => t.status === TaskStatus.BLOCKED).length;
               const inProgressCount = deptTasks.filter((t) => t.status === TaskStatus.IN_PROGRESS).length;
 
               return (
@@ -923,10 +920,7 @@ export function ProjectDetail({
                     </div>
                     <div className="h-1.5 bg-primary-100 rounded-full overflow-hidden">
                       <div
-                        className={cn(
-                          'h-full rounded-full transition-all duration-500',
-                          blockedCount > 0 ? 'bg-red-500' : 'bg-dark-500'
-                        )}
+                        className="h-full rounded-full transition-all duration-500 bg-dark-500"
                         style={{ width: `${deptPct}%` }}
                       />
                     </div>
@@ -935,13 +929,7 @@ export function ProjectDetail({
                       {inProgressCount > 0 && (
                         <span className="flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                          {inProgressCount} active
-                        </span>
-                      )}
-                      {blockedCount > 0 && (
-                        <span className="flex items-center gap-1 text-red-500">
-                          <AlertTriangle className="w-2.5 h-2.5" />
-                          {blockedCount} blocked
+                          {inProgressCount} ongoing
                         </span>
                       )}
                     </div>
@@ -964,7 +952,6 @@ export function ProjectDetail({
                             'w-2.5 h-2.5 rounded-full border-2',
                             task.status === TaskStatus.DONE ? 'bg-green-500 border-green-500' :
                             task.status === TaskStatus.IN_PROGRESS ? 'bg-blue-500 border-blue-500' :
-                            task.status === TaskStatus.BLOCKED ? 'bg-red-500 border-red-500' :
                             'border-primary-300'
                           )} />
                         </div>
@@ -975,7 +962,6 @@ export function ProjectDetail({
                             <span className={cn(
                               'text-xs font-medium leading-tight',
                               task.status === TaskStatus.DONE ? 'text-primary-400 line-through' :
-                              task.status === TaskStatus.BLOCKED ? 'text-red-600' :
                               'text-dark-500'
                             )}>
                               {task.title}
@@ -1015,14 +1001,6 @@ export function ProjectDetail({
           onSuccess={(alert) => {
             setAlerts((prev) => (prev.some((a) => a._id === alert._id) ? prev : [alert, ...prev]));
             setProject((prev) => ({ ...prev, status: ProjectStatus.ON_HOLD }));
-            setTasks((prev) =>
-              prev.map((task) =>
-                alert.affectedDepartments.includes(task.department) &&
-                [TaskStatus.TODO, TaskStatus.IN_PROGRESS].includes(task.status)
-                  ? { ...task, status: TaskStatus.BLOCKED }
-                  : task
-              )
-            );
             setAlertModalOpen(false);
           }}
           onCancel={() => setAlertModalOpen(false)}

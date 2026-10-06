@@ -148,15 +148,16 @@ New → In Production → [On Hold] → Completed → Dispatched
 Admin raises alert
     ↓
 Project → On Hold
-Affected dept tasks → Blocked
     ↓
 Dept users acknowledge
     ↓  (requires comment thread)
 Admin resolves
     ↓
 Project → In Production
-Tasks → unblocked
 ```
+
+Alerts no longer change task status — they put the project on hold and stay
+visible on the project/task so teams can see what is affected.
 
 No bypass. Resolution requires:
 1. At least one acknowledgment
@@ -164,13 +165,17 @@ No bypass. Resolution requires:
 
 ### Task State Machine
 
-```
-Todo → In Progress → Done
-           ↑
-      (can revert)
+Tasks have exactly three statuses: **Pending**, **Ongoing** and **Done**.
 
-Blocked (set by alerts — cannot transition until resolved)
 ```
+Pending → Ongoing → Done
+   ↑         ↑
+   └─────────┴── (can revert)
+```
+
+The task detail page exposes these as three actions — `Mark Pending`,
+`Start Task` and `Mark Done` — which map to the stored values
+`todo` / `in_progress` / `done`.
 
 Locked tasks (dependency not met) show disabled UI and reject API transitions.
 
@@ -278,7 +283,7 @@ comments: { taskId: 1, createdAt: 1 }  { alertId: 1, createdAt: 1 }
 - **Color**: Pure monochrome — **red is reserved exclusively for alerts**
 - **Corners**: Zero border-radius (sharp corners everywhere, factory aesthetic)
 - **Density**: Compact cards, tight spacing, information-first
-- **Status indicators**: Animated pulse on `ACTIVE` alerts and `BLOCKED` tasks
+- **Status indicators**: Animated pulse on `ACTIVE` alerts and `ON HOLD` projects
 
 ---
 

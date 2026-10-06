@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { mutate as swrMutate } from 'swr';
-import { ClipboardList, AlertTriangle, CheckSquare, Square, Plus } from 'lucide-react';
+import { ClipboardList, CheckSquare, Square, Plus } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TaskStatusBadge } from '@/components/ui/badges';
 import { Modal } from '@/components/ui/Modal';
 import { CreateInternalTaskForm } from '@/components/forms/CreateInternalTaskForm';
 import { apiFetch, formatDate, getDepartmentLabel, cn } from '@/lib/utils';
 import type { ITask, Department, ITemplateGroup } from '@/types';
-import { TaskStatus } from '@/types';
 
 interface InternalTasksPageClientProps {
   tasks: ITask[];
@@ -234,13 +233,7 @@ export function InternalTasksPageClient({
                             )}
                             <td>
                               <div className="flex items-center gap-2">
-                                {task.status === TaskStatus.BLOCKED && (
-                                  <AlertTriangle className="w-3 h-3 text-red-500 animate-pulse flex-shrink-0" />
-                                )}
-                                <span className={cn(
-                                  'font-medium text-dark-500',
-                                  task.status === TaskStatus.BLOCKED && 'text-red-700'
-                                )}>
+                                <span className="font-medium text-dark-500">
                                   {task.title}
                                 </span>
                               </div>

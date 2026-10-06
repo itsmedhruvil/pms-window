@@ -61,14 +61,14 @@ export function TableSkeleton({ rows = 5, cols = 5 }: { rows?: number; cols?: nu
 
 export function KanbanSkeleton() {
   return (
-    <div className="grid grid-cols-4 gap-4">
-      {['To Do', 'In Progress', 'Blocked', 'Done'].map((col) => (
+    <div className="grid grid-cols-3 gap-4">
+      {['Pending', 'Ongoing', 'Done'].map((col) => (
         <div key={col} className="border border-primary-200">
           <div className="px-3 py-2.5 bg-primary-100 border-b border-primary-200">
             <Skeleton className="h-3 w-20" />
           </div>
           <div className="p-2 space-y-2">
-            {Array.from({ length: col === 'In Progress' ? 3 : col === 'Done' ? 4 : 2 }).map(
+            {Array.from({ length: col === 'Ongoing' ? 3 : col === 'Done' ? 4 : 2 }).map(
               (_, i) => (
                 <div key={i} className="border border-primary-200 p-3 space-y-2">
                   <Skeleton className="h-3 w-full" />

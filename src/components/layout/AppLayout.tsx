@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { UserButton, useUser } from '@clerk/nextjs';
 import {
   LayoutDashboard,
@@ -15,10 +15,10 @@ import {
   Plus,
   MessageCircle,
   Menu,
-  Building2,
   Settings,
   ChevronLeft,
   ChevronRight,
+  RotateCw,
 } from 'lucide-react';
 import { cn, getDepartmentLabel, apiFetch } from '@/lib/utils';
 import { AlertStatus, UserRole } from '@/types';
@@ -310,18 +310,6 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
             <span>Users</span>
           </Link>
           <Link
-            href="/departments"
-            className={cn(
-              'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',
-              pathname === '/departments'
-                ? 'bg-dark-500 text-white'
-                : 'text-dark-400 hover:text-dark-500 hover:bg-primary-50'
-            )}
-          >
-            <Building2 className="w-4 h-4 flex-shrink-0" />
-            <span>Departments</span>
-          </Link>
-          <Link
             href="/settings"
             className={cn(
               'flex items-center gap-3 px-3 py-2.5 text-xs font-mono font-medium transition-colors rounded-sm',
@@ -356,12 +344,29 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
 // Because Clerk state changes only re-render <Sidebar>, they don't cascade
 // into <main> where text inputs live, preserving focus during typing.
 
+/**
+ * Minimal shape of the browser Navigation API (Chromium). TypeScript's DOM lib
+ * does not ship these types yet, so only the members we use are declared.
+ */
+type NavigationLike = {
+  currentEntry: unknown;
+  entries(): unknown[];
+  addEventListener(type: string, listener: () => void): void;
+  removeEventListener(type: string, listener: () => void): void;
+};
+
 function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [liveActiveAlertCount, setLiveActiveAlertCount] = useState(activeAlertCount);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+
+  /** Mirrors the router's history stack in browsers without the Navigation API. */
+  const navStackRef = useRef<{ urls: string[]; pos: number }>({ urls: [], pos: -1 });
+  const poppedRef = useRef(false);
 
   const handleBack = () => {
     if (typeof window !== 'undefined') {
@@ -375,25 +380,89 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
     }
   };
 
+  /**
+   * Re-fetch every server component on the current route without a full page
+   * reload, so open tabs, filters and scroll position are all preserved.
+   */
+  const handleReload = () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    router.refresh();
+    window.setTimeout(() => setRefreshing(false), 600);
+  };
+
+  // ── Back / forward availability ────────────────────────────────────────────
+  // Next.js 16's App Router no longer writes an `idx` into window.history.state
+  // (it only writes `__NA` and `__PRIVATE_NEXTJS_INTERNALS_TREE`), so the old
+  // `state.idx < history.length - 1` test could never pass and the forward
+  // button stayed permanently disabled.
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const updateHistoryState = () => {
-      const currentState = window.history.state as { idx?: number } | null;
-      const hasBack = window.history.length > 1 && (typeof currentState?.idx !== 'number' || currentState.idx > 0);
-      const hasForward = typeof currentState?.idx === 'number' && currentState.idx < window.history.length - 1;
+    const nav = (window as unknown as { navigation?: NavigationLike }).navigation;
 
-      setCanGoBack(hasBack);
-      setCanGoForward(hasForward);
+    // Preferred: the Navigation API reports our exact position in the session
+    // history, so both buttons are always accurate.
+    if (nav && typeof nav.entries === 'function') {
+      const syncFromNavigation = () => {
+        const entries = nav.entries();
+        const index = nav.currentEntry
+          ? entries.findIndex((entry) => entry === nav.currentEntry)
+          : -1;
+        setCanGoBack(index > 0);
+        setCanGoForward(index >= 0 && index < entries.length - 1);
+      };
+
+      syncFromNavigation();
+      nav.addEventListener('currententrychange', syncFromNavigation);
+      window.addEventListener('popstate', syncFromNavigation);
+
+      return () => {
+        nav.removeEventListener('currententrychange', syncFromNavigation);
+        window.removeEventListener('popstate', syncFromNavigation);
+      };
+    }
+
+    // Fallback (Firefox / Safari): mirror the stack ourselves. `popstate` tells
+    // browser traversal apart from programmatic navigation, and any programmatic
+    // navigation wipes the forward entries.
+    const stack = navStackRef.current;
+    const url = window.location.pathname + window.location.search;
+
+    if (stack.pos < 0) {
+      stack.urls = [url];
+      stack.pos = 0;
+    } else if (poppedRef.current) {
+      poppedRef.current = false;
+      const landedAt = stack.urls.indexOf(url);
+      if (landedAt >= 0) {
+        stack.pos = landedAt;
+      } else {
+        stack.urls = [...stack.urls.slice(0, stack.pos + 1), url];
+        stack.pos = stack.urls.length - 1;
+      }
+    } else if (stack.urls[stack.pos] !== url) {
+      stack.urls = [...stack.urls.slice(0, stack.pos + 1), url];
+      stack.pos = stack.urls.length - 1;
+    }
+
+    const syncFromStack = () => {
+      setCanGoBack(stack.pos > 0);
+      setCanGoForward(stack.pos < stack.urls.length - 1);
     };
 
-    updateHistoryState();
-    window.addEventListener('popstate', updateHistoryState);
+    const handlePopState = () => {
+      poppedRef.current = true;
+      syncFromStack();
+    };
+
+    syncFromStack();
+    window.addEventListener('popstate', handlePopState);
 
     return () => {
-      window.removeEventListener('popstate', updateHistoryState);
+      window.removeEventListener('popstate', handlePopState);
     };
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     setLiveActiveAlertCount(activeAlertCount);
@@ -498,6 +567,17 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
                 aria-label="Go forward"
               >
                 <ChevronRight className="w-4 h-4" />
+              </button>
+              <span className="w-px h-4 bg-primary-200" aria-hidden="true" />
+              <button
+                type="button"
+                onClick={handleReload}
+                disabled={refreshing}
+                className="p-1.5 text-primary-500 hover:text-dark-500 disabled:text-primary-300 disabled:cursor-not-allowed transition-colors"
+                aria-label="Reload current page"
+                title="Reload current page"
+              >
+                <RotateCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
               </button>
             </div>
             <div className="flex items-center gap-2">

@@ -2,14 +2,15 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, AlertTriangle, Plus, CheckSquare, Square, Search, Trash2, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
-import { cn, getDepartmentLabel, formatDate, apiFetch } from '@/lib/utils';
+import { Lock, Plus, CheckSquare, Square, Search, Trash2, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { cn, getDepartmentLabel, formatDate, apiFetch, TASK_STATUS_LABEL } from '@/lib/utils';
 import { TaskStatusBadge } from '@/components/ui/badges';
 import { Modal } from '@/components/ui/Modal';
 import { FilterDrawer, MobileFilterButton } from '@/components/ui/FilterDrawer';
 import { CreateTaskForm } from '@/components/forms/CreateTaskForm';
 import type { ITask, IProject } from '@/types';
 import { TaskStatus, Department } from '@/types';
+import { useRealtime } from '@/hooks/useRealtime';
 
 type TaskView = 'pending' | 'done';
 
@@ -219,6 +220,103 @@ export function TasksClient({
     setTaskModalOpen(false);
   }, []);
 
+  // ── Hot reload ────────────────────────────────────────────────────────────
+  // Mirrors of the loaded rows so the realtime handler can branch on the
+  // current lists without depending on them (which would re-bind the listener
+  // on every render).
+  const pendingRef = useRef(pendingTasks);
+  const doneRef = useRef(doneTasks);
+  const doneLoadedRef = useRef(doneLoaded);
+  const lastFocusRefreshRef = useRef(0);
+
+  useEffect(() => { pendingRef.current = pendingTasks; }, [pendingTasks]);
+  useEffect(() => { doneRef.current = doneTasks; }, [doneTasks]);
+  useEffect(() => { doneLoadedRef.current = doneLoaded; }, [doneLoaded]);
+
+  /**
+   * A task mutated anywhere else in this session (task detail, bulk update,
+   * project panel) is patched in place, and tasks crossing the Pending/Done
+   * boundary are moved between the two lists with their counters kept honest.
+   */
+  useRealtime({
+    onTaskUpdated: (updated) => {
+      if (!updated?._id) return;
+      const id = updated._id;
+      const isDone = updated.status === TaskStatus.DONE;
+      const inPending = pendingRef.current.some((t) => t._id === id);
+      const inDone = doneRef.current.some((t) => t._id === id);
+
+      if (inPending && isDone) {
+        setPendingTasks((prev) => prev.filter((t) => t._id !== id));
+        setPendingCount((c) => Math.max(0, c - 1));
+        setDoneCount((c) => c + 1);
+        if (doneLoadedRef.current) {
+          setDoneTasks((prev) => (prev.some((t) => t._id === id) ? prev : [updated, ...prev]));
+        }
+        return;
+      }
+
+      if (inDone && !isDone) {
+        setDoneTasks((prev) => prev.filter((t) => t._id !== id));
+        setDoneCount((c) => Math.max(0, c - 1));
+        setPendingCount((c) => c + 1);
+        setPendingTasks((prev) => (prev.some((t) => t._id === id) ? prev : [updated, ...prev]));
+        return;
+      }
+
+      if (inPending) setPendingTasks((prev) => prev.map((t) => (t._id === id ? updated : t)));
+      if (inDone) setDoneTasks((prev) => prev.map((t) => (t._id === id ? updated : t)));
+    },
+  });
+
+  /**
+   * Re-fetch everything already loaded in the active view, so changes made by
+   * other users land without a manual reload. Pages already appended by
+   * "Load more" are requested in one go to keep the row set intact.
+   */
+  const refreshView = useCallback(async () => {
+    if (loadingView || loadingMore) return;
+    try {
+      if (view === 'pending') {
+        const limit = PAGE_SIZE * Math.max(1, pendingPage);
+        const res = await apiFetch<ITask[]>(withScope(`page=1&limit=${limit}`)) as unknown as TasksApiResponse;
+        if (res.success && Array.isArray(res.data)) {
+          setPendingTasks(res.data);
+          if (res.pagination) {
+            setPendingCount(res.pagination.total);
+            setPendingTotalPages(Math.max(1, Math.ceil(res.pagination.total / PAGE_SIZE)));
+          }
+        }
+      } else if (doneLoaded) {
+        const limit = PAGE_SIZE * Math.max(1, donePage);
+        const res = await apiFetch<ITask[]>(withScope(`status=done&page=1&limit=${limit}`)) as unknown as TasksApiResponse;
+        if (res.success && Array.isArray(res.data)) {
+          setDoneTasks(res.data);
+          if (res.pagination) {
+            setDoneCount(res.pagination.total);
+            setDoneTotalPages(Math.max(1, Math.ceil(res.pagination.total / PAGE_SIZE)));
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to refresh tasks:', err);
+    }
+  }, [view, pendingPage, donePage, doneLoaded, loadingView, loadingMore, withScope]);
+
+  // Refresh when the tab regains focus, throttled so alt-tabbing does not spam
+  // the API.
+  useEffect(() => {
+    const handleFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusRefreshRef.current < 5000) return;
+      lastFocusRefreshRef.current = now;
+      void refreshView();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [refreshView]);
+
   const filtered = tasks.filter((t) => {
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
 
@@ -243,13 +341,6 @@ export function TasksClient({
     }
     return true;
   });
-
-  const counts = {
-    todo: tasks.filter((t) => t.status === TaskStatus.TODO).length,
-    inProgress: tasks.filter((t) => t.status === TaskStatus.IN_PROGRESS).length,
-    blocked: tasks.filter((t) => t.status === TaskStatus.BLOCKED).length,
-    done: tasks.filter((t) => t.status === TaskStatus.DONE).length,
-  };
 
   const handleBulkUpdateStatus = async (status: TaskStatus) => {
     if (selectedTasks.size === 0 || bulkUpdating) return;
@@ -503,20 +594,6 @@ export function TasksClient({
               )}
             </div>
           </div>
-
-          {/* Stats row */}
-          <div className="flex gap-4 text-[11px] font-mono">
-            {[
-              { label: 'TODO', count: counts.todo, color: 'text-dark-400' },
-              { label: 'IN PROGRESS', count: counts.inProgress, color: 'text-dark-500 font-bold' },
-              { label: 'BLOCKED', count: counts.blocked, color: counts.blocked > 0 ? 'text-red-600 font-bold' : 'text-primary-400' },
-              { label: 'DONE', count: counts.done, color: 'text-primary-500' },
-            ].map(({ label, count, color }) => (
-              <span key={label} className={color}>
-                {count} {label}
-              </span>
-            ))}
-          </div>
         </div>
 
         <div className="flex-shrink-0 px-4 sm:px-6 py-2.5 border-b border-primary-100 flex flex-col gap-3 bg-primary-50">
@@ -615,10 +692,10 @@ export function TasksClient({
               >
                 <option value="all">{view === 'done' ? 'Done' : 'All Pending'}</option>
                 {(view === 'pending'
-                  ? [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED]
-                  : [TaskStatus.DONE]
+                  ? [TaskStatus.TODO, TaskStatus.IN_PROGRESS]
+                  : [] as TaskStatus[]
                 ).map((s) => (
-                  <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                  <option key={s} value={s}>{TASK_STATUS_LABEL[s]}</option>
                 ))}
               </select>
             </div>
@@ -646,8 +723,8 @@ export function TasksClient({
             </label>
             <div className="flex flex-wrap gap-1.5">
               {(['all', ...(view === 'pending'
-                ? [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED]
-                : [TaskStatus.DONE])] as const).map((s) => (
+                ? [TaskStatus.TODO, TaskStatus.IN_PROGRESS]
+                : [] as TaskStatus[])] as Array<TaskStatus | 'all'>).map((s) => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
@@ -658,7 +735,7 @@ export function TasksClient({
                       : 'border-primary-200 text-primary-500 hover:border-primary-400'
                   )}
                 >
-                  {s === 'all' ? (view === 'done' ? 'Done' : 'All Pending') : s.replace('_', ' ')}
+                  {s === 'all' ? (view === 'done' ? 'Done' : 'All Pending') : TASK_STATUS_LABEL[s]}
                 </button>
               ))}
             </div>
@@ -817,7 +894,6 @@ function TaskListView({
                 key={task._id}
                 className={cn(
                   'cursor-pointer transition-colors',
-                  task.status === TaskStatus.BLOCKED ? 'bg-red-50/30' : '',
                   task.isLocked ? 'opacity-60' : '',
                   selectedTasks.has(task._id) ? 'bg-blue-50' : ''
                 )}
@@ -844,13 +920,9 @@ function TaskListView({
                 <td>
                   <div className="flex items-center gap-2">
                     {task.isLocked && <Lock className="w-3 h-3 text-primary-400 flex-shrink-0" />}
-                    {task.status === TaskStatus.BLOCKED && (
-                      <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0 animate-pulse" />
-                    )}
                     <span className={cn(
                       'font-medium text-dark-500',
-                      task.isLocked && 'text-primary-500',
-                      task.status === TaskStatus.BLOCKED && 'text-red-700'
+                      task.isLocked && 'text-primary-500'
                     )}>
                       {task.title}
                     </span>

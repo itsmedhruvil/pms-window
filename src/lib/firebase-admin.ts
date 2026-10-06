@@ -9,9 +9,26 @@
  * This prevents build-time errors when env vars are not yet configured.
  */
 
+/** Strip surrounding quotes/whitespace that some hosts leave on env values */
+function cleanEnv(value: string | undefined): string {
+  return (value || '').trim().replace(/^["']|["']$/g, '');
+}
+
 /** Check if Firebase Admin credentials are configured */
 function hasAdminConfig(): boolean {
-  return !!(process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY);
+  return !!(
+    cleanEnv(process.env.FIREBASE_PROJECT_ID) &&
+    cleanEnv(process.env.FIREBASE_CLIENT_EMAIL) &&
+    cleanEnv(process.env.FIREBASE_PRIVATE_KEY)
+  );
+}
+
+/**
+ * Public helper so API routes can distinguish "push is disabled because the
+ * server is not configured" from "push was attempted but the send failed".
+ */
+export function isFcmConfigured(): boolean {
+  return hasAdminConfig();
 }
 
 /**
@@ -37,9 +54,10 @@ export async function sendFcmPush(
     if (getApps().length === 0) {
       initializeApp({
         credential: cert({
-          projectId: process.env.FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+          projectId: cleanEnv(process.env.FIREBASE_PROJECT_ID),
+          clientEmail: cleanEnv(process.env.FIREBASE_CLIENT_EMAIL),
+          // Env values often store newlines as literal "\n" — restore them.
+          privateKey: cleanEnv(process.env.FIREBASE_PRIVATE_KEY).replace(/\\n/g, '\n'),
         }),
       });
     }
