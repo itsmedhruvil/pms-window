@@ -15,6 +15,7 @@ export enum NotificationType {
   PROJECT_CREATED = 'project_created',
   INTERNAL_TASK_ASSIGNED = 'internal_task_assigned',
   TASK_OVERDUE = 'task_overdue',
+  TASK_PENDING = 'task_pending',
 }
 
 export interface InAppNotification {
@@ -28,10 +29,6 @@ export interface InAppNotification {
   metadata?: Record<string, unknown>;
 }
 
-/**
- * Notification event dispatched from the server or client.
- * Components listen for this event to update the notification bell.
- */
 export interface NotificationEvent {
   type: NotificationType;
   title: string;

@@ -11,8 +11,6 @@ import {
   updateProjectCompletion,
   createSystemLog,
 } from '@/lib/workflow';
-import { NotificationType } from '@/types/notifications';
-import { notifyUsers } from '@/lib/notifications';
 
 // GET /api/tasks/[id]
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
@@ -85,26 +83,6 @@ export const PATCH = withAuth(async (req: NextRequest, ctx, { user }) => {
     return NextResponse.json({ success: false, error: 'Update failed' }, { status: 500 });
   }
 
-  // Helper to extract user ID from populated or raw assignedUser field
-  const extractUserId = (assigned: unknown): string | null => {
-    if (!assigned) return null;
-    if (typeof assigned === 'object' && assigned !== null) {
-      const obj = assigned as Record<string, unknown>;
-      if (obj._id && typeof (obj._id as { toString?: () => string }).toString === 'function') {
-        return (obj._id as { toString(): string }).toString();
-      }
-      if (typeof obj._id === 'string') return obj._id;
-      if (typeof (obj as { toString?: () => string }).toString === 'function') {
-        return (obj as { toString(): string }).toString();
-      }
-    }
-    if (typeof assigned === 'string') return assigned;
-    if (typeof (assigned as { toString?: () => string }).toString === 'function') {
-      return (assigned as { toString(): string }).toString();
-    }
-    return null;
-  };
-
   if (parsed.data.status && parsed.data.status !== oldStatus) {
     await createSystemLog({
       taskId: id,
@@ -120,49 +98,6 @@ export const PATCH = withAuth(async (req: NextRequest, ctx, { user }) => {
       await updateProjectCompletion(task.projectId.toString());
     }
 
-    // Fire-and-forget: rich push + in-app notification to assigned user about status change
-    const statusChangeAssigneeId = extractUserId(updated.assignedUser);
-    if (statusChangeAssigneeId) {
-      const projectTitle = updated.projectId && typeof updated.projectId === 'object' && 'projectTitle' in updated.projectId
-        ? (updated.projectId as unknown as { projectTitle: string }).projectTitle || 'Project'
-        : 'Project';
-
-      await notifyUsers({
-        type: NotificationType.TASK_STATUS_CHANGED,
-        title: `📋 Task Status Changed: ${updated.title}`,
-        body: `"${updated.title}" in "${projectTitle}" changed from "${oldStatus}" to "${parsed.data.status}" by ${user.name}.`,
-        link: task.projectId ? `/tasks/${id}` : '/tasks',
-        userIds: [statusChangeAssigneeId],
-        metadata: {
-          taskId: id,
-          oldStatus,
-          newStatus: parsed.data.status,
-          projectTitle,
-        },
-      });
-    }
-  }
-
-  const oldAssignedUserId = extractUserId(task.assignedUser);
-  const newAssignedUserId = extractUserId(updated.assignedUser);
-
-  if (newAssignedUserId && oldAssignedUserId !== newAssignedUserId) {
-    const projectTitle = updated.projectId && typeof updated.projectId === 'object' && 'projectTitle' in updated.projectId
-      ? (updated.projectId as unknown as { projectTitle: string }).projectTitle || 'Project'
-      : 'Project';
-
-    // Fire-and-forget: rich push + in-app notification to newly assigned user
-    await notifyUsers({
-      type: NotificationType.TASK_ASSIGNED,
-      title: `👤 Task Assigned: ${updated.title}`,
-      body: `You have been assigned task "${updated.title}" in project "${projectTitle}".`,
-      link: task.projectId ? `/tasks/${id}` : '/tasks',
-      userIds: [newAssignedUserId],
-      metadata: {
-        taskId: id,
-        projectTitle,
-      },
-    });
   }
 
   if (parsed.data.files || parsed.data.imageAttachments || parsed.data.attachments) {

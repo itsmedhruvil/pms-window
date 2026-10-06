@@ -8,8 +8,6 @@
  * Data is cached globally, deduplicated across components, and
  * auto-refreshes on focus/reconnect.
  *
- * Also includes in-app notification dispatching after successful mutations.
- *
  * ── Optimistic Updates ───────────────────────────────────────────────────
  * To make AJAX updates instant, all mutations use `populateCache` to
  * immediately update the SWR cache with the server response, skipping
@@ -20,8 +18,6 @@
 import useSWR, { SWRConfiguration, mutate as swrMutate } from 'swr';
 import useSWRMutation from 'swr/mutation';
 import { apiFetch } from '@/lib/utils';
-import { dispatchNotification } from '@/hooks/useInAppNotifications';
-import { NotificationType } from '@/types/notifications';
 import type { IComment, PaginatedResponse } from '@/types';
 
 // ── Generic fetcher ──────────────────────────────────────────────────────────
@@ -210,18 +206,6 @@ export function useCreateTask() {
       populateCache: true,
       revalidate: false,
       rollbackOnError: true,
-      onSuccess: (data: any) => {
-        // Trigger in-app notification
-        if (data) {
-          dispatchNotification({
-            type: NotificationType.TASK_STATUS_CHANGED,
-            title: '📋 New Task Created',
-            body: `Task "${data.title || 'New Task'}" has been created.`,
-            link: data._id ? `/tasks/${data._id}` : '/tasks',
-            metadata: { taskId: data._id },
-          });
-        }
-      },
     }
   );
 }
@@ -238,23 +222,6 @@ export function useCreateAlert() {
       populateCache: true,
       revalidate: false,
       rollbackOnError: true,
-      onSuccess: (data: any) => {
-        // In-app notification for alert creation
-        if (data) {
-          const alertTypeLabel = (data.type || '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-          const projectTitle = data.projectId && typeof data.projectId === 'object' && 'projectTitle' in data.projectId
-            ? (data.projectId as any).projectTitle || 'Project'
-            : 'Project';
-
-          dispatchNotification({
-            type: NotificationType.ALERT_CREATED,
-            title: `🚨 ${alertTypeLabel} Alert Raised`,
-            body: `Alert in "${projectTitle}": ${data.message?.slice(0, 150) || 'No details'}`,
-            link: '/alerts',
-            metadata: { alertId: data._id, projectId: typeof data.projectId === 'object' ? data.projectId?._id : data.projectId },
-          });
-        }
-      },
     }
   );
 }
@@ -273,24 +240,6 @@ export function useUpdateAlert() {
       populateCache: true,
       revalidate: false,
       rollbackOnError: true,
-      onSuccess: (data: any, key: string, config: any) => {
-        const arg = config?.arg as Record<string, unknown>;
-        const action = arg?.action as string;
-        // In-app notification for alert acknowledge/resolve
-        if (data) {
-          const notificationType = action === 'acknowledge' ? NotificationType.ALERT_ACKNOWLEDGED : NotificationType.ALERT_RESOLVED;
-          const title = action === 'acknowledge' ? '✅ Alert Acknowledged' : '✅ Alert Resolved';
-          const alertTypeLabel = (data.type || '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-
-          dispatchNotification({
-            type: notificationType,
-            title: `${title}: ${alertTypeLabel}`,
-            body: `Alert "${data.type?.replace(/_/g, ' ') || 'Alert'}" was ${action}ed.`,
-            link: '/alerts',
-            metadata: { alertId: data._id },
-          });
-        }
-      },
     }
   );
 }
@@ -307,22 +256,6 @@ export function useCreateComment() {
       populateCache: true,
       revalidate: false,
       rollbackOnError: true,
-      onSuccess: (data: any) => {
-        // If comment has mentions, show notification
-        if (data?.mentions && data.mentions.length > 0) {
-          dispatchNotification({
-            type: NotificationType.COMMENT_MENTION,
-            title: `💬 ${data.author?.name || 'Someone'} mentioned you`,
-            body: `${data.content?.slice(0, 100) || ''}${(data.content?.length || 0) > 100 ? '...' : ''}`,
-            link: data.taskId ? `/tasks/${data.taskId}` : data.discussionId ? '/discussions' : '/',
-            metadata: {
-              taskId: data.taskId,
-              alertId: data.alertId,
-              discussionId: data.discussionId,
-            },
-          });
-        }
-      },
     }
   );
 }
@@ -356,21 +289,6 @@ export function useUpdateTaskStatus() {
           window.dispatchEvent(new CustomEvent('app-data-changed', {
             detail: { entity: 'task', action: 'updated', data },
           }));
-        }
-        // In-app notification
-        if (data) {
-          const projectTitle = data.projectId && typeof data.projectId === 'object' && 'projectTitle' in data.projectId
-            ? (data.projectId as any).projectTitle || 'Project'
-            : 'Project';
-          const status = data.status || 'updated';
-
-          dispatchNotification({
-            type: NotificationType.TASK_STATUS_CHANGED,
-            title: `📋 Task Status Changed: ${data.title || 'Task'}`,
-            body: `"${data.title || 'Task'}" in "${projectTitle}" changed to "${status}".`,
-            link: data._id ? `/tasks/${data._id}` : '/tasks',
-            metadata: { taskId: data._id },
-          });
         }
       },
     }

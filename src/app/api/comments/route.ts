@@ -5,8 +5,6 @@ import UserModel from '@/models/User';
 import DiscussionModel from '@/models/Discussion';
 import { withAuth } from '@/lib/auth';
 import { CreateCommentSchema, PaginationSchema } from '@/lib/validations';
-import { NotificationType } from '@/types/notifications';
-import { notifyUsers } from '@/lib/notifications';
 
 // GET /api/comments?taskId=xxx OR ?alertId=xxx OR ?discussionId=xxx
 export const GET = withAuth(async (req: NextRequest) => {
@@ -88,34 +86,6 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
     isSystemLog: false,
   });
 
-  // Fire-and-forget: push notification via OneSignal for @mentions
-  if (mentionIds.length > 0) {
-    const uniqueMentionIds = mentionIds.filter((id) => id !== user._id.toString());
-    if (uniqueMentionIds.length > 0) {
-      let mentionLink = '/';
-      if (parsed.data.discussionId) {
-        mentionLink = '/discussions';
-      } else if (parsed.data.taskId) {
-        mentionLink = `/tasks/${parsed.data.taskId}`;
-      } else if (parsed.data.alertId) {
-        mentionLink = `/projects`;
-      }
-
-      await notifyUsers({
-        type: NotificationType.COMMENT_MENTION,
-        title: `@${user.name} mentioned you`,
-        body: `${user.name} mentioned you in a comment: ${parsed.data.content.slice(0, 100)}${parsed.data.content.length > 100 ? '...' : ''}`,
-        link: mentionLink,
-        userIds: uniqueMentionIds,
-        metadata: {
-          taskId: parsed.data.taskId,
-          alertId: parsed.data.alertId,
-          discussionId: parsed.data.discussionId,
-        },
-      });
-    }
-  }
-
   // If this is a reply to a discussion, add @mentioned users to the discussion access list + notify participants
   if (parsed.data.discussionId) {
     const discussion = await DiscussionModel.findById(parsed.data.discussionId).lean();
@@ -127,26 +97,6 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
         });
       }
 
-      // Collect participants to notify (starter + mentioned users, minus comment author)
-      const participants = new Set<string>();
-      participants.add(discussion.startedBy.toString());
-      mentionIds.forEach((id) => participants.add(id));
-      participants.delete(user._id.toString());
-
-      // Fire-and-forget: rich push + in-app notification to all participants
-      if (participants.size > 0) {
-        await notifyUsers({
-          type: NotificationType.DISCUSSION_REPLY,
-          title: `New reply in discussion`,
-          body: `${user.name} replied in discussion: ${parsed.data.content.slice(0, 100)}${parsed.data.content.length > 100 ? '...' : ''}`,
-          link: `/discussions`,
-          userIds: Array.from(participants),
-          metadata: {
-            discussionId: parsed.data.discussionId,
-            commentId: comment._id.toString(),
-          },
-        });
-      }
     }
   }
 

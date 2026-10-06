@@ -13,7 +13,7 @@ import { cn, getDepartmentLabel, formatDate, ALERT_TYPE_LABEL, normalizeProjectP
 import {
   ProjectStatusBadge, PriorityBadge, TaskStatusBadge, AlertSeverityBadge
 } from '@/components/ui/badges';
-import { useProjectRealtime } from '@/hooks/useRealtime';
+import { useRealtime } from '@/hooks/useRealtime';
 import { ProjectStatusControl } from '@/components/project/ProjectStatusControl';
 import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
 import { Modal, ConfirmModal } from '@/components/ui/Modal';
@@ -253,7 +253,7 @@ export function ProjectDetail({
     }
   };
 
-  useProjectRealtime(project._id, {
+  useRealtime({
     onTaskUpdated: useCallback((updatedTask: ITask) => {
       setTasks((prev) => prev.map((t) => t._id === updatedTask._id ? updatedTask : t));
     }, []),

@@ -1,6 +1,6 @@
 # Window Manufacturing PMS
 
-Production-grade PMS system for window manufacturing operations. Built with Next.js 14 App Router, MongoDB, Clerk auth, and Pusher realtime.
+Production-grade PMS system for window manufacturing operations. Built with Next.js App Router, MongoDB, Clerk auth, and Firebase Cloud Messaging for push notifications.
 
 ---
 
@@ -33,11 +33,10 @@ src/
 │   ├── task/                     # TaskAssignPanel
 │   └── ui/                       # Badges, Skeletons, Modal, ErrorBoundary
 ├── hooks/
-│   └── useRealtime.ts            # Pusher channel subscriptions
+│   └── useRealtime.ts            # Local UI data-change events
 ├── lib/
 │   ├── auth.ts                   # withAuth() middleware, role guards
 │   ├── db.ts                     # Mongoose connection (cached)
-│   ├── pusher.ts                 # Server + client Pusher helpers
 │   ├── utils.ts                  # cn(), date helpers, style maps
 │   ├── validations.ts            # Zod schemas for all inputs
 │   └── workflow.ts               # Task generation, state engine
@@ -56,7 +55,7 @@ src/
 | npm | 9+ |
 | MongoDB Atlas | Free tier works |
 | Clerk account | Free tier works |
-| Pusher Channels | Sandbox tier works |
+| Firebase | Optional; enables push notifications |
 
 ---
 
@@ -76,19 +75,7 @@ npm install
 cp .env.example .env.local
 ```
 
-Edit `.env.local`:
-
-```env
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-MONGODB_URI=mongodb+srv://...
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-CLERK_WEBHOOK_SECRET=whsec_...
-PUSHER_APP_ID=...
-NEXT_PUBLIC_PUSHER_KEY=...
-PUSHER_SECRET=...
-NEXT_PUBLIC_PUSHER_CLUSTER=ap2
-```
+Configure the required MongoDB, Clerk, and Cloudinary values in `.env.local`. See [.env.example](.env.example) for the full variable list; Firebase values are optional and enable push notifications.
 
 ### 3. Set up Clerk
 
@@ -103,11 +90,11 @@ NEXT_PUBLIC_PUSHER_CLUSTER=ap2
 > `role: "super_admin"` and `department: "office_admin"` on your user document,
 > or set `public_metadata` in Clerk dashboard before signing up.
 
-### 4. Set up Pusher
+### 4. Set up Firebase Cloud Messaging (optional)
 
-1. Create a Channels app at [dashboard.pusher.com](https://dashboard.pusher.com)
-2. Copy App ID, Key, Secret, and Cluster into `.env.local`
-3. Enable client events in Pusher app settings if needed
+1. Create a Firebase project and register a web app.
+2. Copy the web app config and Web Push VAPID key into the `NEXT_PUBLIC_FIREBASE_*` and `NEXT_PUBLIC_FCM_VAPID_KEY` variables in `.env.local`.
+3. To send push notifications from the server, add a Firebase service account to `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`.
 
 ### 5. Run development server
 
@@ -247,25 +234,9 @@ All routes require Clerk authentication. Role restrictions are noted.
 
 ---
 
-## Realtime Events (Pusher)
+## Push Notifications (Firebase Cloud Messaging)
 
-### Channels
-
-| Channel | Used For |
-|---|---|
-| `project-{id}` | Per-project events |
-| `erp-global` | System-wide alerts |
-| `dept-{dept}` | Department-specific (future) |
-
-### Events
-
-| Event | Channel | Payload |
-|---|---|---|
-| `alert_created` | `erp-global` | `{ alertId, projectId, severity, type }` |
-| `alert_updated` | `project-{id}` | Full alert object |
-| `task_updated` | `project-{id}` | Full task object |
-| `project_status_changed` | `project-{id}` | `{ projectId, status, completionPercentage }` |
-| `comment_added` | `project-{id}` | `{ comment, taskId?, alertId? }` |
+The app registers signed-in users' browser FCM tokens and uses Firebase Cloud Messaging for foreground and background push notifications. Server-side delivery requires Firebase Admin credentials; without them, push delivery is skipped. Local UI updates after mutations use browser events and do not depend on a push provider.
 
 ---
 

@@ -10,7 +10,7 @@ import { getDepartmentLabel, formatDate } from '@/lib/utils';
 import {
   TaskStatusBadge
 } from '@/components/ui/badges';
-import { useProjectRealtime } from '@/hooks/useRealtime';
+import { useRealtime } from '@/hooks/useRealtime';
 import type { IProject, ITask } from '@/types';
 import { TaskStatus, Department } from '@/types';
 
@@ -46,7 +46,7 @@ export function WindowDetail({ project, tasks: initialTasks, windowIndex, isAdmi
   const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   // Realtime updates
-  useProjectRealtime(project._id, {
+  useRealtime({
     onTaskUpdated: useCallback((updatedTask: ITask) => {
       setTasks((prev) => prev.map((t) => t._id === updatedTask._id ? updatedTask : t));
     }, []),

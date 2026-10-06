@@ -6,8 +6,6 @@ import { withAuth } from '@/lib/auth';
 import { CreateAlertSchema } from '@/lib/validations';
 import { AlertStatus, UserRole } from '@/types';
 import { applyAlertEffects, createSystemLog } from '@/lib/workflow';
-import { NotificationType } from '@/types/notifications';
-import { notifyUsers } from '@/lib/notifications';
 
 // POST /api/projects/[id]/alert — convenience endpoint to raise alert with projectId in URL
 export const POST = withAuth(
@@ -50,49 +48,6 @@ export const POST = withAuth(
       .populate('raisedBy', 'name email')
       .populate('projectId', 'projectTitle clientName')
       .lean();
-
-    // Fire-and-forget: push notification via OneSignal to affected departments + admins
-    if (populated) {
-      const projectTitle =
-        populated.projectId && typeof populated.projectId === 'object' && 'projectTitle' in populated.projectId
-          ? (populated.projectId as unknown as { projectTitle: string }).projectTitle || 'Project'
-          : 'Project';
-
-      const alertTypeLabel = (parsed.data.type || '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-
-      const UserModel = (await import('@/models/User')).default;
-      const deptUsers = await UserModel.find({
-        department: { $in: parsed.data.affectedDepartments },
-        isActive: true,
-      }).select('_id').lean();
-      const admins = await UserModel.find({
-        role: { $in: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-        isActive: true,
-      }).select('_id').lean();
-
-      const allUserIds = [
-        ...new Set([
-          ...deptUsers.map((u) => u._id.toString()),
-          ...admins.map((a) => a._id.toString()),
-        ]),
-      ];
-
-      if (allUserIds.length > 0) {
-        await notifyUsers({
-          type: NotificationType.ALERT_CREATED,
-          title: `🚨 ${alertTypeLabel} Alert Raised`,
-          body: `Alert in "${projectTitle}": ${populated.message?.slice(0, 150) || 'No details'}`,
-          link: `/projects/${projectId}`,
-          userIds: allUserIds,
-          metadata: {
-            alertId: populated._id.toString(),
-            alertType: parsed.data.type,
-            severity: parsed.data.severity,
-            projectTitle,
-          },
-        });
-      }
-    }
 
     return NextResponse.json({ success: true, data: populated }, { status: 201 });
   },

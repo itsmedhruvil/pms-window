@@ -4,8 +4,6 @@ import AlertModel from '@/models/Alert';
 import { withAuth } from '@/lib/auth';
 import { AlertStatus, UserRole } from '@/types';
 import { resolveAlertEffects, createSystemLog } from '@/lib/workflow';
-import { NotificationType } from '@/types/notifications';
-import { notifyUsers } from '@/lib/notifications';
 import type { IUserDocument } from '@/models/User';
 
 // PATCH /api/alerts/[id] - acknowledge or resolve
@@ -74,27 +72,6 @@ async function patchHandler(
       authorId: user._id.toString(),
     });
 
-    // Fire-and-forget: rich push + in-app notification to admins about acknowledgment
-    const UserModelForNotif = (await import('@/models/User')).default;
-    const adminUsers = await UserModelForNotif.find({
-      role: { $in: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-      isActive: true,
-    }).select('_id').lean();
-    const adminIds = adminUsers.map((a) => a._id.toString());
-    if (adminIds.length > 0) {
-      await notifyUsers({
-        type: NotificationType.ALERT_ACKNOWLEDGED,
-        title: `✅ Alert Acknowledged by ${user.department}`,
-        body: `"${alert.type?.replace(/_/g, ' ') || 'Alert'}" acknowledged by ${user.name} (${user.department})`,
-        link: '/alerts',
-        userIds: adminIds,
-        metadata: {
-          alertId: id,
-          acknowledgedBy: user.name,
-          department: user.department,
-        },
-      });
-    }
   } else if (action === 'resolve') {
     // Only admins can resolve alerts
     if (user.role === UserRole.DEPARTMENT_USER) {
@@ -138,26 +115,6 @@ async function patchHandler(
       authorId: user._id.toString(),
     });
 
-    // Fire-and-forget: rich push + in-app notification to affected departments about resolution
-    const UserModelForResolveNotif = (await import('@/models/User')).default;
-    const affectedDeptUsers = await UserModelForResolveNotif.find({
-      department: { $in: alert.affectedDepartments },
-      isActive: true,
-    }).select('_id').lean();
-    const resolveUserIds = affectedDeptUsers.map((u) => u._id.toString());
-    if (resolveUserIds.length > 0) {
-      await notifyUsers({
-        type: NotificationType.ALERT_RESOLVED,
-        title: `✅ Alert Resolved`,
-        body: `Alert "${alert.type?.replace(/_/g, ' ') || 'Alert'}" resolved by ${user.name}. Workflow restored.`,
-        link: '/alerts',
-        userIds: resolveUserIds,
-        metadata: {
-          alertId: id,
-          resolvedBy: user.name,
-        },
-      });
-    }
   } else {
     return NextResponse.json(
       { success: false, error: 'Invalid action. Use "acknowledge" or "resolve"' },

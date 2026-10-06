@@ -2,9 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import UserModel from '@/models/User';
 import { sendFcmPushToUsers } from '@/lib/firebase-admin';
+import { withAuth } from '@/lib/auth';
+import { UserRole } from '@/types';
 
 // POST /api/test-push - Send a test push notification to all active users
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
+  if (user.role !== UserRole.ADMIN && user.role !== UserRole.SUPER_ADMIN) {
+    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+  }
+
   try {
     await connectDB();
 
@@ -61,4 +67,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

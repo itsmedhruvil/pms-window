@@ -81,7 +81,6 @@
 ✅ src/app/api/projects/[id]/duplicate/route.ts
 ✅ src/app/tasks/manage/page.tsx
 ✅ src/components/TaskManagementClient.tsx
-✅ src/lib/pusher.ts (stub)
 ```
 
 ### Modified Files:

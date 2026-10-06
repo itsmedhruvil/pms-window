@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { NotificationType, type InAppNotification, type NotificationEvent } from '@/types/notifications';
+import { NotificationType, type InAppNotification } from '@/types/notifications';
 import { useUser } from '@clerk/nextjs';
 import { apiFetch } from '@/lib/utils';
 
@@ -175,20 +175,6 @@ export function useInAppNotifications() {
 }
 
 /**
- * Dispatch an in-app notification event.
- * Call this from API routes or client-side code to show a notification.
- */
-export function dispatchNotification(notification: NotificationEvent): void {
-  if (typeof window === 'undefined') return;
-  
-  const event = new CustomEvent('pms-notification', {
-    detail: notification,
-    bubbles: true,
-  });
-  window.dispatchEvent(event);
-}
-
-/**
  * Get the appropriate link for a notification type
  */
 export function getNotificationLink(type: NotificationType, metadata?: Record<string, unknown>): string {
@@ -200,6 +186,8 @@ export function getNotificationLink(type: NotificationType, metadata?: Record<st
     case NotificationType.TASK_ASSIGNED:
     case NotificationType.TASK_STATUS_CHANGED:
       return metadata?.taskId ? `/tasks/${metadata.taskId}` : '/tasks';
+    case NotificationType.TASK_PENDING:
+      return metadata?.isInternal ? '/internal-tasks' : '/tasks';
     case NotificationType.COMMENT_MENTION:
       if (metadata?.taskId) return `/tasks/${metadata.taskId}`;
       if (metadata?.discussionId) return '/discussions';

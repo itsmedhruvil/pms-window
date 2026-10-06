@@ -46,7 +46,7 @@ export function InternalTasksPageClient({
     };
   }, []);
 
-  // Check for overdue tasks every 5 minutes (broadcast)
+  // Check for one daily pending-task summary per user.
   useEffect(() => {
     // Only admin should trigger this to avoid duplicate notifications
     if (!isAdmin) return;
@@ -54,7 +54,7 @@ export function InternalTasksPageClient({
     const checkOverdue = () => {
       apiFetch('/api/notifications', {
         method: 'POST',
-        body: JSON.stringify({ action: 'overdue-check' }),
+        body: JSON.stringify({ action: 'pending-task-check' }),
       }).catch(() => {});
     };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import type { IAlert, ITask, ProjectStatus } from '@/types';
 
 type EventHandlers = {
@@ -12,16 +12,11 @@ type EventHandlers = {
 };
 
 /**
- * Centralized event bus for real-time data across the app.
- * Listens for custom DOM events dispatched by mutation points.
- * This is the actual implementation replacing the previous stub.
+ * Local event bus for refreshing app data after mutations.
  */
-export function useRealtime(channels: string[], handlers: EventHandlers) {
+export function useRealtime(handlers: EventHandlers) {
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
-
-  const stableChannels = channels.join(',');
-  const stableKeys = Object.keys(handlers).join(',');
 
   useEffect(() => {
     const handleDataChange = (e: Event) => {
@@ -58,25 +53,7 @@ export function useRealtime(channels: string[], handlers: EventHandlers) {
 
     window.addEventListener('app-data-changed', handleDataChange);
     return () => window.removeEventListener('app-data-changed', handleDataChange);
-  }, [stableChannels, stableKeys]);
-}
-
-export function useProjectRealtime(projectId: string, handlers: EventHandlers) {
-  const channels = projectId
-    ? [`project-${projectId}`, 'erp-global']
-    : [];
-  return useRealtime(channels, handlers);
-}
-
-export function useGlobalAlerts(onAlertCreated: (alert: IAlert) => void) {
-  return useRealtime(['erp-global'], {
-    onAlertCreated,
-    onAlertUpdated: (alert) => {
-      // Also trigger created callback for updates so the list stays in sync
-      // This helps when alerts are acknowledged/resolved from other pages
-      window.dispatchEvent(new CustomEvent('erp-alert-updated', { detail: alert }));
-    },
-  });
+  }, []);
 }
 
 /**

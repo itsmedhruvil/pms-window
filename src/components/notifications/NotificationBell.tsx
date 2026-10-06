@@ -62,6 +62,11 @@ const NOTIFICATION_ICONS: Record<string, { icon: React.ReactNode; color: string;
     color: 'text-red-600',
     bg: 'bg-red-50',
   },
+  [NotificationType.TASK_PENDING]: {
+    icon: <ClipboardList className="w-4 h-4" />,
+    color: 'text-amber-600',
+    bg: 'bg-amber-50',
+  },
 };
 
 function getNotificationStyle(type: NotificationType) {
