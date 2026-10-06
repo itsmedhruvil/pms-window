@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import DiscussionModel from '@/models/Discussion';
+import DiscussionReadModel from '@/models/DiscussionRead';
 import CommentModel from '@/models/Comment';
-import { withAuth } from '@/lib/auth';
+import { isAdminRole, withAuth } from '@/lib/auth';
 import { UserRole } from '@/types';
 
 // GET /api/discussions/[id]
@@ -113,11 +114,11 @@ export const PUT = withAuth(
 
 // DELETE /api/discussions/[id] - Delete discussion and associated comments
 export const DELETE = withAuth(
-  async (_req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+  async (_req: NextRequest, { params }: { params: Promise<{ id: string }> }, { user }) => {
     await connectDB();
     const { id } = await params;
 
-    const discussion = await DiscussionModel.findByIdAndDelete(id);
+    const discussion = await DiscussionModel.findById(id);
     if (!discussion) {
       return NextResponse.json(
         { success: false, error: 'Discussion not found' },
@@ -125,10 +126,19 @@ export const DELETE = withAuth(
       );
     }
 
-    // Also clean up associated comments
-    await CommentModel.deleteMany({ discussionId: id });
+    if (!isAdminRole(user.role) && discussion.startedBy.toString() !== user._id.toString()) {
+      return NextResponse.json(
+        { success: false, error: 'Only the discussion starter or an admin can delete this discussion' },
+        { status: 403 }
+      );
+    }
+
+    await Promise.all([
+      DiscussionModel.deleteOne({ _id: id }),
+      CommentModel.deleteMany({ discussionId: id }),
+      DiscussionReadModel.deleteMany({ discussionId: id }),
+    ]);
 
     return NextResponse.json({ success: true, data: { id } });
-  },
-  [UserRole.SUPER_ADMIN, UserRole.ADMIN]
+  }
 );

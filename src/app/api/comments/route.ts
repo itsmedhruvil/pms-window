@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import connectDB from '@/lib/db';
 import CommentModel from '@/models/Comment';
 import UserModel from '@/models/User';
@@ -14,6 +15,13 @@ export const GET = withAuth(async (req: NextRequest) => {
   const alertId = req.nextUrl.searchParams.get('alertId');
   const discussionId = req.nextUrl.searchParams.get('discussionId');
   const pagination = PaginationSchema.parse(Object.fromEntries(req.nextUrl.searchParams));
+
+  if (discussionId && !mongoose.Types.ObjectId.isValid(discussionId)) {
+    return NextResponse.json(
+      { success: false, error: 'discussionId must be a valid ID' },
+      { status: 400 }
+    );
+  }
 
   if (!taskId && !alertId && !discussionId) {
     return NextResponse.json(

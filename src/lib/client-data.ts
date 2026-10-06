@@ -117,9 +117,9 @@ export function useDiscussion(id: string) {
  * Fetch comments for a discussion/task/alert.
  * Uses a faster refresh interval so the active chat feels live.
  */
-export function useComments<T = PaginatedResponse<IComment>>(params: Record<string, string>) {
-  const query = new URLSearchParams(params).toString();
-  return useSWR<T>(KEYS.comments(query), fetcher, {
+export function useComments<T = PaginatedResponse<IComment>>(params: Record<string, string> | null) {
+  const query = params ? new URLSearchParams(params).toString() : '';
+  return useSWR<T>(params ? KEYS.comments(query) : null, fetcher, {
     ...defaultConfig,
     refreshInterval: 15000, // Faster polling for active chat
   });

@@ -8,6 +8,7 @@ import {
 import { apiFetch, cn, timeAgo } from '@/lib/utils';
 import type { ReactNode } from 'react';
 import type { IDiscussion, IComment, IUser, IProject, ICommentAttachment } from '@/types';
+import { UserRole } from '@/types';
 import { Modal } from '@/components/ui/Modal';
 import { useDiscussions, useComments } from '@/lib/client-data';
 
@@ -177,7 +178,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
   );
 
   const { data: commentsData, isLoading: loadingComments, mutate: mutateComments } = useComments(
-    activeId ? { discussionId: activeId, limit: '100' } : { discussionId: 'none', limit: '100' }
+    activeId ? { discussionId: activeId, limit: '100' } : null
   );
   const comments = useMemo<IComment[]>(
     () => (commentsData && Array.isArray(commentsData.items) ? commentsData.items : []),
@@ -490,7 +491,9 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
 
   const canModifyDiscussion = (discussion: IDiscussion) => {
     const starter = typeof discussion.startedBy === 'object' ? discussion.startedBy as Partial<IUser> : null;
-    return starter?._id === currentUser._id;
+    return currentUser.role === UserRole.ADMIN
+      || currentUser.role === UserRole.SUPER_ADMIN
+      || starter?._id === currentUser._id;
   };
 
   // ── Filtered discussions for search ──────────────────────────────
