@@ -26,6 +26,14 @@ import { ClientSession } from 'mongoose';
  */
 const LEGACY_BLOCKED_STATUS = 'blocked';
 
+/**
+ * Projects used to support a fifth `dispatched` status. The lifecycle is now
+ * New → In Production → [On Hold] → Completed, so old documents may still carry
+ * the value. It is kept here as a raw string for the legacy cleanup in
+ * `normalizeLegacyProjectStatuses` / `normalizeLegacyProjectStatus`.
+ */
+const LEGACY_DISPATCHED_STATUS = 'dispatched';
+
 async function getWorkflowDepartments() {
   const departments = await getActiveDepartmentNames();
   return departments.length > 0 ? departments : DEPARTMENT_SEQUENCE;
@@ -671,6 +679,34 @@ export async function normalizeLegacyTaskStatus(taskId: string): Promise<void> {
   await TaskModel.collection.updateOne(
     { _id: new Types.ObjectId(taskId), status: LEGACY_BLOCKED_STATUS },
     { $set: { status: TaskStatus.TODO } }
+  );
+}
+
+/**
+ * Legacy data hygiene for projects.
+ *
+ * Any leftover `dispatched` document is normalised back to Completed so it
+ * still renders and can be edited. The raw collection is used because
+ * `dispatched` is no longer a valid `ProjectStatus`.
+ */
+export async function normalizeLegacyProjectStatuses(): Promise<void> {
+  await ProjectModel.collection.updateMany(
+    { status: LEGACY_DISPATCHED_STATUS },
+    { $set: { status: ProjectStatus.COMPLETED } }
+  );
+}
+
+/**
+ * Normalise a single project that may still carry the legacy `dispatched`
+ * status. Uses the `_id` index and matches nothing once the data is clean, so
+ * it is cheap enough to run on every project detail load.
+ */
+export async function normalizeLegacyProjectStatus(projectId: string): Promise<void> {
+  if (!Types.ObjectId.isValid(projectId)) return;
+
+  await ProjectModel.collection.updateOne(
+    { _id: new Types.ObjectId(projectId), status: LEGACY_DISPATCHED_STATUS },
+    { $set: { status: ProjectStatus.COMPLETED } }
   );
 }
 

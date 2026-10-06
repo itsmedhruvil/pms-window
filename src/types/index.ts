@@ -24,7 +24,6 @@ export enum ProjectStatus {
   IN_PRODUCTION = 'in_production',
   ON_HOLD = 'on_hold',
   COMPLETED = 'completed',
-  DISPATCHED = 'dispatched',
 }
 
 export enum FactoryGroup {

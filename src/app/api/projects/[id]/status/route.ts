@@ -18,9 +18,8 @@ const ALLOWED_TRANSITIONS: Partial<Record<ProjectStatus, ProjectStatus[]>> = {
   [ProjectStatus.NEW]: [ProjectStatus.IN_PRODUCTION],
   [ProjectStatus.IN_PRODUCTION]: [ProjectStatus.ON_HOLD, ProjectStatus.COMPLETED],
   [ProjectStatus.ON_HOLD]: [ProjectStatus.IN_PRODUCTION],
-  // A completed project can be dispatched OR moved back into previous production work.
-  [ProjectStatus.COMPLETED]: [ProjectStatus.DISPATCHED, ProjectStatus.IN_PRODUCTION],
-  [ProjectStatus.DISPATCHED]: [ProjectStatus.COMPLETED],
+  // A completed project can be moved back into production to be reworked.
+  [ProjectStatus.COMPLETED]: [ProjectStatus.IN_PRODUCTION],
 };
 
 // POST /api/projects/[id]/status

@@ -135,7 +135,7 @@ Each project auto-generates tasks in this order. Tasks are **dependency-locked**
 ### Project Lifecycle
 
 ```
-New → In Production → [On Hold] → Completed → Dispatched
+New → In Production → [On Hold] → Completed
 ```
 
 - `On Hold` is triggered automatically when any alert becomes `Active`

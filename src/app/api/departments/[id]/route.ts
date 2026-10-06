@@ -3,7 +3,9 @@ import connectDB from '@/lib/db';
 import DepartmentModel from '@/models/Department';
 import UserModel from '@/models/User';
 import TaskModel from '@/models/Task';
+import CommentModel from '@/models/Comment';
 import { withAuth } from '@/lib/auth';
+import { updateProjectCompletion } from '@/lib/workflow';
 import { UserRole, FactoryGroup } from '@/types';
 
 // GET /api/departments/[id]
@@ -86,23 +88,47 @@ export const DELETE = withAuth(
       );
     }
 
-    // Check for tasks in this department
-    const tasksInDept = await TaskModel.countDocuments({ department: deptName });
-    if (tasksInDept > 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Cannot delete "${department.label}": ${tasksInDept} task(s) exist in this department.`,
-        },
-        { status: 400 }
-      );
+    // Tasks in the department are deleted along with it instead of blocking
+    // the delete. They are hard-deleted together with their comments, exactly
+    // like DELETE /api/tasks/[id], and each affected project's completion
+    // percentage is recalculated afterwards.
+    const tasksInDept = await TaskModel.find({ department: deptName })
+      .select('projectId')
+      .lean();
+
+    const affectedProjects = new Set<string>();
+    for (const task of tasksInDept) {
+      if (task.projectId) affectedProjects.add(String(task.projectId));
+    }
+
+    if (tasksInDept.length > 0) {
+      const taskIds = tasksInDept.map((task) => task._id);
+      await CommentModel.deleteMany({ taskId: { $in: taskIds } });
+      await TaskModel.deleteMany({ _id: { $in: taskIds } });
     }
 
     await DepartmentModel.findByIdAndDelete(id);
 
+    // Best-effort: the department and its tasks are already gone, so a failure
+    // to recompute completion must not surface as a failed delete.
+    for (const projectId of affectedProjects) {
+      try {
+        await updateProjectCompletion(projectId);
+      } catch (completionError) {
+        console.error(
+          `[departments] Failed to recompute completion for project ${projectId}:`,
+          completionError
+        );
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      message: `Department "${department.label}" has been deleted.`,
+      message:
+        tasksInDept.length > 0
+          ? `Department "${department.label}" and ${tasksInDept.length} task(s) have been deleted.`
+          : `Department "${department.label}" has been deleted.`,
+      data: { deletedTasks: tasksInDept.length },
     });
   },
   [UserRole.SUPER_ADMIN]

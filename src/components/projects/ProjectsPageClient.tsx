@@ -23,7 +23,6 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: ProjectStatus.IN_PRODUCTION, label: 'In Production' },
   { value: ProjectStatus.ON_HOLD, label: 'On Hold' },
   { value: ProjectStatus.COMPLETED, label: 'Completed' },
-  { value: ProjectStatus.DISPATCHED, label: 'Dispatched' },
 ];
 
 const PRIORITY_OPTIONS: { value: string; label: string }[] = [
@@ -83,7 +82,7 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin, initia
   const currentTabProjects = useMemo(() => {
     if (!isAdmin) return projects;
     const isPreviousProject = (project: IProject) =>
-      project.status === ProjectStatus.COMPLETED || project.status === ProjectStatus.DISPATCHED;
+      project.status === ProjectStatus.COMPLETED;
 
     return activeTab === 'previous'
       ? projects.filter(isPreviousProject)
@@ -275,7 +274,7 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin, initia
                     : 'bg-white text-primary-500 border-primary-200 hover:border-primary-400'
                 )}
               >
-                Active Projects ({projects.filter((project) => project.status !== ProjectStatus.COMPLETED && project.status !== ProjectStatus.DISPATCHED).length})
+                Active Projects ({projects.filter((project) => project.status !== ProjectStatus.COMPLETED).length})
               </button>
               <button
                 type="button"
@@ -287,7 +286,7 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin, initia
                     : 'bg-white text-primary-500 border-primary-200 hover:border-primary-400'
                 )}
               >
-                Previous Work ({projects.filter((project) => project.status === ProjectStatus.COMPLETED || project.status === ProjectStatus.DISPATCHED).length})
+                Previous Work ({projects.filter((project) => project.status === ProjectStatus.COMPLETED).length})
               </button>
             </div>
           )}
@@ -341,8 +340,6 @@ export function ProjectsPageClient({ projects, activeAlertCount, isAdmin, initia
                         ? 'bg-amber-500 text-white border-amber-600'
                         : opt.value === ProjectStatus.COMPLETED
                         ? 'bg-dark-600 text-white border-dark-600'
-                        : opt.value === ProjectStatus.DISPATCHED
-                        ? 'bg-dark-500 text-white border-dark-500'
                         : 'bg-blue-600 text-white border-blue-700'
                       : 'border-primary-200 text-primary-500 hover:border-primary-400'
                   )}

@@ -217,19 +217,31 @@ export function SettingsClient({ initialDepartments, canManage }: SettingsClient
   const deleteDepartment = async (deptId: string) => {
     const dept = departments.find((d) => d._id === deptId);
     if (!dept) return;
-    if (!confirm(`Delete "${dept.label}"? This cannot be undone.`)) return;
+    if (
+      !confirm(
+        `Delete "${dept.label}"?\n\nAny tasks in this department will be deleted too. This cannot be undone.`
+      )
+    )
+      return;
 
     setSavingId(deptId + 'del');
     setError(null);
 
-    const result = await apiFetch(`/api/departments/${deptId}`, { method: 'DELETE' });
+    const result = await apiFetch<{ deletedTasks: number }>(`/api/departments/${deptId}`, {
+      method: 'DELETE',
+    });
 
     setSavingId(null);
 
     if (result.success) {
       setDepartments((prev) => prev.filter((d) => d._id !== deptId));
       notifyDepartmentsChanged();
-      flashSuccess(`"${dept.label}" deleted`);
+      const deletedTasks = result.data?.deletedTasks ?? 0;
+      flashSuccess(
+        deletedTasks > 0
+          ? `"${dept.label}" deleted with ${deletedTasks} task${deletedTasks === 1 ? '' : 's'}`
+          : `"${dept.label}" deleted`
+      );
     } else {
       setError(result.error || 'Failed to delete department');
     }

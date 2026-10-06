@@ -59,7 +59,6 @@ export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   [ProjectStatus.IN_PRODUCTION]: 'In Production',
   [ProjectStatus.ON_HOLD]: 'On Hold',
   [ProjectStatus.COMPLETED]: 'Completed',
-  [ProjectStatus.DISPATCHED]: 'Dispatched',
 };
 
 export const PROJECT_STATUS_STYLE: Record<ProjectStatus, string> = {
@@ -67,7 +66,6 @@ export const PROJECT_STATUS_STYLE: Record<ProjectStatus, string> = {
   [ProjectStatus.IN_PRODUCTION]: 'bg-dark-500 text-white border-dark-500',
   [ProjectStatus.ON_HOLD]: 'bg-red-50 text-red-700 border-red-300',
   [ProjectStatus.COMPLETED]: 'bg-dark-600 text-white border-dark-600',
-  [ProjectStatus.DISPATCHED]: 'bg-primary-200 text-dark-600 border-primary-300',
 };
 
 export const PRIORITY_LABEL: Record<ProjectPriority, string> = {

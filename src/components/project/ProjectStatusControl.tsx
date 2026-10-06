@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Play, CheckCircle2, Truck, AlertTriangle } from 'lucide-react';
+import { Play, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { cn, apiFetch } from '@/lib/utils';
 import { ProjectStatus } from '@/types';
 import type { IProject } from '@/types';
@@ -25,30 +25,17 @@ const TRANSITIONS: Record<ProjectStatus, { to: ProjectStatus; label: string; ico
     icon: <Play className="w-3.5 h-3.5" />,
     style: 'border border-dark-500 text-dark-500 hover:bg-dark-500 hover:text-white',
   },
-  [ProjectStatus.COMPLETED]: {
-    to: ProjectStatus.DISPATCHED,
-    label: 'Mark Dispatched',
-    icon: <Truck className="w-3.5 h-3.5" />,
-    style: 'bg-dark-600 text-white hover:bg-dark-600',
-  },
-  [ProjectStatus.DISPATCHED]: null,
+  // Completed is terminal — nothing ships it anywhere else any more.
+  [ProjectStatus.COMPLETED]: null,
 };
 
-// Secondary actions — e.g. moving a completed project back into prior production work.
+// Secondary actions — e.g. moving a completed project back into production work.
 const EXTRA_TRANSITIONS: Partial<Record<ProjectStatus, Array<{ to: ProjectStatus; label: string; icon: React.ReactNode; style: string }>>> = {
   [ProjectStatus.COMPLETED]: [
     {
-      to: ProjectStatus.DISPATCHED,
-      label: 'Send to Previous Work',
-      icon: <Truck className="w-3.5 h-3.5" />,
-      style: 'border border-primary-300 text-dark-500 hover:bg-primary-50',
-    },
-  ],
-  [ProjectStatus.DISPATCHED]: [
-    {
-      to: ProjectStatus.COMPLETED,
-      label: 'Move to Previous Work',
-      icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+      to: ProjectStatus.IN_PRODUCTION,
+      label: 'Reopen Production',
+      icon: <Play className="w-3.5 h-3.5" />,
       style: 'border border-primary-300 text-dark-500 hover:bg-primary-50',
     },
   ],

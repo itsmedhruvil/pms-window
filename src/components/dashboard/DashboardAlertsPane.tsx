@@ -25,7 +25,6 @@ interface DashboardMetricsData {
     totalActiveProjects: number;
     projectsOnHold: number;
     projectsCompleted: number;
-    projectsDispatched: number;
     overdueProjects: number;
     taskCompletionRate: Record<Department, number>;
     avgTaskCompletionTime: number;

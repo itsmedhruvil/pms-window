@@ -26,7 +26,7 @@ import {
   UserRole,
 } from '@/types';
 import { subDays } from 'date-fns';
-import { ensureDefaultTaskTemplates, normalizeLegacyTaskStatuses, normalizeLegacyTaskStatus } from '@/lib/workflow';
+import { ensureDefaultTaskTemplates, normalizeLegacyTaskStatuses, normalizeLegacyTaskStatus, normalizeLegacyProjectStatuses, normalizeLegacyProjectStatus } from '@/lib/workflow';
 import { getTaskStageFilter } from '@/lib/task-stage-filter';
 
 // ─── Projects ────────────────────────────────────────────────────────────────
@@ -45,6 +45,7 @@ export interface ProjectListFilters {
 
 export async function getProjects(filters: ProjectListFilters = {}) {
   await connectDB();
+  await normalizeLegacyProjectStatuses();
 
   const { status, priority, search, page = 1, limit = 50 } = filters;
   const skip = (page - 1) * limit;
@@ -125,6 +126,7 @@ export async function getProjects(filters: ProjectListFilters = {}) {
 
 export async function getProjectDetail(id: string) {
   await connectDB();
+  await normalizeLegacyProjectStatus(id);
   await normalizeLegacyTaskStatuses(id);
 
   const [project, tasks, alerts] = await Promise.all([
@@ -389,7 +391,7 @@ export async function getDashboardData() {
     ]),
     ProjectModel.countDocuments({
       deadline: { $lt: now },
-      status: { $nin: [ProjectStatus.COMPLETED, ProjectStatus.DISPATCHED] },
+      status: { $nin: [ProjectStatus.COMPLETED] },
     }),
     AlertModel.find({ status: AlertStatus.ACTIVE })
       .populate('projectId', 'projectTitle clientName')
@@ -478,7 +480,6 @@ export async function getDashboardData() {
       totalActiveProjects,
       projectsOnHold: projectStatusMap[ProjectStatus.ON_HOLD] || 0,
       projectsCompleted: projectStatusMap[ProjectStatus.COMPLETED] || 0,
-      projectsDispatched: projectStatusMap[ProjectStatus.DISPATCHED] || 0,
       overdueProjects,
       taskCompletionRate,
       avgTaskCompletionTime,

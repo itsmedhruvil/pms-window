@@ -6,10 +6,12 @@ import AlertModel from '@/models/Alert';
 import { withAuth } from '@/lib/auth';
 import { ProjectStatus, TaskStatus, AlertStatus } from '@/types';
 import type { Department } from '@/types';
+import { normalizeLegacyProjectStatuses } from '@/lib/workflow';
 import { subDays } from 'date-fns';
 
 export const GET = withAuth(async (_req: NextRequest) => {
   await connectDB();
+  await normalizeLegacyProjectStatuses();
 
   const now = new Date();
   const thirtyDaysAgo = subDays(now, 30);
@@ -110,7 +112,7 @@ export const GET = withAuth(async (_req: NextRequest) => {
     ]),
     ProjectModel.countDocuments({
       deadline: { $lt: now },
-      status: { $nin: [ProjectStatus.COMPLETED, ProjectStatus.DISPATCHED] as ProjectStatus[] },
+      status: { $nin: [ProjectStatus.COMPLETED] as ProjectStatus[] },
     }),
     AlertModel.find({ status: AlertStatus.ACTIVE })
       .populate('projectId', 'projectTitle clientName')
@@ -212,7 +214,6 @@ export const GET = withAuth(async (_req: NextRequest) => {
         totalActiveProjects,
         projectsOnHold: projectStatusMap[ProjectStatus.ON_HOLD] || 0,
         projectsCompleted: projectStatusMap[ProjectStatus.COMPLETED] || 0,
-        projectsDispatched: projectStatusMap[ProjectStatus.DISPATCHED] || 0,
         overdueProjects,
         taskCompletionRate,
         avgTaskCompletionTime,
