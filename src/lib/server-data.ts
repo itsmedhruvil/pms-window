@@ -28,6 +28,7 @@ import {
 import { subDays } from 'date-fns';
 import { ensureDefaultTaskTemplates, normalizeLegacyTaskStatuses, normalizeLegacyTaskStatus, normalizeLegacyProjectStatuses, normalizeLegacyProjectStatus } from '@/lib/workflow';
 import { getTaskStageFilter } from '@/lib/task-stage-filter';
+import { applyLiveProjectFilter, getArchivedProjectIds, LIVE_TASKS_LOOKUP_STAGES } from '@/lib/task-archive';
 
 // ─── Projects ────────────────────────────────────────────────────────────────
 
@@ -167,6 +168,12 @@ export interface TaskListFilters {
    * `excludeDone: false` (or an explicit `status`) to include them.
    */
   excludeDone?: boolean;
+  /**
+   * When true (default), tasks of completed (archived) projects are excluded
+   * so task lists only show live work. Pass `includeArchived: true` — or an
+   * explicit `projectId` (project detail view) — to include them.
+   */
+  includeArchived?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -183,6 +190,7 @@ export async function getTasks(filters: TaskListFilters = {}) {
     isAdmin = true,
     limit = 100,
     excludeDone = true,
+    includeArchived = false,
     page,
     pageSize,
   } = filters;
@@ -208,6 +216,12 @@ export async function getTasks(filters: TaskListFilters = {}) {
   if (stage) {
     const stageFilter = getTaskStageFilter(stage);
     if (stageFilter) query.$and = [...((query.$and as unknown[]) || []), stageFilter];
+  }
+
+  // Archive guard — live task lists hide completed-project tasks.
+  // Internal-task-only views (projectId === null) have no project, so skip.
+  if (!includeArchived && projectId !== null) {
+    applyLiveProjectFilter(query, await getArchivedProjectIds());
   }
 
   if (!isAdmin && department) {
@@ -243,11 +257,11 @@ export async function getTasks(filters: TaskListFilters = {}) {
  * pagination without loading every document.
  */
 export async function getTaskCounts(
-  filters: Pick<TaskListFilters, 'department' | 'projectId' | 'assignedUserId' | 'isAdmin' | 'stage'> = {}
+  filters: Pick<TaskListFilters, 'department' | 'projectId' | 'assignedUserId' | 'isAdmin' | 'stage' | 'includeArchived'> = {}
 ): Promise<{ pending: number; done: number; total: number }> {
   await connectDB();
 
-  const { department, projectId, assignedUserId, isAdmin = true, stage } = filters;
+  const { department, projectId, assignedUserId, isAdmin = true, stage, includeArchived = false } = filters;
 
   const baseQuery: Record<string, unknown> = {};
   if (projectId !== undefined) {
@@ -265,6 +279,11 @@ export async function getTaskCounts(
   if (stage) {
     const stageFilter = getTaskStageFilter(stage);
     if (stageFilter) baseQuery.$and = [...((baseQuery.$and as unknown[]) || []), stageFilter];
+  }
+
+  // Same archive guard as getTasks so Pending/Done tabs match the lists.
+  if (!includeArchived && projectId !== null) {
+    applyLiveProjectFilter(baseQuery, await getArchivedProjectIds());
   }
 
   const [pending, done] = await Promise.all([
@@ -350,8 +369,12 @@ export async function getDashboardData() {
   const now = new Date();
   const ninetyDaysAgo = subDays(now, 90);
 
-  // Use $facet to reduce 3 task aggregations into 1 query
+  // Use $facet to reduce 3 task aggregations into 1 query.
+  // Archived (completed-project) tasks are excluded via a projects $lookup
+  // so live dashboards only reflect active work — same rule as task lists.
   const [dashboardData] = await TaskModel.aggregate([
+    ...LIVE_TASKS_LOOKUP_STAGES,
+    { $project: { _archProj: 0 } },
     {
       $facet: {
         tasksByDept: [

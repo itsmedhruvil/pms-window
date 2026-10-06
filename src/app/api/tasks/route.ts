@@ -5,8 +5,12 @@ import { withAuth } from '@/lib/auth';
 import { UserRole } from '@/types';
 import { CreateTaskSchema } from '@/lib/validations';
 import { getTaskStageFilter } from '@/lib/task-stage-filter';
+import { applyLiveProjectFilter, getArchivedProjectIds } from '@/lib/task-archive';
 
 // GET /api/tasks?projectId=xxx&department=xxx&status=xxx&includeDone=true&page=1&limit=100
+// Live-only by default: tasks of completed (archived) projects are excluded
+// unless `includeArchived=true` or an explicit `projectId` is given.
+// Pass includeDone=true (or an explicit status) to also fetch DONE tasks.
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
   await connectDB();
 
@@ -19,6 +23,9 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
   const includeDone =
     req.nextUrl.searchParams.get('includeDone') === 'true' ||
     req.nextUrl.searchParams.get('include_done') === 'true';
+  const includeArchived =
+    req.nextUrl.searchParams.get('includeArchived') === 'true' ||
+    req.nextUrl.searchParams.get('include_archived') === 'true';
   const page = Math.max(1, parseInt(req.nextUrl.searchParams.get('page') || '1', 10));
   const limit = Math.min(200, Math.max(1, parseInt(req.nextUrl.searchParams.get('limit') || '50', 10)));
   const skip = (page - 1) * limit;
@@ -36,6 +43,11 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
   if (stage) {
     const stageFilter = getTaskStageFilter(stage);
     if (stageFilter) query.$and = [...((query.$and as unknown[]) || []), stageFilter];
+  }
+
+  // Archive guard — hide tasks of completed projects from live views.
+  if (!includeArchived) {
+    applyLiveProjectFilter(query, await getArchivedProjectIds());
   }
 
   // Department users only see their dept tasks + either assigned to them or unassigned

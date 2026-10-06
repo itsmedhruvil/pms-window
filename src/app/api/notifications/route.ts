@@ -6,6 +6,7 @@ import { withAuth } from '@/lib/auth';
 import { TaskStatus, UserRole } from '@/types';
 import { NotificationType } from '@/types/notifications';
 import { notifyUsers } from '@/lib/notifications';
+import { getArchivedProjectIds } from '@/lib/task-archive';
 
 // GET /api/notifications — fetch current user's notifications
 export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
@@ -115,9 +116,14 @@ async function checkAndNotifyPendingTasks() {
   const dueSoonLimit = new Date(now);
   dueSoonLimit.setDate(dueSoonLimit.getDate() + 3);
 
+  // Live-only: skip tasks of completed (archived) projects.
+  const archivedIds = await getArchivedProjectIds();
   const pendingTasks = await TaskModel.find({
     status: { $ne: TaskStatus.DONE },
     assignedUser: { $ne: null },
+    ...(archivedIds.length > 0
+      ? { $or: [{ projectId: null }, { projectId: { $nin: archivedIds } }] }
+      : {}),
   })
     .populate('assignedUser', '_id')
     .lean();

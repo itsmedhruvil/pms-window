@@ -216,6 +216,10 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
   const [deleteThread, setDeleteThread] = useState<{ _id: string; title: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Delete message (single chat bubble) confirmation
+  const [deleteMessage, setDeleteMessage] = useState<{ _id: string } | null>(null);
+  const [deletingMessage, setDeletingMessage] = useState(false);
+
   // @mention state
   const [availableUsers, setAvailableUsers] = useState<Partial<IUser>[]>([]);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
@@ -383,6 +387,19 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
       mutateDiscussions();
     } else setError(result.error || 'Failed to delete discussion');
     setDeleting(false);
+  };
+
+  // ── Delete single message ──────────────────────────────────────────
+  const handleDeleteMessageConfirm = async () => {
+    if (!deleteMessage) return;
+    setDeletingMessage(true); setError(null);
+    const result = await apiFetch(`/api/comments/${deleteMessage._id}`, { method: 'DELETE' });
+    if (result.success) {
+      setDeleteMessage(null);
+      mutateComments();
+      mutateDiscussions();
+    } else setError(result.error || 'Failed to delete message');
+    setDeletingMessage(false);
   };
 
   // ── Send message (optimistic) ────────────────────────────────────
@@ -692,13 +709,13 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     }
 
     return (
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col min-h-0 h-full">
         {renderChatHeader()}
 
-        {/* Messages area */}
+        {/* Messages area — only this scrolls; header + composer stay fixed */}
         <div
           ref={messagesRef}
-          className="flex-1 overflow-y-auto px-4 py-4 space-y-1 bg-[#e5ddd5]"
+          className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-1 bg-[#e5ddd5]"
           style={{
             backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(0,0,0,0.03) 1px, transparent 0)',
             backgroundSize: '20px 20px',
@@ -775,12 +792,27 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
 
                         {/* Bubble content */}
                         <div className={cn(
-                          'relative px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap break-words shadow-sm',
+                          'relative px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap break-words shadow-sm group/bubble',
                           isOwn
                             ? 'bg-[#d9fdd3] rounded-lg rounded-tr-none'
                             : 'bg-white rounded-lg rounded-tl-none'
                         )}>
                           {msg.content}
+                          {!isTemp && (author?._id === currentUser._id
+                            || currentUser.role === UserRole.ADMIN
+                            || currentUser.role === UserRole.SUPER_ADMIN) && (
+                            <button
+                              type="button"
+                              onClick={() => setDeleteMessage({ _id: msg._id })}
+                              title="Delete message"
+                              className={cn(
+                                'absolute -top-2 p-1 rounded-full bg-white border border-gray-200 text-primary-400 hover:text-red-600 hover:border-red-300 shadow-sm opacity-0 group-hover/bubble:opacity-100 focus:opacity-100 transition-all',
+                                isOwn ? '-left-2' : '-right-2'
+                              )}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
                           <div className={cn(
                             'flex items-center gap-1 mt-1 float-right ml-2',
                             isOwn ? 'text-[#35a13a]' : 'text-primary-400'
@@ -837,8 +869,8 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
           <div ref={bottomRef} />
         </div>
 
-        {/* Chat input area */}
-        <div className="border-t border-gray-200 px-3 py-2.5 bg-gray-50 relative">
+        {/* Chat input area — sticky to bottom of the chat pane, never scrolls away */}
+        <div className="flex-shrink-0 sticky bottom-0 z-10 border-t border-gray-200 px-3 py-2.5 bg-gray-50 relative shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
           {/* Uploaded files preview */}
           {uploadedFiles.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2 pb-2 border-b border-gray-200">
@@ -920,7 +952,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="flex flex-col bg-white h-[calc(100dvh-3.5rem)] lg:h-[calc(100dvh-5.5rem)] overflow-hidden">
       {/* ── Header ───────────────────────────────────────────── */}
       <div className="bg-white border-b border-primary-200 flex-shrink-0">
         <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
@@ -1036,7 +1068,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
       )}
 
       {/* ── Main two-pane layout ──────────────────────────────── */}
-      <div className="flex-1 min-h-0 flex">
+      <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* Left: Thread list */}
         <div className={cn(
           'w-full lg:w-[360px] xl:w-[400px] flex-shrink-0 border-r border-primary-100 flex flex-col min-h-0',
@@ -1136,6 +1168,42 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
               className="flex items-center gap-2 px-4 py-2 text-[10px] font-mono font-bold uppercase rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 transition-all shadow-sm"
             >
               {deleting ? <><Loader2 className="w-3 h-3 animate-spin" /> Deleting...</> : <><Trash2 className="w-3 h-3" /> Delete</>}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Delete Message Confirmation Modal (sticky to viewport bottom) ── */}
+      <Modal open={!!deleteMessage} onClose={() => { if (!deletingMessage) setDeleteMessage(null); }} size="sm" className="md:mb-0">
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+              <Trash2 className="w-5 h-5 text-red-500" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-dark-500">Delete Message</h2>
+              <p className="text-xs text-primary-500 font-mono">This action cannot be undone</p>
+            </div>
+          </div>
+          <p className="text-xs font-mono text-dark-400 mb-6 bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
+            Are you sure you want to permanently delete this message?
+          </p>
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-primary-200">
+            <button
+              type="button"
+              onClick={() => setDeleteMessage(null)}
+              disabled={deletingMessage}
+              className="px-4 py-2 text-[10px] font-mono font-bold uppercase rounded-lg border border-primary-300 text-dark-400 hover:border-dark-400 hover:text-dark-500 disabled:opacity-40 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteMessageConfirm}
+              disabled={deletingMessage}
+              className="flex items-center gap-2 px-4 py-2 text-[10px] font-mono font-bold uppercase rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 transition-all shadow-sm"
+            >
+              {deletingMessage ? <><Loader2 className="w-3 h-3 animate-spin" /> Deleting...</> : <><Trash2 className="w-3 h-3" /> Delete</>}
             </button>
           </div>
         </div>

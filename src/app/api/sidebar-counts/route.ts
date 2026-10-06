@@ -8,11 +8,17 @@ import CommentModel from '@/models/Comment';
 import ProjectModel from '@/models/Project';
 import { withAuth } from '@/lib/auth';
 import { TaskStatus, AlertStatus, ProjectStatus, UserRole } from '@/types';
+import { getArchivedProjectIds } from '@/lib/task-archive';
 
 export const GET = withAuth(async (_req: NextRequest, _ctx, { user }) => {
   await connectDB();
 
   const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
+  const archivedIds = await getArchivedProjectIds();
+  // Live-only: hide tasks of completed (archived) projects, keep internal tasks.
+  const liveTaskFilter = archivedIds.length > 0
+    ? { $or: [{ projectId: null }, { projectId: { $nin: archivedIds } }] }
+    : {};
 
   // Run all counts in parallel for efficiency
   const [
@@ -50,17 +56,20 @@ export const GET = withAuth(async (_req: NextRequest, _ctx, { user }) => {
       return unread;
     })(),
 
-    // Tasks not done (filter by dept for non-admins) — includes both project and internal tasks
+    // Tasks not done (filter by dept for non-admins) — includes both project and internal tasks.
+    // Live-only: archived (completed-project) tasks are excluded.
     TaskModel.countDocuments({
       ...(isAdmin ? {} : { department: user.department as string }),
       status: { $ne: TaskStatus.DONE },
+      ...liveTaskFilter,
     }),
 
-    // Overdue tasks (not done and past due date)
+    // Overdue tasks (not done and past due date) — live-only.
     TaskModel.countDocuments({
       ...(isAdmin ? {} : { department: user.department as string }),
       status: { $ne: TaskStatus.DONE },
       dueDate: { $lt: new Date(), $ne: null },
+      ...liveTaskFilter,
     }),
 
     // Active projects (new + in_production + on_hold)

@@ -7,6 +7,7 @@ import { withAuth } from '@/lib/auth';
 import { ProjectStatus, TaskStatus, AlertStatus } from '@/types';
 import type { Department } from '@/types';
 import { normalizeLegacyProjectStatuses } from '@/lib/workflow';
+import { LIVE_TASKS_LOOKUP_STAGES } from '@/lib/task-archive';
 import { subDays } from 'date-fns';
 
 export const GET = withAuth(async (_req: NextRequest) => {
@@ -16,8 +17,11 @@ export const GET = withAuth(async (_req: NextRequest) => {
   const now = new Date();
   const thirtyDaysAgo = subDays(now, 30);
 
-  // Use a single $facet aggregation to get all stats in one query
+  // Use a single $facet aggregation to get all stats in one query.
+  // Archived (completed-project) tasks are excluded — same rule as task lists.
   const [dashboardData] = await TaskModel.aggregate([
+    ...LIVE_TASKS_LOOKUP_STAGES,
+    { $project: { _archProj: 0 } },
     {
       $facet: {
         // Task stats per department with completion rates
