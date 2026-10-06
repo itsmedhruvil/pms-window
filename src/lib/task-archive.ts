@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import ProjectModel from '@/models/Project';
 import { ProjectStatus } from '@/types';
 
@@ -38,8 +39,8 @@ export function applyLiveProjectFilter(
   query.$and = and;
 }
 
-/** Aggregation `$match` stage fragment excluding archived project tasks. */
-export const LIVE_TASKS_LOOKUP_STAGES = [
+/** Aggregation stages excluding archived project tasks (typed for Mongoose). */
+export const LIVE_TASKS_LOOKUP_STAGES: mongoose.PipelineStage[] = [
   {
     $lookup: {
       from: 'projects',
@@ -58,4 +59,5 @@ export const LIVE_TASKS_LOOKUP_STAGES = [
       ],
     },
   },
-] as unknown[];
+  { $project: { _archProj: 0 } },
+];

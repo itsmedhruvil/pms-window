@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import useSWR from 'swr';
 import { Send, Bot, Upload, Paperclip, X, Loader2, Download, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import { timeAgo, apiFetch } from '@/lib/utils';
+import { uploadFilesFast } from '@/lib/fast-upload';
 import { dispatchDataChange, useRealtime } from '@/hooks/useRealtime';
 import { invalidateComments } from '@/lib/client-data';
 import { Spinner } from '@/components/ui/spinner';
@@ -35,6 +36,7 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
   const [availableUsers, setAvailableUsers] = useState<Partial<IUser>[]>(propUsers);
   const [uploadedFiles, setUploadedFiles] = useState<ICommentAttachment[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -136,29 +138,18 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
   const handleFileUpload = async (files: FileList | null) => {
     if (!files?.length) return;
     setUploadingFile(true);
-    const newFiles: ICommentAttachment[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-        const uploadData = await uploadRes.json();
-        if (uploadData.success) {
-          newFiles.push({
-            id: `${Date.now()}-${i}`,
-            name: file.name,
-            url: uploadData.data.url,
-            type: file.type,
-            size: file.size,
-            uploadedAt: new Date(),
-          });
-        }
-      } catch {
-        // skip failed
-      }
+    setUploadError(null);
+    // Compresses images + uploads in parallel — old loop sent full-size
+    // phone photos one-by-one and silently dropped failures.
+    const { uploaded, failed } = await uploadFilesFast(files);
+    setUploadedFiles((prev) => [...prev, ...uploaded.map((u) => u.attachment)]);
+    if (failed.length > 0) {
+      setUploadError(
+        failed.length === 1
+          ? failed[0].message
+          : `${failed.length} files failed: ${failed.map((f) => f.message).join(' ')}`
+      );
     }
-    setUploadedFiles((prev) => [...prev, ...newFiles]);
     setUploadingFile(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -265,6 +256,12 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
                 </span>
               ))}
             </div>
+          )}
+
+          {uploadError && (
+            <p className="text-[10px] font-mono text-red-600 bg-red-50 border border-red-200 px-2 py-1.5 mb-2">
+              {uploadError}
+            </p>
           )}
 
           <div className="flex gap-2 items-end">

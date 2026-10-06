@@ -21,7 +21,6 @@ export const GET = withAuth(async (_req: NextRequest) => {
   // Archived (completed-project) tasks are excluded — same rule as task lists.
   const [dashboardData] = await TaskModel.aggregate([
     ...LIVE_TASKS_LOOKUP_STAGES,
-    { $project: { _archProj: 0 } },
     {
       $facet: {
         // Task stats per department with completion rates

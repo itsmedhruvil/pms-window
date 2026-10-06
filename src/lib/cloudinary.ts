@@ -21,6 +21,9 @@ export interface CloudinaryUploadResult {
   createdAt: Date;
 }
 
+/** How long to wait for Cloudinary before failing fast with a clear error. */
+const CLOUDINARY_TIMEOUT_MS = 45_000;
+
 /**
  * Upload a file buffer to Cloudinary.
  * Supports images (jpg, png, gif, webp), PDFs, and other document types.
@@ -40,7 +43,18 @@ export async function uploadToCloudinary(
   const isVideo = ['mp4', 'webm', 'mov'].includes(ext);
   const isPdf = ext === 'pdf';
 
-  return new Promise((resolve, reject) => {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => {
+      reject(
+        new Error(
+          `Upload to Cloudinary timed out after ${CLOUDINARY_TIMEOUT_MS / 1000}s — check connection and retry with a smaller file.`
+        )
+      );
+    }, CLOUDINARY_TIMEOUT_MS);
+  });
+
+  const uploadPromise = new Promise<CloudinaryUploadResult>((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder,
@@ -71,6 +85,12 @@ export async function uploadToCloudinary(
 
     uploadStream.end(fileBuffer);
   });
+
+  try {
+    return await Promise.race([uploadPromise, timeoutPromise]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 }
 
 /**

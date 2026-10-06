@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 
+/** Reject anything bigger — Vercel serverless bodies time out past ~4.5 MB
+ *  on slow networks, and the client compresses images well below this. */
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+
 /**
  * POST /api/upload
  * Upload any file to Cloudinary.
@@ -19,6 +23,16 @@ export const POST = withAuth(async (req: NextRequest) => {
       return NextResponse.json(
         { success: false, error: 'No file provided' },
         { status: 400 }
+      );
+    }
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `File is ${(file.size / 1024 / 1024).toFixed(1)} MB — max 15 MB. Compress the image and retry.`,
+        },
+        { status: 413 }
       );
     }
 
@@ -82,9 +96,15 @@ export const POST = withAuth(async (req: NextRequest) => {
     });
   } catch (error) {
     console.error('Upload error:', error);
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : 'Failed to upload file';
+    // 413 = too large, 504 = upstream (Cloudinary) timeout — keep status honest.
+    const status = /timed out/i.test(message) ? 504 : 500;
     return NextResponse.json(
-      { success: false, error: 'Failed to upload file' },
-      { status: 500 }
+      { success: false, error: message },
+      { status }
     );
   }
 });

@@ -6,6 +6,7 @@ import {
   Download, CheckCheck, Clock, Plus, ArrowLeft,
 } from 'lucide-react';
 import { apiFetch, cn, timeAgo } from '@/lib/utils';
+import { uploadFilesFast } from '@/lib/fast-upload';
 import type { ReactNode } from 'react';
 import type { IDiscussion, IComment, IUser, IProject, ICommentAttachment } from '@/types';
 import { UserRole } from '@/types';
@@ -298,23 +299,18 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
   const handleFileUpload = async (files: FileList | null) => {
     if (!files?.length) return;
     setUploadingFile(true);
-    const newFiles: ICommentAttachment[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-        const uploadData = await uploadRes.json();
-        if (uploadData.success) {
-          newFiles.push({
-            id: `${Date.now()}-${i}`, name: file.name, url: uploadData.data.url,
-            type: file.type, size: file.size, uploadedAt: new Date(),
-          });
-        }
-      } catch { /* skip */ }
+    setError(null);
+    // Compresses images + uploads in parallel — old loop sent full-size
+    // phone photos one-by-one and silently dropped failures.
+    const { uploaded, failed } = await uploadFilesFast(files);
+    setUploadedFiles((prev) => [...prev, ...uploaded.map((u) => u.attachment)]);
+    if (failed.length > 0) {
+      setError(
+        failed.length === 1
+          ? `Upload failed: ${failed[0].message}`
+          : `${failed.length} uploads failed: ${failed.map((f) => f.message).join(' ')}`
+      );
     }
-    setUploadedFiles((prev) => [...prev, ...newFiles]);
     setUploadingFile(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };

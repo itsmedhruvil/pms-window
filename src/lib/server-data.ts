@@ -374,7 +374,6 @@ export async function getDashboardData() {
   // so live dashboards only reflect active work — same rule as task lists.
   const [dashboardData] = await TaskModel.aggregate([
     ...LIVE_TASKS_LOOKUP_STAGES,
-    { $project: { _archProj: 0 } },
     {
       $facet: {
         tasksByDept: [

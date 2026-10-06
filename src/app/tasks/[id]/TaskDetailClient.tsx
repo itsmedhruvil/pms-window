@@ -33,6 +33,7 @@ import { CreateAlertForm } from '@/components/forms/CreateAlertForm';
 import { Modal } from '@/components/ui/Modal';
 import { TaskStatusBadge } from '@/components/ui/badges';
 import { apiFetch, cn, getDepartmentLabel, formatDate, formatDateTime } from '@/lib/utils';
+import { uploadFilesFast } from '@/lib/fast-upload';
 import { IComment, IProject, ITask, IUser, TaskStatus } from '@/types';
 
 interface TaskDetailClientProps {
@@ -41,7 +42,7 @@ interface TaskDetailClientProps {
   canModify: boolean;
 }
 
-const MAX_FILE_SIZE = 20_000_000; // 20 MB for all files
+const MAX_UPLOAD_MB = 15; // must match MAX_UPLOAD_BYTES in /api/upload + fast-upload
 const MAX_FILES = 20;
 
 type TabId = 'comments' | 'files';
@@ -351,41 +352,22 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
 
       const selected = Array.from(files).slice(0, remainingSlots);
 
-      const invalid = selected.find((file) => file.size > MAX_FILE_SIZE);
-      if (invalid) {
-        setUploadError(`Use files under ${Math.round(MAX_FILE_SIZE / 1_000_000)} MB each.`);
-        return;
-      }
+      // Compresses images + uploads in parallel — old loop sent full-size
+      // phone photos one-by-one and failed silently on slow networks.
+      const pid = getProjectId(task);
+      const { uploaded, failed } = await uploadFilesFast(selected, {
+        projectId: typeof pid === 'string' ? pid : undefined,
+      });
 
-      const additions: TaskFileEntry[] = [];
-      const failed: string[] = [];
-
-      for (const file of selected) {
-        try {
-          const formData = new FormData();
-          formData.append('file', file);
-          if (projectId) formData.append('projectId', projectId);
-
-          const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-          const uploadData = await uploadRes.json();
-
-          if (uploadData.success) {
-            additions.push({
-              id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-              name: file.name,
-              url: uploadData.data.url,
-              size: file.size,
-              type: file.type,
-              publicId: uploadData.data.publicId,
-              uploadedAt: new Date(),
-            });
-          } else {
-            failed.push(file.name);
-          }
-        } catch {
-          failed.push(file.name);
-        }
-      }
+      const additions: TaskFileEntry[] = uploaded.map((u) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        name: u.fileName,
+        url: u.attachment.url,
+        size: u.attachment.size,
+        type: u.attachment.type,
+        publicId: u.publicId,
+        uploadedAt: new Date(),
+      }));
 
       if (additions.length > 0) {
         // Always merge against the latest task files so repeat uploads accumulate.
@@ -393,10 +375,11 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
       }
 
       if (failed.length > 0) {
+        const failedNames = failed.map((f) => f.message).join(' ');
         setUploadError(
           additions.length > 0
-            ? `Uploaded ${additions.length} file(s); could not upload: ${failed.join(', ')}`
-            : `Could not upload: ${failed.join(', ')}`
+            ? `Uploaded ${additions.length} file(s); could not upload: ${failedNames}`
+            : `Could not upload: ${failedNames}`
         );
       }
     } catch {
@@ -614,7 +597,7 @@ export function TaskDetailClient({ initialTask, currentUser, canModify }: TaskDe
                       {fileUploading ? 'Uploading...' : 'Click to upload or drag & drop'}
                     </p>
                     <p className="text-[10px] font-mono text-primary-400 mt-1">
-                      Images, PDFs, documents & spreadsheets (max {Math.round(MAX_FILE_SIZE / 1_000_000)} MB each)
+                      Images, PDFs, documents & spreadsheets (max {MAX_UPLOAD_MB} MB each · images auto-compressed)
                     </p>
                   </button>
                 ) : (
