@@ -13,19 +13,12 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
   await connectDB();
 
   const searchParams = req.nextUrl.searchParams;
-  const limit = Math.min(100, parseInt(searchParams.get('limit') || '50', 10));
+  const parsedLimit = parseInt(searchParams.get('limit') || '50', 10);
+  const limit = Math.min(100, Math.max(1, Number.isNaN(parsedLimit) ? 50 : parsedLimit));
   const includeDismissed = searchParams.get('includeDismissed') === 'true';
   const unreadOnly = searchParams.get('unreadOnly') === 'true';
-  const visibleTypes = [
-    NotificationType.TASK_PENDING,
-    NotificationType.PROJECT_CREATED,
-    NotificationType.DISCUSSION_CREATED,
-  ];
 
-  const query: Record<string, unknown> = {
-    userId: user._id,
-    type: { $in: visibleTypes },
-  };
+  const query: Record<string, unknown> = { userId: user._id };
 
   if (!includeDismissed) {
     query.dismissed = false;
@@ -41,7 +34,6 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
 
   const unreadCount = await NotificationModel.countDocuments({
     userId: user._id,
-    type: { $in: visibleTypes },
     read: false,
     dismissed: false,
   });
@@ -64,8 +56,7 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
 
   return NextResponse.json({
     success: true,
-    data: serialized,
-    unreadCount,
+    data: { items: serialized, unreadCount },
   });
 });
 

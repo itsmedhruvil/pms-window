@@ -61,8 +61,13 @@ export const POST = withAuth(async (req: NextRequest) => {
       'text/csv',
     ];
 
-    // Also accept any image/* type since mobile browsers may send unknown formats
-    if (!allowedTypes.includes(file.type) && !file.type.startsWith('image/')) {
+    // Also accept any image/* type since mobile browsers may send unknown
+    // formats, and infer the type from the extension when the browser reports
+    // an empty MIME type (common for phone camera/gallery files).
+    const allowedExtensions =
+      /\.(avif|csv|docx?|gif|heic|heif|jpe?g|pdf|png|svg|txt|webp|xlsx?)$/i;
+    const hasAllowedType = allowedTypes.includes(file.type) || file.type.startsWith('image/');
+    if (!hasAllowedType && !allowedExtensions.test(file.name)) {
       return NextResponse.json(
         { success: false, error: 'Only PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, and image files are allowed' },
         { status: 400 }
@@ -75,7 +80,10 @@ export const POST = withAuth(async (req: NextRequest) => {
 
     // Determine folder based on file type
     const projectFolder = projectId ? `pms/projects/${projectId}` : 'pms';
-    const folder = file.type.startsWith('image/')
+    const isImageFile =
+      file.type.startsWith('image/') ||
+      /\.(avif|gif|heic|heif|jpe?g|png|svg|webp)$/i.test(file.name);
+    const folder = isImageFile
       ? `${projectFolder}/task-images`
       : `${projectFolder}/task-files`;
 

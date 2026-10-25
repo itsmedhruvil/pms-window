@@ -56,22 +56,29 @@ export function getFirebaseMessaging(): Messaging | null {
  * Request notification permission and register the device's FCM token.
  * Sends the token to the server so it can be used for targeted push notifications.
  *
+ * `requestPermission: false` can be used for silent re-registration (e.g. on
+ * app start when the user has already granted permission). Browsers require a
+ * user gesture for the permission prompt, so a first-time enable must come
+ * from a click (see the notification bell).
+ *
  * Returns the FCM token string, or null if permission denied / error.
  */
-export async function requestFcmToken(): Promise<string | null> {
+export async function requestFcmToken(
+  options: { requestPermission?: boolean } = {}
+): Promise<string | null> {
+  const { requestPermission = true } = options;
   try {
-    if (typeof window === 'undefined') return null;
-
-    // Check if notifications are supported
-    if (!('Notification' in window)) {
-      console.warn('[FCM] Notifications not supported in this browser');
+    if (!isPushSupported()) {
+      console.warn('[FCM] Push notifications are not supported in this browser');
       return null;
     }
 
-    // Request permission
-    const permission = await Notification.requestPermission();
+    let permission = Notification.permission;
+    if (permission === 'default' && requestPermission) {
+      permission = await Notification.requestPermission();
+    }
     if (permission !== 'granted') {
-      console.warn('[FCM] Notification permission denied');
+      console.warn('[FCM] Notification permission not granted');
       return null;
     }
 
@@ -81,17 +88,56 @@ export async function requestFcmToken(): Promise<string | null> {
       return null;
     }
 
-    const token = await getToken(msg, { vapidKey: VAPID_KEY });
+    if (!VAPID_KEY) {
+      console.warn('[FCM] NEXT_PUBLIC_FCM_VAPID_KEY is missing');
+      return null;
+    }
+
+    const registration = await registerMessagingServiceWorker();
+    const token = await getToken(msg, {
+      vapidKey: VAPID_KEY,
+      ...(registration ? { serviceWorkerRegistration: registration } : {}),
+    });
+
     if (!token) {
       console.warn('[FCM] No token returned');
       return null;
     }
 
-    console.log('[FCM] Token obtained');
     return token;
   } catch (error) {
     console.error('[FCM] Error getting token:', error);
     return null;
+  }
+}
+
+/** True when this browser can receive web push notifications. */
+export function isPushSupported(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    'Notification' in window &&
+    'serviceWorker' in navigator &&
+    'PushManager' in window
+  );
+}
+
+/** Current notification permission, or 'unsupported'. */
+export function getPushPermission(): NotificationPermission | 'unsupported' {
+  return isPushSupported() ? Notification.permission : 'unsupported';
+}
+
+/**
+ * Register the Firebase messaging service worker explicitly so `getToken`
+ * cannot race the PWA/service-worker install and so the worker is always
+ * scoped to the whole app.
+ */
+async function registerMessagingServiceWorker(): Promise<ServiceWorkerRegistration | undefined> {
+  if (!('serviceWorker' in navigator)) return undefined;
+  try {
+    return await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+  } catch (error) {
+    console.warn('[FCM] Service worker registration failed:', error);
+    return undefined;
   }
 }
 
@@ -118,10 +164,7 @@ export async function removeFcmToken(): Promise<boolean> {
   try {
     const msg = getFirebaseMessaging();
     if (msg) {
-      const currentToken = await getToken(msg, { vapidKey: VAPID_KEY }).catch(() => null);
-      if (currentToken) {
-        await deleteToken(msg);
-      }
+      await deleteToken(msg).catch(() => false);
     }
     // Tell the server to clear the token
     const result = await apiFetch('/api/users/me', {

@@ -5,6 +5,8 @@ import TaskModel from '@/models/Task';
 import UserModel from '@/models/User';
 import { withAuth, canModifyTask } from '@/lib/auth';
 import { createSystemLog } from '@/lib/workflow';
+import { notifyUsers } from '@/lib/notifications';
+import { NotificationType } from '@/types/notifications';
 
 const AssignSchema = z.object({
   userId: z.string().nullable(), // null = unassign
@@ -82,6 +84,28 @@ export const POST = withAuth(async (req: NextRequest, ctx, { user }) => {
   const updated = await TaskModel.findById(id)
     .populate('assignedUser', 'name email department avatar')
     .lean();
+
+  if (userId) {
+    try {
+      await notifyUsers({
+        type: task.projectId
+          ? NotificationType.TASK_ASSIGNED
+          : NotificationType.INTERNAL_TASK_ASSIGNED,
+        title: `Task assigned: ${task.title}`,
+        body: `${user.name} assigned you "${task.title}".`,
+        link: task.projectId ? `/tasks/${id}` : '/internal-tasks',
+        userIds: [userId],
+        excludeUserIds: [user._id.toString()],
+        metadata: {
+          taskId: id,
+          projectId: task.projectId?.toString(),
+          department: task.department,
+        },
+      });
+    } catch (error) {
+      console.error('[tasks/assign] Failed to dispatch notification:', error);
+    }
+  }
 
   return NextResponse.json({ success: true, data: updated });
 });

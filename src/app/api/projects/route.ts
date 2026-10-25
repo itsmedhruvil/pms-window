@@ -184,10 +184,11 @@ export const POST = withAuth(
         if (allUserIds.length > 0) {
           await notifyUsers({
             type: NotificationType.PROJECT_CREATED,
-            title: `📦 New Project: ${populated.projectTitle}`,
+            title: `New Project: ${populated.projectTitle}`,
             body: `"${populated.projectTitle}" was created for client "${populated.clientName}". Tasks have been auto-generated.`,
             link: `/projects/${populated._id}`,
             userIds: allUserIds,
+            excludeUserIds: [user._id.toString()],
             metadata: {
               projectId: populated._id.toString(),
               projectTitle: populated.projectTitle,

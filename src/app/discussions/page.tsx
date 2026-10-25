@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -12,7 +13,9 @@ export default async function DiscussionsPage() {
 
   return (
     <AppLayout>
-      <DiscussionsClient currentUser={serialize(user) as unknown as Partial<import('@/types').IUser>} />
+      <Suspense fallback={null}>
+        <DiscussionsClient currentUser={serialize(user) as unknown as Partial<import('@/types').IUser>} />
+      </Suspense>
     </AppLayout>
   );
 }

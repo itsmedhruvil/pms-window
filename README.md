@@ -241,7 +241,26 @@ All routes require Clerk authentication. Role restrictions are noted.
 
 ## Push Notifications (Firebase Cloud Messaging)
 
-The app registers signed-in users' browser FCM tokens and uses Firebase Cloud Messaging for foreground and background push notifications. Server-side delivery requires Firebase Admin credentials; without them, push delivery is skipped. Local UI updates after mutations use browser events and do not depend on a push provider.
+The app stores in-app notifications in MongoDB (the bell) and mirrors them to
+browser push through Firebase Cloud Messaging.
+
+1. Add the Firebase web config + `NEXT_PUBLIC_FCM_VAPID_KEY` to `.env.local`.
+2. Add the Firebase service-account values (`FIREBASE_PROJECT_ID`,
+   `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`) so the server can send push.
+3. Sign in, open the notification bell, and click **Enable** to grant browser
+   permission on that device. Browsers only allow this prompt from a user
+   gesture, so the app never asks automatically on page load.
+
+Notifications are created for project creation, task assignment, new alerts,
+@mentions, discussion replies, and task/alert comments. The bell refreshes on
+foreground push, tab focus, and a low-frequency poll while visible. Without
+Firebase Admin credentials the in-app bell still works; only push is skipped.
+
+### Attachments
+
+Chat and comment composers accept images and documents via the image/paperclip
+buttons, clipboard paste, or drag-and-drop. Images are compressed in the
+browser before upload and attachment-only messages are supported.
 
 ---
 

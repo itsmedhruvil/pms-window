@@ -83,13 +83,24 @@ export const GET = withAuth(async (req: NextRequest, _ctx, { user }) => {
 });
 
 // POST /api/tasks
-export const POST = withAuth(async (req: NextRequest) => {
+export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
   await connectDB();
 
   const body = await req.json();
   const parsed = CreateTaskSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
+  }
+
+  // Department users may only create work for their own department.
+  if (
+    user.role === UserRole.DEPARTMENT_USER &&
+    parsed.data.department !== user.department
+  ) {
+    return NextResponse.json(
+      { success: false, error: 'Cannot create tasks outside your department' },
+      { status: 403 }
+    );
   }
 
   const taskData = {

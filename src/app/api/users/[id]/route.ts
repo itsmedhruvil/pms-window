@@ -12,7 +12,7 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
   await connectDB();
   const { id } = await ctx.params;
 
-  const user = await UserModel.findById(id).select('-__v').lean();
+  const user = await UserModel.findById(id).select('-__v -fcmToken -clerkId').lean();
   if (!user) {
     return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
   }
@@ -76,7 +76,7 @@ export const PATCH = withAuth(
       id,
       { $set: parsed.data },
       { new: true, runValidators: true }
-    ).select('-__v');
+    ).select('-__v -fcmToken');
 
     if (!updated) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
@@ -91,11 +91,12 @@ export const PATCH = withAuth(
       );
     }
 
-    return NextResponse.json({ success: true, data: updated });
+    const safeUser = updated.toObject() as unknown as Record<string, unknown>;
+    delete safeUser.clerkId;
+    return NextResponse.json({ success: true, data: safeUser });
   },
   [UserRole.SUPER_ADMIN, UserRole.ADMIN]
 );
-
 // DELETE /api/users/[id] — soft delete + task unassignment
 export const DELETE = withAuth(
   async (_req: NextRequest, ctx, { user: currentUser }) => {

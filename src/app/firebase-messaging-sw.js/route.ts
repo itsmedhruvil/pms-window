@@ -37,8 +37,22 @@ messaging.onBackgroundMessage((payload) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
-  event.waitUntil(self.clients.openWindow(url));
+  const url = event.notification.data?.url || event.notification.data?.click_action || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.startsWith(self.location.origin)) {
+          client.focus();
+          if ('navigate' in client && client.url !== url) {
+            return client.navigate(url);
+          }
+          return undefined;
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
 });
 `;
 

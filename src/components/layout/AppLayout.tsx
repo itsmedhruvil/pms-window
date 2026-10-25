@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { cn, getDepartmentLabel, apiFetch } from '@/lib/utils';
 import { AlertStatus, UserRole } from '@/types';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { IAlert } from '@/types';
 import { useDepartments } from '@/hooks/useDepartments';
@@ -85,38 +85,45 @@ const Sidebar = memo(function Sidebar({ activeAlertCount = 0 }: { activeAlertCou
   const [counts, setCounts] = useState<Record<string, number>>({});
 
   // Fetch sidebar counts (discussions, pending tasks, alerts, etc.)
+  const refreshCounts = useCallback(() => {
+    apiFetch<Record<string, number>>('/api/sidebar-counts')
+      .then((res) => {
+        if (res.success && res.data) setCounts(res.data as Record<string, number>);
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!isSignedIn) return;
-    const fetchCounts = () => {
-      apiFetch<Record<string, number>>('/api/sidebar-counts')
-        .then((res) => {
-          if (res.success && res.data) setCounts(res.data as Record<string, number>);
-        })
-        .catch(() => {});
-    };
-    fetchCounts();
-    const interval = setInterval(fetchCounts, 30000);
-    return () => clearInterval(interval);
-  }, [isSignedIn]);
 
-  // Re-fetch counts on alert events
-  useEffect(() => {
-    const handleEvent = () => {
-      apiFetch<Record<string, number>>('/api/sidebar-counts')
-        .then((res) => {
-          if (res.success && res.data) setCounts(res.data as Record<string, number>);
-        })
-        .catch(() => {});
+    refreshCounts();
+
+    // Polling stops while the tab is hidden; counts refresh on return/events.
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') refreshCounts();
+    }, 30000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') refreshCounts();
     };
-    window.addEventListener('erp-alert-created', handleEvent);
-    window.addEventListener('erp-alert-resolved', handleEvent);
-    window.addEventListener('erp-alert-deleted', handleEvent);
+
+    const events = [
+      'erp-alert-created',
+      'erp-alert-resolved',
+      'erp-alert-deleted',
+      'erp-task-updated',
+      'app-data-changed',
+      'pms-notification',
+    ];
+    events.forEach((event) => window.addEventListener(event, refreshCounts));
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
-      window.removeEventListener('erp-alert-created', handleEvent);
-      window.removeEventListener('erp-alert-resolved', handleEvent);
-      window.removeEventListener('erp-alert-deleted', handleEvent);
+      clearInterval(interval);
+      events.forEach((event) => window.removeEventListener(event, refreshCounts));
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, []);
+  }, [isSignedIn, refreshCounts]);
 
   /** Get the badge count for a nav item, or null if 0 */
   const getBadgeCount = (label: string): number | null => {
@@ -539,7 +546,7 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
           </Link>
         </div>
         <div className="flex items-center gap-0.5 pt-[env(safe-area-inset-top)]">
-          <NotificationBell serverActiveAlertCount={liveActiveAlertCount} />
+          <NotificationBell />
           <UserButton />
         </div>
       </header>
@@ -589,7 +596,7 @@ function AppLayoutInner({ children, activeAlertCount = 0 }: AppLayoutProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <NotificationBell serverActiveAlertCount={liveActiveAlertCount} />
+            <NotificationBell />
           </div>
         </div>
 
