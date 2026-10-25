@@ -145,10 +145,11 @@ export const POST = withAuth(
           : '';
         await notifyUsers({
           type: NotificationType.DISCUSSION_CREATED,
-          title: `💡 New Discussion: ${populated.title}`,
+          title: `New Discussion: ${populated.title}`,
           body: `${user.name} started a discussion in "${projectInfo}".${descriptionPreview ? ` "${descriptionPreview}"` : ''}`,
-          link: `/discussions`,
+          link: `/discussions?thread=${populated._id.toString()}`,
           userIds: adminIds,
+          excludeUserIds: [user._id.toString()],
           metadata: {
             discussionId: populated._id.toString(),
             projectId,

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   MessageCircle, Send, Loader2, Search, Paperclip, X, Edit3, Trash2,
-  Download, CheckCheck, Clock, Plus, ArrowLeft,
+  Download, CheckCheck, Clock, Plus, ArrowLeft, ImagePlus, UploadCloud,
 } from 'lucide-react';
 import { apiFetch, cn, timeAgo } from '@/lib/utils';
 import { uploadFilesFast } from '@/lib/fast-upload';
@@ -192,8 +193,11 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
   const [error, setError] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<ICommentAttachment[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
 
@@ -255,6 +259,17 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     }
   }, [discussions, activeId]);
 
+  // Deep link support: /discussions?thread=<id> opens that thread directly
+  // (used by notification links), including when already on this page.
+  const searchParams = useSearchParams();
+  const threadParam = searchParams.get('thread');
+  useEffect(() => {
+    if (threadParam) {
+      setActiveId(threadParam);
+      setMobileView('chat');
+    }
+  }, [threadParam]);
+
   // ── Mark as read when active changes ──────────────────────────────
   useEffect(() => {
     if (!activeId) return;
@@ -296,23 +311,51 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
   }, [activeId, mutateComments, mutateDiscussions]);
 
   // ── File upload ──────────────────────────────────────────────────
-  const handleFileUpload = async (files: FileList | null) => {
+  const handleFileUpload = async (files: FileList | File[] | null) => {
     if (!files?.length) return;
     setUploadingFile(true);
+    setAttachmentError(null);
     setError(null);
-    // Compresses images + uploads in parallel — old loop sent full-size
-    // phone photos one-by-one and silently dropped failures.
+    // Compresses images + uploads in parallel, reporting per-file failures
+    // instead of silently dropping them.
     const { uploaded, failed } = await uploadFilesFast(files);
     setUploadedFiles((prev) => [...prev, ...uploaded.map((u) => u.attachment)]);
     if (failed.length > 0) {
-      setError(
+      setAttachmentError(
         failed.length === 1
-          ? `Upload failed: ${failed[0].message}`
-          : `${failed.length} uploads failed: ${failed.map((f) => f.message).join(' ')}`
+          ? failed[0].message
+          : `${failed.length} files failed: ${failed.map((f) => f.message).join(' ')}`
       );
     }
     setUploadingFile(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (imageInputRef.current) imageInputRef.current.value = '';
+  };
+
+  /** Paste screenshots / images straight into the composer. */
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.clipboardData?.files || []);
+    if (files.length === 0) return;
+    e.preventDefault();
+    void handleFileUpload(files);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer?.types.includes('Files')) return;
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer?.files || []);
+    if (files.length > 0) void handleFileUpload(files);
   };
 
   const removeFile = (id: string) => setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
@@ -458,6 +501,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
       }, { revalidate: false });
       setNewMessage('');
       setUploadedFiles([]);
+      setAttachmentError(null);
       setShowMentionDropdown(false);
       // Refresh list (unread counts, last message)
       mutateDiscussions();
@@ -837,7 +881,7 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                                     onClick={() => setPreviewImage({ url: att.url, name: att.name })}
                                     className="border border-gray-200 rounded-lg overflow-hidden hover:border-blue-400 transition-colors shadow-sm"
                                   >
-                                    <img src={att.url} alt={att.name} className="w-24 h-24 object-cover" />
+                                    <img src={att.url} alt={att.name} className="w-24 h-24 object-cover" loading="lazy" decoding="async" />
                                   </button>
                                 ) : (
                                   <a
@@ -866,20 +910,65 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
         </div>
 
         {/* Chat input area — sticky to bottom of the chat pane, never scrolls away */}
-        <div className="flex-shrink-0 sticky bottom-0 z-10 border-t border-gray-200 px-3 py-2.5 bg-gray-50 relative shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
+        <div
+          className={cn(
+            'flex-shrink-0 sticky bottom-0 z-10 border-t px-3 py-2.5 bg-gray-50 relative shadow-[0_-4px_12px_rgba(0,0,0,0.04)] transition-colors',
+            isDragging ? 'border-blue-400 bg-blue-50' : 'border-gray-200'
+          )}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {isDragging && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center gap-2 bg-blue-50/95 border-2 border-dashed border-blue-400 rounded-lg pointer-events-none">
+              <UploadCloud className="w-5 h-5 text-blue-500" />
+              <span className="text-xs font-semibold text-blue-600">Drop images or files to attach</span>
+            </div>
+          )}
+
           {/* Uploaded files preview */}
           {uploadedFiles.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2 pb-2 border-b border-gray-200">
               {uploadedFiles.map((f) => (
-                <span key={f.id} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono bg-white border border-gray-200 rounded-lg text-dark-600 shadow-sm">
-                  <Paperclip className="w-3 h-3" />
-                  <span className="truncate max-w-[80px]">{f.name}</span>
-                  <button type="button" onClick={() => removeFile(f.id)} className="text-primary-400 hover:text-red-500 ml-0.5">
+                <div
+                  key={f.id}
+                  className="relative group/pending inline-flex items-center gap-1.5 p-1 pr-2 text-[10px] font-mono bg-white border border-gray-200 rounded-lg text-dark-600 shadow-sm"
+                >
+                  {f.type.startsWith('image/') ? (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewImage({ url: f.url, name: f.name })}
+                      className="w-8 h-8 rounded overflow-hidden flex-shrink-0"
+                    >
+                      <img src={f.url} alt={f.name} className="w-8 h-8 object-cover" loading="lazy" />
+                    </button>
+                  ) : (
+                    <Paperclip className="w-3.5 h-3.5 ml-1 flex-shrink-0" />
+                  )}
+                  <span className="truncate max-w-[90px]">{f.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(f.id)}
+                    className="text-primary-400 hover:text-red-500 ml-0.5 flex-shrink-0"
+                    aria-label={`Remove ${f.name}`}
+                  >
                     <X className="w-3 h-3" />
                   </button>
-                </span>
+                </div>
               ))}
+              {uploadingFile && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono bg-white border border-dashed border-blue-300 rounded-lg text-blue-600">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Uploading…
+                </span>
+              )}
             </div>
+          )}
+
+          {attachmentError && (
+            <p className="text-[10px] font-mono text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5 mb-2">
+              {attachmentError}
+            </p>
           )}
 
           {/* @mention dropdown */}
@@ -913,29 +1002,49 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
                 rows={1}
                 className="w-full text-[13px] resize-none border border-gray-200 rounded-full px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-primary-400 bg-white"
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                onPaste={handlePaste}
               />
             </div>
             <div className="flex gap-1.5">
               <input
+                ref={imageInputRef}
+                type="file"
+                multiple
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleFileUpload(e.target.files)}
+              />
+              <input
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,image/*"
                 className="hidden"
                 onChange={(e) => handleFileUpload(e.target.files)}
               />
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => imageInputRef.current?.click()}
                 disabled={uploadingFile}
                 className="p-2.5 text-primary-400 hover:text-blue-600 hover:bg-blue-50 rounded-full border border-gray-200 hover:border-blue-300 transition-all disabled:opacity-40 bg-white"
-                title="Attach file"
+                title="Attach a photo"
+                aria-label="Attach a photo"
               >
-                {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+                {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingFile}
+                className="hidden sm:flex p-2.5 text-primary-400 hover:text-blue-600 hover:bg-blue-50 rounded-full border border-gray-200 hover:border-blue-300 transition-all disabled:opacity-40 bg-white"
+                title="Attach a file"
+                aria-label="Attach a file"
+              >
+                <Paperclip className="w-4 h-4" />
               </button>
               <button
                 onClick={handleSend}
-                disabled={sending || (!newMessage.trim() && uploadedFiles.length === 0)}
+                disabled={sending || uploadingFile || (!newMessage.trim() && uploadedFiles.length === 0)}
                 className="p-2.5 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-full transition-all shadow-sm"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

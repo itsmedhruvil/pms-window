@@ -4,6 +4,8 @@ import AlertModel from '@/models/Alert';
 import { withAuth } from '@/lib/auth';
 import { AlertStatus, UserRole } from '@/types';
 import { resolveAlertEffects, createSystemLog } from '@/lib/workflow';
+import { notifyUsers } from '@/lib/notifications';
+import { NotificationType } from '@/types/notifications';
 import type { IUserDocument } from '@/models/User';
 
 // PATCH /api/alerts/[id] - acknowledge or resolve
@@ -72,6 +74,20 @@ async function patchHandler(
       authorId: user._id.toString(),
     });
 
+    try {
+      await notifyUsers({
+        type: NotificationType.ALERT_ACKNOWLEDGED,
+        title: `Alert acknowledged by ${user.name}`,
+        body: alert.message,
+        link: '/alerts',
+        userIds: [alert.raisedBy.toString()],
+        excludeUserIds: [user._id.toString()],
+        metadata: { alertId: id, department: user.department },
+      });
+    } catch (error) {
+      console.error('[alerts] Failed to dispatch acknowledgement notification:', error);
+    }
+
   } else if (action === 'resolve') {
     // Only admins can resolve alerts
     if (user.role === UserRole.DEPARTMENT_USER) {
@@ -114,6 +130,31 @@ async function patchHandler(
       content: `Alert resolved by ${user.name}. Workflow restored.`,
       authorId: user._id.toString(),
     });
+
+    try {
+      const UserModel = (await import('@/models/User')).default;
+      const recipients = await UserModel.find({
+        isActive: true,
+        $or: [
+          { role: { $in: [UserRole.SUPER_ADMIN, UserRole.ADMIN] } },
+          { department: { $in: alert.affectedDepartments } },
+        ],
+      })
+        .select('_id')
+        .lean();
+
+      await notifyUsers({
+        type: NotificationType.ALERT_RESOLVED,
+        title: 'Alert resolved',
+        body: `${user.name} resolved the alert: ${alert.message}`,
+        link: '/alerts',
+        userIds: recipients.map((u) => u._id.toString()),
+        excludeUserIds: [user._id.toString()],
+        metadata: { alertId: id, departments: alert.affectedDepartments },
+      });
+    } catch (error) {
+      console.error('[alerts] Failed to dispatch resolution notification:', error);
+    }
 
   } else {
     return NextResponse.json(

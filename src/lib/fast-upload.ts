@@ -22,6 +22,38 @@ const MAX_DIMENSION = 1600;
 const JPEG_QUALITY = 0.8;
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 
+const EXTENSION_MIME: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  avif: 'image/avif',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  svg: 'image/svg+xml',
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  csv: 'text/csv',
+  txt: 'text/plain',
+};
+
+/**
+ * Some mobile browsers report an empty MIME type for camera/photos. Infer it
+ * from the extension so uploads pass validation and images still render as
+ * images in the chat.
+ */
+export function ensureFileType(file: File): File {
+  if (file.type) return file;
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  const type = EXTENSION_MIME[ext];
+  if (!type) return file;
+  return new File([file], file.name, { type });
+}
+
 function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -44,12 +76,13 @@ function loadImage(file: File): Promise<HTMLImageElement> {
  * - it's already small enough that compression buys nothing (< 400 KB).
  */
 export async function compressImageIfNeeded(file: File): Promise<File> {
-  if (!file.type.startsWith('image/')) return file;
-  if (file.type === 'image/svg+xml' || file.type === 'image/gif') return file;
-  if (file.size < 400 * 1024) return file;
+  const typedFile = ensureFileType(file);
+  if (!typedFile.type.startsWith('image/')) return file;
+  if (typedFile.type === 'image/svg+xml' || typedFile.type === 'image/gif') return file;
+  if (typedFile.size < 400 * 1024) return typedFile;
 
   try {
-    const img = await loadImage(file);
+    const img = await loadImage(typedFile);
     const scale = Math.min(1, MAX_DIMENSION / Math.max(img.width, img.height));
     // Already within bounds but large (e.g. uncompressed PNG) → re-encode only.
     const width = Math.max(1, Math.round(img.width * scale));
@@ -59,25 +92,25 @@ export async function compressImageIfNeeded(file: File): Promise<File> {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return file;
+    if (!ctx) return typedFile;
     // JPEG has no alpha — paint white behind transparent PNGs.
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
     ctx.drawImage(img, 0, 0, width, height);
 
     const outType =
-      file.type === 'image/png' && scale >= 1 ? 'image/png' : 'image/jpeg';
+      typedFile.type === 'image/png' && scale >= 1 ? 'image/png' : 'image/jpeg';
     const blob: Blob | null = await new Promise((resolve) =>
       canvas.toBlob(resolve, outType, JPEG_QUALITY)
     );
-    if (!blob || blob.size >= file.size) return file;
+    if (!blob || blob.size >= typedFile.size) return typedFile;
 
-    const base = file.name.replace(/\.[^.]+$/, '') || 'image';
+    const base = typedFile.name.replace(/\.[^.]+$/, '') || 'image';
     const ext = outType === 'image/png' ? 'png' : 'jpg';
     return new File([blob], `${base}.${ext}`, { type: outType });
   } catch {
     // Compression is best-effort — fall back to the original file.
-    return file;
+    return typedFile;
   }
 }
 
@@ -95,6 +128,31 @@ export interface UploadFailure {
 }
 
 /**
+ * Run async work with a small concurrency limit. Uploading 20 phone photos at
+ * once exhausts mobile memory and the serverless connection pool, so uploads
+ * run three at a time while still being much faster than one-by-one.
+ */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index]);
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
+}
+
+/**
  * Upload files in parallel. Compresses images first, enforces a size cap,
  * and reports per-file failures instead of silently dropping them.
  */
@@ -103,17 +161,16 @@ export async function uploadFilesFast(
   opts: { signal?: AbortSignal; projectId?: string } = {}
 ): Promise<{ uploaded: UploadResult[]; failed: UploadFailure[] }> {
   const list = Array.from(files);
-  const settled = await Promise.all(
-    list.map(async (original): Promise<
-      | { ok: true; value: UploadResult }
-      | { ok: false; value: UploadFailure }
-    > => {
+  const settled = await mapWithConcurrency(list, 3, async (original): Promise<
+    | { ok: true; value: UploadResult }
+    | { ok: false; value: UploadFailure }
+  > => {
       const fail = (message: string) => ({
         ok: false as const,
         value: { fileName: original.name, message },
       });
       try {
-        const file = await compressImageIfNeeded(original);
+        const file = ensureFileType(await compressImageIfNeeded(original));
         if (file.size > MAX_UPLOAD_BYTES) {
           return fail(
             `"${original.name}" is ${(file.size / 1024 / 1024).toFixed(1)} MB — max ${MAX_UPLOAD_BYTES / 1024 / 1024} MB.`
@@ -153,7 +210,7 @@ export async function uploadFilesFast(
               id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
               name: original.name,
               url: data.data.url,
-              type: original.type,
+              type: file.type,
               size: file.size,
               uploadedAt: new Date(),
             },
@@ -167,8 +224,7 @@ export async function uploadFilesFast(
           `"${original.name}" — ${err instanceof Error ? err.message : 'network error, check connection and retry.'}`
         );
       }
-    })
-  );
+  });
 
   return {
     uploaded: settled.filter((s) => s.ok).map((s) => (s as { value: UploadResult }).value),

@@ -1,8 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, X, CheckCheck, ExternalLink, Trash2, AlertTriangle, UserPlus, MessageSquare, ClipboardList, Lightbulb } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { Bell, X, CheckCheck, ExternalLink, Trash2, AlertTriangle, UserPlus, MessageSquare, ClipboardList, Lightbulb, BellRing, BellOff, Loader2 } from 'lucide-react';
 import { useInAppNotifications } from '@/hooks/useInAppNotifications';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { NotificationType } from '@/types/notifications';
 import { cn } from '@/lib/utils';
 
@@ -89,23 +91,17 @@ function timeAgo(date: Date): string {
   return new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
-interface NotificationBellProps {
-  /**
-   * Active alert count from the server (legacy badge count).
-   * The unread notification count is managed internally.
-   */
-  serverActiveAlertCount?: number;
-}
-
-export function NotificationBell({ serverActiveAlertCount = 0 }: NotificationBellProps) {
+export function NotificationBell() {
   const {
     notifications,
     unreadCount,
+    isLoading,
     markAsRead,
     markAllAsRead,
     dismiss,
     clearAll,
   } = useInAppNotifications();
+  const push = usePushNotifications();
 
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -138,7 +134,7 @@ export function NotificationBell({ serverActiveAlertCount = 0 }: NotificationBel
     };
   }, [isOpen]);
 
-  const totalCount = unreadCount + serverActiveAlertCount;
+  const totalCount = unreadCount;
 
   return (
     <div className="relative">
@@ -217,7 +213,12 @@ export function NotificationBell({ serverActiveAlertCount = 0 }: NotificationBel
 
           {/* Notification list */}
           <div className="flex-1 overflow-y-auto">
-            {notifications.length === 0 ? (
+            {isLoading && notifications.length === 0 ? (
+              <div className="px-4 py-8 flex flex-col items-center justify-center gap-2">
+                <Loader2 className="w-5 h-5 text-primary-400 animate-spin" />
+                <p className="text-[10px] font-mono text-primary-400">Loading notifications…</p>
+              </div>
+            ) : notifications.length === 0 ? (
               <div className="px-4 py-8 text-center">
                 <Bell className="w-8 h-8 text-primary-300 mx-auto mb-2" />
                 <p className="text-[10px] font-mono text-primary-400">No notifications</p>
@@ -265,14 +266,14 @@ export function NotificationBell({ serverActiveAlertCount = 0 }: NotificationBel
                             {timeAgo(notification.timestamp)}
                           </span>
                           {notification.link && notification.link !== '/' && (
-                            <a
+                            <Link
                               href={notification.link}
-                              onClick={() => markAsRead(notification.id)}
+                              onClick={() => { void markAsRead(notification.id); setIsOpen(false); }}
                               className="text-[8px] font-mono text-blue-600 hover:text-blue-800 flex items-center gap-0.5"
                             >
                               <ExternalLink className="w-2.5 h-2.5" />
                               Open
-                            </a>
+                            </Link>
                           )}
                         </div>
                       </div>
@@ -303,6 +304,39 @@ export function NotificationBell({ serverActiveAlertCount = 0 }: NotificationBel
                 })}
               </div>
             )}
+          </div>
+
+          {/* Push notification controls */}
+          <div className="px-4 py-2.5 border-t border-primary-200 bg-white flex-shrink-0">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 min-w-0">
+                {push.enabled ? (
+                  <BellRing className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                ) : (
+                  <BellOff className="w-3.5 h-3.5 text-primary-400 flex-shrink-0" />
+                )}
+                <span className="text-[9px] font-mono text-primary-500 truncate">
+                  {!push.supported
+                    ? 'Push not supported on this browser'
+                    : push.denied
+                    ? 'Notifications blocked in browser settings'
+                    : push.enabled
+                    ? 'Push notifications on this device'
+                    : 'Enable push notifications on this device'}
+                </span>
+              </div>
+              {push.supported && !push.denied && (
+                <button
+                  type="button"
+                  onClick={() => (push.enabled ? push.disable() : push.enable())}
+                  disabled={push.busy}
+                  className="text-[9px] font-mono font-bold uppercase tracking-wide px-2 py-1 border border-primary-200 rounded hover:border-dark-500 hover:text-dark-500 disabled:opacity-40 flex items-center gap-1 flex-shrink-0"
+                >
+                  {push.busy && <Loader2 className="w-3 h-3 animate-spin" />}
+                  {push.enabled ? 'Turn off' : 'Enable'}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Footer */}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import useSWR from 'swr';
-import { Send, Bot, Upload, Paperclip, X, Loader2, Download, ExternalLink, Image as ImageIcon } from 'lucide-react';
+import { Send, Bot, ImagePlus, Paperclip, X, Loader2, Download, UploadCloud } from 'lucide-react';
 import { timeAgo, apiFetch } from '@/lib/utils';
 import { uploadFilesFast } from '@/lib/fast-upload';
 import { dispatchDataChange, useRealtime } from '@/hooks/useRealtime';
@@ -26,7 +26,7 @@ function isSameThread(a: IComment[], b: IComment[]) {
   return a.every((comment, i) => comment._id === b[i]._id);
 }
 
-export function CommentThread({ taskId, alertId, availableUsers: propUsers = [], currentUser }: CommentThreadProps) {
+export function CommentThread({ taskId, alertId, availableUsers: propUsers = [] }: CommentThreadProps) {
   const [comments, setComments] = useState<IComment[]>([]);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
@@ -37,10 +37,12 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
   const [uploadedFiles, setUploadedFiles] = useState<ICommentAttachment[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const prevCountRef = useRef(0);
 
   const queryParams = taskId ? `taskId=${taskId}` : `alertId=${alertId}`;
@@ -135,7 +137,7 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
     textareaRef.current?.focus();
   };
 
-  const handleFileUpload = async (files: FileList | null) => {
+  const handleFileUpload = async (files: FileList | File[] | null) => {
     if (!files?.length) return;
     setUploadingFile(true);
     setUploadError(null);
@@ -152,6 +154,33 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
     }
     setUploadingFile(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (imageInputRef.current) imageInputRef.current.value = '';
+  };
+
+  /** Paste a screenshot or copied image directly into the composer. */
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.clipboardData?.files || []);
+    if (files.length === 0) return;
+    e.preventDefault();
+    void handleFileUpload(files);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer?.types.includes('Files')) return;
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer?.files || []);
+    if (files.length > 0) void handleFileUpload(files);
   };
 
   const removeFile = (id: string) => setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
@@ -176,6 +205,7 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
       setContent('');
       setMentions([]);
       setUploadedFiles([]);
+      setUploadError(null);
       // INSTANT: notify other pages of the new comment
       dispatchDataChange('comment', 'added', {
         comment: result.data,
@@ -225,7 +255,18 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
         </div>
 
         {/* Input */}
-        <div className="border-t border-primary-200 p-3 bg-white relative">
+        <div
+          className={`border-t border-primary-200 p-3 bg-white relative transition-colors ${isDragging ? 'bg-blue-50 border-blue-400 border-2 border-dashed' : ''}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {isDragging && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center gap-2 bg-blue-50/95 pointer-events-none">
+              <UploadCloud className="w-5 h-5 text-blue-500" />
+              <span className="text-xs font-semibold text-blue-600">Drop images or files to attach</span>
+            </div>
+          )}
           {showMentionDropdown && filteredUsers.length > 0 && (
             <div className="absolute bottom-full left-3 right-3 mb-1 bg-white border border-primary-200 shadow-lg z-10 max-h-32 overflow-y-auto">
               {filteredUsers.map((user) => (
@@ -245,16 +286,35 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
           {uploadedFiles.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
               {uploadedFiles.map((f) => (
-                <span key={f.id} className="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-mono bg-primary-50 border border-primary-200 text-dark-600">
+                <span key={f.id} className="inline-flex items-center gap-1.5 p-1 pr-2 text-[9px] font-mono bg-primary-50 border border-primary-200 text-dark-600">
                   {f.type.startsWith('image/') ? (
-                    <img src={f.url} alt={f.name} className="w-5 h-5 object-cover rounded" />
+                    <button
+                      type="button"
+                      onClick={() => setPreviewImage({ url: f.url, name: f.name })}
+                      className="w-6 h-6 overflow-hidden"
+                    >
+                      <img src={f.url} alt={f.name} className="w-6 h-6 object-cover" loading="lazy" />
+                    </button>
                   ) : (
-                    <Paperclip className="w-3 h-3" />
+                    <Paperclip className="w-3 h-3 ml-0.5" />
                   )}
-                  {f.name}
-                  <button type="button" onClick={() => removeFile(f.id)} className="text-primary-400 hover:text-red-500"><X className="w-3 h-3" /></button>
+                  <span className="truncate max-w-[110px]">{f.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(f.id)}
+                    className="text-primary-400 hover:text-red-500"
+                    aria-label={`Remove ${f.name}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                 </span>
               ))}
+              {uploadingFile && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-mono border border-dashed border-blue-300 text-blue-600">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Uploading…
+                </span>
+              )}
             </div>
           )}
 
@@ -276,34 +336,54 @@ export function CommentThread({ taskId, alertId, availableUsers: propUsers = [],
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && e.metaKey) handleSubmit();
                 }}
+                onPaste={handlePaste}
               />
             </div>
+            <input
+              ref={imageInputRef}
+              type="file"
+              multiple
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleFileUpload(e.target.files)}
+            />
             <input
               ref={fileInputRef}
               type="file"
               multiple
-              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,image/*"
               className="hidden"
               onChange={(e) => handleFileUpload(e.target.files)}
             />
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => imageInputRef.current?.click()}
               disabled={uploadingFile}
               className="flex-shrink-0 p-2.5 text-primary-400 hover:text-dark-500 border border-primary-200 hover:border-dark-500 transition-colors disabled:opacity-40"
-              title="Attach file"
+              title="Attach an image"
+              aria-label="Attach an image"
             >
-              {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingFile}
+              className="hidden sm:block flex-shrink-0 p-2.5 text-primary-400 hover:text-dark-500 border border-primary-200 hover:border-dark-500 transition-colors disabled:opacity-40"
+              title="Attach a file"
+              aria-label="Attach a file"
+            >
+              <Paperclip className="w-4 h-4" />
             </button>
             <button
               onClick={handleSubmit}
-              disabled={loading || (!content.trim() && uploadedFiles.length === 0)}
+              disabled={loading || uploadingFile || (!content.trim() && uploadedFiles.length === 0)}
               className="flex-shrink-0 p-2.5 bg-dark-500 text-white hover:bg-dark-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
           </div>
-          <p className="text-[10px] text-primary-400 mt-1 font-mono">⌘+Enter to send · @name to mention · Attach files</p>
+          <p className="text-[10px] text-primary-400 mt-1 font-mono">⌘+Enter to send · @name to mention · Paste, drop or attach images</p>
         </div>
       </div>
 
@@ -390,7 +470,7 @@ function CommentItem({ comment, onImagePreview }: { comment: IComment; onImagePr
                       onClick={() => onImagePreview(att.url, att.name)}
                       className="border border-primary-200 hover:border-dark-500 transition-colors overflow-hidden"
                     >
-                      <img src={att.url} alt={att.name} className="w-20 h-20 object-cover" />
+                      <img src={att.url} alt={att.name} className="w-20 h-20 object-cover" loading="lazy" decoding="async" />
                     </button>
                     <div className="flex items-center gap-1 mt-1">
                       <span className="text-[9px] font-mono text-primary-400 truncate max-w-[80px]">{att.name}</span>

@@ -243,7 +243,9 @@ export const CreateCommentSchema = z.object({
   taskId: z.string().optional(),
   alertId: z.string().optional(),
   discussionId: z.string().optional(),
-  content: z.string().min(1, 'Comment cannot be empty'),
+  // Attachment-only messages are valid — the chat UI allows sending an image
+  // or file without typing any text.
+  content: z.string().trim().max(5000).optional().default(''),
   mentions: z.array(z.string()).optional().default([]),
   attachments: z.array(z.object({
     id: z.string(),
@@ -251,11 +253,14 @@ export const CreateCommentSchema = z.object({
     url: z.string(),
     type: z.string(),
     size: z.number(),
-    uploadedAt: z.string().optional(),
+    uploadedAt: z.union([z.string(), z.date()]).optional(),
   })).optional().default([]),
 }).refine(
-  (data) => data.taskId || data.alertId || data.discussionId,
+  (data) => Boolean(data.taskId || data.alertId || data.discussionId),
   { message: 'Comment must belong to a task, alert, or discussion' }
+).refine(
+  (data) => data.content.length > 0 || data.attachments.length > 0,
+  { message: 'Add a message or attach a file', path: ['content'] }
 );
 
 // ============================================================

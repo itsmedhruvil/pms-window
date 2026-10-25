@@ -1,89 +1,85 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { requestFcmToken, registerFcmTokenOnServer, removeFcmToken, onForegroundMessage } from '@/lib/firebase';
 import { NotificationType } from '@/types/notifications';
 
 /**
  * FCM (Firebase Cloud Messaging) provider.
  *
- * Responsibilities:
- * 1. Request notification permission and obtain FCM token on sign-in.
- * 2. Register the token on the server for targeted push notifications.
- * 3. Listen for foreground messages and dispatch them as in-app notifications.
- * 4. Clean up token on sign-out.
+ * The Firebase SDK (~100 KB) is loaded lazily after sign-in so it never blocks
+ * the first paint or the dashboard bundle.
+ *
+ * 1. Silently refreshes the FCM token when the user already granted push
+ *    permission (never prompts automatically — browsers block that).
+ * 2. Re-registers instantly after the user enables push from the bell.
+ * 3. Converts foreground push messages into in-app notification events.
+ * 4. Clears the token on sign-out.
  */
 export default function FCMProvider() {
-  const { isSignedIn, user } = useUser();
-  const setupDone = useRef(false);
+  const { isSignedIn, isLoaded } = useUser();
 
   useEffect(() => {
-    if (!isSignedIn || !user || setupDone.current) return;
-    setupDone.current = true;
+    if (!isLoaded || !isSignedIn) return;
 
-    const setupFcm = async () => {
-      // Request permission and get token
-      const token = await requestFcmToken();
-      if (token) {
-        // Register token on server
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
+    let unregisterPushEnabled: (() => void) | null = null;
+
+    const setup = async () => {
+      const { getPushPermission, onForegroundMessage, registerFcmTokenOnServer, requestFcmToken } =
+        await import('@/lib/firebase');
+      if (cancelled) return;
+
+      const registerIfAllowed = async () => {
+        if (getPushPermission() !== 'granted') return;
+        if (window.localStorage.getItem('pms-push-disabled') === 'true') return;
+
+        // requestPermission: false keeps this silent; the user already opted in.
+        const token = await requestFcmToken({ requestPermission: false });
+        if (cancelled || !token) return;
         await registerFcmTokenOnServer(token);
-        console.log('[FCM] Token registered for user:', user.id);
-      }
+      };
 
-      // Listen for foreground messages
-      const unsubscribe = onForegroundMessage((payload) => {
+      // Foreground messages: refresh the MongoDB-backed bell immediately.
+      unsubscribe = onForegroundMessage((payload) => {
         const notification = payload.notification;
         const data = payload.data || {};
+        if (!notification && !data.title) return;
 
-        if (!notification) return;
-
-        const title = notification.title || 'New Notification';
-        const body = notification.body || '';
-        const link = data.url || data.click_action || '/';
-        const notificationType = data.type || NotificationType.ALERT_CREATED;
-        const icon = data.icon || '🔔';
-        const color = data.color || '#6B7280';
-
-        // Dispatch as in-app notification
-        const inAppEvent = new CustomEvent('pms-notification', {
-          detail: {
-            type: notificationType,
-            title: `${icon} ${title}`,
-            body,
-            link,
-            metadata: {
-              ...data,
-              icon,
-              color,
+        window.dispatchEvent(
+          new CustomEvent('pms-notification', {
+            detail: {
+              type: data.type || NotificationType.ALERT_CREATED,
+              title: notification?.title || data.title || 'New Notification',
+              body: notification?.body || data.body || '',
+              link: data.url || data.click_action || '/',
+              metadata: data,
             },
-          },
-          bubbles: true,
-        });
-        window.dispatchEvent(inAppEvent);
+          })
+        );
       });
 
-      return unsubscribe;
+      void registerIfAllowed();
+      window.addEventListener('pms-push-enabled', registerIfAllowed);
+      unregisterPushEnabled = () => window.removeEventListener('pms-push-enabled', registerIfAllowed);
     };
 
-    let unsubscribe: (() => void) | null = null;
-    setupFcm().then((unsub) => {
-      unsubscribe = unsub;
-    });
+    void setup();
 
     return () => {
-      setupDone.current = false;
-      if (unsubscribe) unsubscribe();
+      cancelled = true;
+      unsubscribe?.();
+      unregisterPushEnabled?.();
     };
-  }, [isSignedIn, user]);
+  }, [isLoaded, isSignedIn]);
 
-  // Clean up token on sign-out
+  // Clear the server-side token when the user signs out.
   useEffect(() => {
-    if (!isSignedIn && setupDone.current) {
-      removeFcmToken().catch(() => {});
-      setupDone.current = false;
+    if (isLoaded && !isSignedIn) {
+      void import('@/lib/firebase').then(({ removeFcmToken }) => removeFcmToken());
     }
-  }, [isSignedIn]);
+  }, [isLoaded, isSignedIn]);
 
   return null;
 }
