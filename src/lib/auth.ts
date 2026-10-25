@@ -127,24 +127,40 @@ export async function getCurrentUser(): Promise<IUserDocument | null> {
     const clerkUser = await auth();
     if (!clerkUser) return null;
 
-    await connectDB();
-    const client = await clerkClient();
     const clerkUserId = clerkUser.userId;
     if (!clerkUserId) {
       return null;
     }
 
+    await connectDB();
+
+    /**
+     * Fast path: the user is already linked in MongoDB.
+     *
+     * This avoids a Clerk Backend API round-trip on every page/API request,
+     * which was adding 100–300ms per request and eating into Clerk's rate
+     * limits. Profile fields are synced at account creation / via the users
+     * API, and role/department already come from the DB (source of truth).
+     * Legacy role casing is normalised here so it is repaired in place.
+     */
+    const linkedUser = await UserModel.findOne({ clerkId: clerkUserId });
+    if (linkedUser) {
+      const normalizedRole = normalizeRole(linkedUser.role);
+      if (normalizedRole !== linkedUser.role) {
+        linkedUser.role = normalizedRole as UserRole;
+        await linkedUser.save();
+      }
+      return linkedUser;
+    }
+
+    // Slow path (first login / freshly invited user): fetch Clerk profile,
+    // link the account or create the JIT database record.
+    const client = await clerkClient();
     let clerkUserData;
     try {
       clerkUserData = await client.users.getUser(clerkUserId);
     } catch (clerkErr) {
-      console.error(`[Auth] Clerk API fetch failed for ${clerkUserId}, falling back to DB user:`, clerkErr);
-
-      // Try to find the user from the MongoDB record using clerkId
-      const dbUser = await UserModel.findOne({ clerkId: clerkUserId }).lean();
-      if (dbUser) return dbUser as unknown as IUserDocument;
-
-      // No DB fallback — user can't be resolved
+      console.error(`[Auth] Clerk API fetch failed for ${clerkUserId}:`, clerkErr);
       return null;
     }
 
