@@ -245,8 +245,12 @@ The app stores in-app notifications in MongoDB (the bell) and mirrors them to
 browser push through Firebase Cloud Messaging.
 
 1. Add the Firebase web config + `NEXT_PUBLIC_FCM_VAPID_KEY` to `.env.local`.
-2. Add the Firebase service-account values (`FIREBASE_PROJECT_ID`,
-   `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`) so the server can send push.
+2. Add Firebase Admin credentials so the server can send push. The easiest
+   option is a single `FIREBASE_SERVICE_ACCOUNT_JSON` variable containing the
+   entire service-account JSON from Firebase Console → Project settings →
+   Service accounts → Generate new private key. Alternatively set
+   `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`.
+   Redeploy after changing environment variables.
 3. Sign in, open the notification bell, and click **Enable** to grant browser
    permission on that device. Browsers only allow this prompt from a user
    gesture, so the app never asks automatically on page load.

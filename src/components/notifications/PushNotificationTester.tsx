@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BellRing, BellOff, CheckCircle2, AlertTriangle, Loader2, Send } from 'lucide-react';
 import { apiFetch, cn } from '@/lib/utils';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -10,6 +10,12 @@ interface TestPushResponse {
   failed: number;
   totalUsers: number;
   message: string;
+}
+
+interface FcmConfigStatus {
+  configured: boolean;
+  source: 'service-account-json' | 'service-account-base64' | 'individual' | 'none';
+  missing: string[];
 }
 
 type Result = { ok: boolean; message: string } | null;
@@ -24,8 +30,21 @@ export function PushNotificationTester() {
   const push = usePushNotifications();
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<Result>(null);
+  const [config, setConfig] = useState<FcmConfigStatus | null>(null);
   const [title, setTitle] = useState('🔔 Test Notification');
   const [body, setBody] = useState('Push notifications are working. This is a test from Unique Arts PMS.');
+
+  useEffect(() => {
+    let mounted = true;
+    apiFetch<FcmConfigStatus>('/api/test-push')
+      .then((res) => {
+        if (mounted && res.success && res.data) setConfig(res.data);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleSend = async () => {
     if (sending) return;
@@ -104,6 +123,29 @@ export function PushNotificationTester() {
           </div>
         </div>
 
+        {config && !config.configured && (
+          <div className="px-4 py-3 border-b border-amber-200 bg-amber-50 text-amber-800">
+            <p className="text-[11px] font-bold">Server push is not configured — test sends will fail.</p>
+            <p className="text-[10px] font-mono mt-1">
+              Missing: {config.missing.length > 0 ? config.missing.join(', ') : 'Firebase Admin credentials'}
+            </p>
+            <p className="text-[10px] font-mono mt-1 leading-relaxed">
+              In Vercel add <code>FIREBASE_SERVICE_ACCOUNT_JSON</code> (paste the whole
+              service-account JSON) or add all three: <code>FIREBASE_PROJECT_ID</code>,{' '}
+              <code>FIREBASE_CLIENT_EMAIL</code>, <code>FIREBASE_PRIVATE_KEY</code>. Then redeploy.
+            </p>
+          </div>
+        )}
+
+        {config?.configured && (
+          <div className="px-4 py-2 border-b border-emerald-200 bg-emerald-50 text-emerald-700 flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-mono">
+              Server credentials configured ({config.source})
+            </span>
+          </div>
+        )}
+
         <div className="p-4 space-y-3">
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="block">
@@ -130,7 +172,7 @@ export function PushNotificationTester() {
             <button
               type="button"
               onClick={handleSend}
-              disabled={sending || !push.supported}
+              disabled={sending || !push.supported || (config !== null && !config.configured)}
               className="inline-flex items-center gap-2 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wide bg-dark-500 text-white hover:bg-dark-600 disabled:opacity-40 transition-colors"
             >
               {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}

@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import UserModel from '@/models/User';
-import { sendFcmPushToUsers, isFcmConfigured } from '@/lib/firebase-admin';
+import { sendFcmPushToUsers, getFcmConfigStatus } from '@/lib/firebase-admin';
 import { withAuth } from '@/lib/auth';
 import { UserRole } from '@/types';
 
-// POST /api/test-push - Send a test push notification to all active users
+// GET /api/test-push - Report server-side push configuration (admin only)
+export const GET = withAuth(
+  async () => {
+    const status = getFcmConfigStatus();
+    return NextResponse.json({ success: true, data: status });
+  },
+  [UserRole.SUPER_ADMIN, UserRole.ADMIN]
+);
+
+// POST /api/test-push - Send a test push notification
 export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
   if (user.role !== UserRole.ADMIN && user.role !== UserRole.SUPER_ADMIN) {
     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
@@ -17,15 +26,18 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
     // Push delivery requires Firebase Admin credentials on the server.
     // Without them, sending is skipped and every token "fails" — surface a
     // clear configuration error instead of a misleading send failure.
-    if (!isFcmConfigured()) {
-      console.error(
-        '[Test Push] Firebase Admin not configured. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY.'
-      );
+    const config = getFcmConfigStatus();
+    if (!config.configured) {
+      const missing = config.missing.length > 0 ? ` Missing: ${config.missing.join(', ')}.` : '';
+      console.error(`[Test Push] Firebase Admin not configured.${missing}`);
       return NextResponse.json(
         {
           success: false,
           error:
-            'Push notifications are disabled: Firebase Admin credentials are not configured on the server (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY).',
+            'Push notifications are disabled: Firebase Admin credentials are not configured on the server.' +
+            missing +
+            ' Add FIREBASE_SERVICE_ACCOUNT_JSON (recommended) or FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY, then redeploy.',
+          data: config,
         },
         { status: 503 }
       );
