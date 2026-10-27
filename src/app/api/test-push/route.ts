@@ -32,23 +32,39 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const title = body.title || '🧪 Test Push Notification';
-    const bodyText = body.body || 'This is a test push notification sent to all users.';
-    const link = body.link || '/';
+    const title = body.title || '🔔 Test Notification';
+    const bodyText = body.body || 'Push notifications are working. This is a test from Unique Arts PMS.';
+    const link = body.link || '/dashboard';
+    const onlyMe = body.onlyMe === true;
 
-    // Fetch all active users with FCM tokens
-    const users = await UserModel.find({
-      isActive: true,
-      fcmToken: { $ne: '', $exists: true },
-    }).select('fcmToken').lean();
+    // Fetch target users with FCM tokens. `onlyMe` avoids spamming the team
+    // while testing a device.
+    const users = onlyMe
+      ? await UserModel.find({
+          _id: user._id,
+          fcmToken: { $nin: ['', null] },
+        })
+          .select('fcmToken')
+          .lean()
+      : await UserModel.find({
+          isActive: true,
+          fcmToken: { $nin: ['', null] },
+        })
+          .select('fcmToken')
+          .lean();
 
     const tokens = users
-      .map((u: { fcmToken?: string }) => u.fcmToken)
-      .filter((t: string | undefined): t is string => Boolean(t));
+      .map((u: { fcmToken?: string | null }) => u.fcmToken)
+      .filter((t: string | null | undefined): t is string => Boolean(t));
 
     if (tokens.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'No users with registered FCM tokens found' },
+        {
+          success: false,
+          error: onlyMe
+            ? 'No push token is registered for your account on this device. Open the notification bell and click "Enable" first.'
+            : 'No users with registered FCM tokens found',
+        },
         { status: 400 }
       );
     }
@@ -71,6 +87,7 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { user }) => {
       data: {
         notificationTitle: title,
         notificationBody: bodyText,
+        onlyMe,
         totalUsers: tokens.length,
         sent: result.success,
         failed: result.failed,

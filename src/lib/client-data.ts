@@ -46,7 +46,6 @@ const KEYS = {
   tasks: (params?: string) => params ? `/api/tasks?${params}` : '/api/tasks',
   task: (id: string) => `/api/tasks/${id}`,
   alerts: (params?: string) => params ? `/api/alerts?${params}` : '/api/alerts',
-  departments: '/api/departments',
   dashboard: '/api/dashboard',
   usersList: '/api/users',
   discussions: (params?: string) => params ? `/api/discussions?${params}` : '/api/discussions',
@@ -77,13 +76,6 @@ export function useTask(id: string) {
 export function useAlerts(params?: Record<string, string>) {
   const query = params ? new URLSearchParams(params).toString() : '';
   return useSWR(KEYS.alerts(query), fetcher, defaultConfig);
-}
-
-export function useDepartments() {
-  return useSWR(KEYS.departments, fetcher, {
-    ...defaultConfig,
-    dedupingInterval: 30000, // Departments change rarely — cache 30s
-  });
 }
 
 export function useDashboard() {

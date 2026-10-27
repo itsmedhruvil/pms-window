@@ -2,6 +2,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SettingsClient } from './SettingsClient';
+import { PushNotificationTester } from '@/components/notifications/PushNotificationTester';
 import { getAlerts, serialize } from '@/lib/server-data';
 import { UserRole, AlertStatus, FactoryGroup } from '@/types';
 import connectDB from '@/lib/db';
@@ -44,6 +45,7 @@ export default async function SettingsPage() {
           factoryGroup: FactoryGroup;
         }>}
       />
+      <PushNotificationTester />
     </AppLayout>
   );
 }

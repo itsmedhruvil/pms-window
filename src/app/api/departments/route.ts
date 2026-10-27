@@ -13,7 +13,11 @@ export const GET = withAuth(async () => {
     .sort({ sequence: 1 })
     .lean();
 
-  return NextResponse.json({ success: true, data: departments });
+  return NextResponse.json(
+    { success: true, data: departments },
+    // Department edits must be visible immediately after create/reorder/delete.
+    { headers: { 'Cache-Control': 'no-store' } }
+  );
 });
 
 // POST /api/departments
