@@ -47,13 +47,37 @@ export default function FCMProvider() {
         const data = payload.data || {};
         if (!notification && !data.title) return;
 
+        const title = notification?.title || data.title || 'New Notification';
+        const body = notification?.body || data.body || '';
+        const link = data.url || data.click_action || '/';
+
+        // FCM does not render a system notification while the app is focused.
+        // Show one explicitly so foreground pushes (and the Settings test)
+        // are actually visible, then refresh the in-app bell.
+        if (
+          typeof Notification !== 'undefined' &&
+          Notification.permission === 'granted' &&
+          'serviceWorker' in navigator
+        ) {
+          navigator.serviceWorker.ready
+            .then((registration) =>
+              registration.showNotification(title, {
+                body,
+                icon: '/icons/icon-192x192.png',
+                badge: '/icons/icon-192x192.png',
+                data: { ...data, url: link },
+              })
+            )
+            .catch((error) => console.warn('[FCM] Foreground notification failed:', error));
+        }
+
         window.dispatchEvent(
           new CustomEvent('pms-notification', {
             detail: {
               type: data.type || NotificationType.ALERT_CREATED,
-              title: notification?.title || data.title || 'New Notification',
-              body: notification?.body || data.body || '',
-              link: data.url || data.click_action || '/',
+              title,
+              body,
+              link,
               metadata: data,
             },
           })
