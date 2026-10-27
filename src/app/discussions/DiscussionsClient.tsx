@@ -421,9 +421,18 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
     setDeleting(true); setError(null);
     const result = await apiFetch(`/api/discussions/${deleteThread._id}`, { method: 'DELETE' });
     if (result.success) {
-      if (activeId === deleteThread._id) setActiveId(null);
+      if (activeId === deleteThread._id) {
+        setActiveId(null);
+        setMobileView('list');
+      }
+      const deletedId = deleteThread._id;
       setDeleteThread(null);
-      mutateDiscussions();
+      // Remove instantly, then revalidate to reconcile with the server.
+      void mutateDiscussions(
+        (current: ExtendedDiscussion[] | undefined) =>
+          Array.isArray(current) ? current.filter((d) => d._id !== deletedId) : current,
+        { revalidate: true }
+      );
     } else setError(result.error || 'Failed to delete discussion');
     setDeleting(false);
   };
@@ -629,55 +638,74 @@ export function DiscussionsClient({ currentUser }: DiscussionsClientProps) {
               : (discussion.description || 'No messages yet');
 
             return (
-              <button
+              <div
                 key={discussion._id}
-                type="button"
-                onClick={() => { setActiveId(discussion._id); setMobileView('chat'); }}
                 className={cn(
-                  'w-full flex items-start gap-3 px-3 py-3 text-left transition-colors border-b border-primary-50',
+                  'relative group border-b border-primary-50',
                   isActive ? 'bg-primary-50' : 'hover:bg-gray-50'
                 )}
               >
-                <div className="relative flex-shrink-0">
-                  <UserAvatar name={startedBy?.name} size="md" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-white" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className={cn(
-                      'text-sm truncate',
-                      unreadCount > 0 ? 'font-bold text-dark-500' : 'font-medium text-dark-500'
-                    )}>
-                      {discussion.title}
-                    </h3>
-                    <span className="text-[10px] font-mono text-primary-400 flex-shrink-0">
-                      {timeAgo(discussion.lastMessageAt || discussion.createdAt)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 mt-0.5">
-                    <p className={cn(
-                      'text-xs truncate flex-1 min-w-0',
-                      unreadCount > 0 ? 'text-dark-600 font-medium' : 'text-primary-500'
-                    )}>
-                      {previewText}
-                    </p>
+                <button
+                  type="button"
+                  onClick={() => { setActiveId(discussion._id); setMobileView('chat'); }}
+                  className="w-full flex items-start gap-3 px-3 py-3 pr-10 text-left transition-colors"
+                >
+                  <div className="relative flex-shrink-0">
+                    <UserAvatar name={startedBy?.name} size="md" />
                     {unreadCount > 0 && (
-                      <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 bg-blue-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
-                        {unreadCount > 99 ? '99+' : unreadCount}
-                      </span>
+                      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-white" />
                     )}
                   </div>
-                  {project?.projectTitle && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[9px] font-medium truncate max-w-[160px]">
-                        {project.projectTitle}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className={cn(
+                        'text-sm truncate',
+                        unreadCount > 0 ? 'font-bold text-dark-500' : 'font-medium text-dark-500'
+                      )}>
+                        {discussion.title}
+                      </h3>
+                      <span className="text-[10px] font-mono text-primary-400 flex-shrink-0">
+                        {timeAgo(discussion.lastMessageAt || discussion.createdAt)}
                       </span>
                     </div>
-                  )}
-                </div>
-              </button>
+                    <div className="flex items-center justify-between gap-2 mt-0.5">
+                      <p className={cn(
+                        'text-xs truncate flex-1 min-w-0',
+                        unreadCount > 0 ? 'text-dark-600 font-medium' : 'text-primary-500'
+                      )}>
+                        {previewText}
+                      </p>
+                      {unreadCount > 0 && (
+                        <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 bg-blue-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
+                      )}
+                    </div>
+                    {project?.projectTitle && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[9px] font-medium truncate max-w-[160px]">
+                          {project.projectTitle}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </button>
+
+                {canModifyDiscussion(discussion) && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteThread({ _id: discussion._id, title: discussion.title });
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-primary-400 hover:text-red-600 hover:bg-red-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                    title="Delete thread"
+                    aria-label={`Delete thread ${discussion.title}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             );
           })
         )}

@@ -250,6 +250,8 @@ browser push through Firebase Cloud Messaging.
 3. Sign in, open the notification bell, and click **Enable** to grant browser
    permission on that device. Browsers only allow this prompt from a user
    gesture, so the app never asks automatically on page load.
+4. Admins can open **Settings → Push Notifications** and click **Send test push**
+   to verify delivery on their own device (only their token is used).
 
 Notifications are created for project creation, task assignment, new alerts,
 @mentions, discussion replies, and task/alert comments. The bell refreshes on
